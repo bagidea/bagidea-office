@@ -3996,6 +3996,32 @@
     e.preventDefault();
     if (e.dataTransfer && e.dataTransfer.files.length) uploadFiles([...e.dataTransfer.files]);
   });
+  // ---- 📋 paste: drop clipboard images/files into the same attach pipeline ----
+  //  Plain-text paste is left untouched — we only intercept when real files exist.
+  document.addEventListener("paste", (e) => {
+    const dt = e.clipboardData;
+    if (!dt) return;
+    const files = [];
+    // Prefer items() — covers screenshots that arrive as a nameless image blob.
+    if (dt.items && dt.items.length) {
+      for (const it of dt.items) {
+        if (it.kind !== "file") continue;
+        const f = it.getAsFile();
+        if (f) files.push(f);
+      }
+    } else if (dt.files && dt.files.length) {
+      for (const f of dt.files) files.push(f);
+    }
+    if (!files.length) return;          // nothing but text — let the browser paste it
+    e.preventDefault();
+    // Pasted screenshots are usually nameless; give them a real, unique filename.
+    const named = files.map((f) => {
+      if (f.name) return f;
+      const ext = (f.type.split("/")[1] || "png").replace("jpeg", "jpg");
+      return new File([f], "pasted-" + Date.now() + "." + ext, { type: f.type });
+    });
+    uploadFiles(named);
+  });
 
   // Media nodes for chat bubbles (uploads + agent-produced files).
   function mediaNode(url, kind, name) {
