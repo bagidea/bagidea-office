@@ -123,11 +123,10 @@ function help() {
   console.log("");
 }
 
+const { findShellExe: _findShell } = require("./find-shell");
+
 function findShellExe() {
-  const isMac = process.platform === "darwin";
-  const name = isMac ? "bagidea-office-shell" : "bagidea-office-shell.exe";
-  const exe = path.join(ROOT, "shell", "target", "release", name);
-  return fs.existsSync(exe) ? exe : null;
+  return _findShell(ROOT);
 }
 
 const NOT_RUNNING = () => bad(`The office isn't running — run ${c.accent}bagidea start${c.reset} first`);
