@@ -124,7 +124,9 @@ function help() {
 }
 
 function findShellExe() {
-  const exe = path.join(ROOT, "shell", "target", "release", "bagidea-office-shell.exe");
+  const isMac = process.platform === "darwin";
+  const name = isMac ? "bagidea-office-shell" : "bagidea-office-shell.exe";
+  const exe = path.join(ROOT, "shell", "target", "release", name);
   return fs.existsSync(exe) ? exe : null;
 }
 
