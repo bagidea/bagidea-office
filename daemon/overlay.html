@@ -1136,6 +1136,22 @@
     "เสียงผู้หญิง": { en: "Female voices", zh: "女声", ja: "女性ボイス" },
     "เสียงผู้ชาย": { en: "Male voices", zh: "男声", ja: "男性ボイス" },
     "อื่นๆ": { en: "Other", zh: "其他", ja: "その他" },
+    "กำลัง": { en: "", zh: "正在", ja: "" },
+    "กำลังใช้": { en: "Using", zh: "正在使用", ja: "使用" },
+    "กำลังใช้ปลั๊กอิน": { en: "Using plugin", zh: "正在使用插件", ja: "プラグイン使用" },
+    "กำลังคิดและวางแผน…": { en: "Thinking & planning…", zh: "正在思考与规划…", ja: "考えて計画中…" },
+    "กำลังรับคำสั่ง…": { en: "Receiving order…", zh: "正在接收指令…", ja: "指示を受け取り中…" },
+    "กำลังเดินมารับคำสั่ง…": { en: "Walking over to receive orders…", zh: "正在走来听候指示…", ja: "指示を受けに来ています…" },
+    "เดินมาส่งสรุปงานแล้ว ↑": { en: "Here with the work summary ↑", zh: "已前来提交工作总结 ↑", ja: "作業サマリーを持って来ました ↑" },
+    "ส่งสรุปงานให้ CEO": { en: "Sends work summary to CEO", zh: "向 CEO 提交工作总结", ja: "CEO に作業サマリーを送信" },
+    "CEO เรียก": { en: "CEO summoned", zh: "CEO 召唤", ja: "CEO が呼び出し" },
+    "เข้ารับคำสั่ง": { en: "to receive orders", zh: "接取指令", ja: "指示を受け取る" },
+    "มอบหมายงานให้": { en: "assigned work to", zh: "分配任务给", ja: "に仕事を割り当て" },
+    "เตือนนัด:": { en: "Reminder:", zh: "日程提醒：", ja: "リマインダー：" },
+    "กำลังทำ %n งาน": { en: "Working on %n tasks", zh: "正在进行 %n 项任务", ja: "%n 件の作業中" },
+    "กำลังทำงาน…": { en: "Working…", zh: "正在运行…", ja: "作業中…" },
+    "ทำงานอยู่…": { en: "Working…", zh: "运行中…", ja: "稼働中…" },
+    "ขอใช้": { en: "Requesting", zh: "请求使用", ja: "リクエスト" },
   };
   function uiLang() {
     try {
@@ -1149,8 +1165,8 @@
   let TR = {};   // thai -> translation for the CURRENT language
   function loadTR() {
     TR = {};
-    for (const [k, v] of Object.entries(DICT)) if (v[LANG]) TR[k] = v[LANG];
     try { Object.assign(TR, JSON.parse(localStorage.getItem("i18n_" + LANG) || "{}")); } catch {}
+    for (const [k, v] of Object.entries(DICT)) if (v[LANG]) TR[k] = v[LANG];
   }
   if (LANG !== "th") loadTR();
   function tr(s) { if (LANG === "th" || !s) return s; return TR[String(s).trim()] || s; }
@@ -1496,7 +1512,7 @@
   function toolLabel(tool) {
     if (!tool) return tr("ทำงานอยู่…");
     const desc = BUILTIN_DESC[tool];
-    if (desc) return tr("กำลัง") + " " + tr(desc.split(" / ")[0]).toLowerCase();
+    if (desc) { const p = tr("กำลัง"); const v = tr(desc).split(" / ")[0].toLowerCase(); return p ? p + " " + v : v; }
     if (tool.startsWith("mcp__")) return tr("กำลังใช้ปลั๊กอิน") + " " + tool.split("__").pop();
     return tr("กำลังใช้") + " " + tool;
   }
@@ -5538,26 +5554,26 @@
     else if (ev.type === "ceo.summon") {
       // Direct feedback in the CEO pane (you just gave the order) — log otherwise.
       if (!ev.replay) {
-        addLog(`👑 CEO เรียก <b>${nameOf("main")}</b> เข้ารับคำสั่ง`);
-        if (target === "ceo") addChip(`👑 <b>${nameOf("main")}</b> กำลังเดินมารับคำสั่ง…`);
+        addLog(`👑 ${tr("CEO เรียก")} <b>${nameOf("main")}</b> ${tr("เข้ารับคำสั่ง")}`);
+        if (target === "ceo") addChip(`👑 <b>${nameOf("main")}</b> ${tr("กำลังเดินมารับคำสั่ง…")}`);
       }
     }
     else if (ev.type === "task.delegated") {
       if (!ev.replay) {
-        addLog(`📋 <b>${nameOf("main")}</b> มอบหมายงานให้ <b>${nameOf(ev.target)}</b>`);
-        if (target === "ceo") addChip(`📋 มอบหมายงานให้ <b>${nameOf(ev.target)}</b>`);
+        addLog(`📋 <b>${nameOf("main")}</b> ${tr("มอบหมายงานให้")} <b>${nameOf(ev.target)}</b>`);
+        if (target === "ceo") addChip(`📋 ${tr("มอบหมายงานให้")} <b>${nameOf(ev.target)}</b>`);
       }
     }
     else if (ev.type === "ceo.report") {
       if (!ev.replay) {
-        addLog(`📨 <b>${nameOf("main")}</b> ส่งสรุปงานให้ CEO`);
-        if (target === "ceo") addChip(`📨 <b>${nameOf("main")}</b> เดินมาส่งสรุปงานแล้ว ↑`);
+        addLog(`📨 <b>${nameOf("main")}</b> ${tr("ส่งสรุปงานให้ CEO")}`);
+        if (target === "ceo") addChip(`📨 <b>${nameOf("main")}</b> ${tr("เดินมาส่งสรุปงานแล้ว ↑")}`);
       }
     }
     else if (ev.type === "reminder") {
       if (!ev.replay) {
-        addChip(`🔔 <b>เตือนนัด:</b> ${String(ev.text).replace(/</g, "&lt;")} (${new Date(ev.at).toLocaleTimeString()})`);
-        addLog(`🔔 เตือนนัด: <b>${String(ev.text).replace(/</g, "&lt;")}</b>`);
+        addChip(`🔔 <b>${tr("เตือนนัด:")}</b> ${String(ev.text).replace(/</g, "&lt;")} (${new Date(ev.at).toLocaleTimeString()})`);
+        addLog(`🔔 ${tr("เตือนนัด:")} <b>${String(ev.text).replace(/</g, "&lt;")}</b>`);
         uiSnd("alert");
       }
     }
