@@ -1,34 +1,34 @@
 {
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"E:\\Projects\\bagidea-ai-agents-office\\daemon\\hook.ps1\" -Type task.started"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"E:\\Projects\\bagidea-ai-agents-office\\daemon\\hook.ps1\" -Type task.progress"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"E:\\Projects\\bagidea-ai-agents-office\\daemon\\hook.ps1\" -Type task.completed"
-          }
-        ]
-      }
-    ]
-  }
+    "hooks":  {
+                  "UserPromptSubmit":  [
+                                           {
+                                               "hooks":  [
+                                                             {
+                                                                 "command":  "powershell -NoProfile -ExecutionPolicy Bypass -File \"D:\\BagIdeaOffice\\app\\daemon\\hook.ps1\" -Type task.started",
+                                                                 "type":  "command"
+                                                             }
+                                                         ]
+                                           }
+                                       ],
+                  "PostToolUse":  [
+                                      {
+                                          "hooks":  [
+                                                        {
+                                                            "command":  "powershell -NoProfile -ExecutionPolicy Bypass -File \"D:\\BagIdeaOffice\\app\\daemon\\hook.ps1\" -Type task.progress",
+                                                            "type":  "command"
+                                                        }
+                                                    ]
+                                      }
+                                  ],
+                  "Stop":  [
+                               {
+                                   "hooks":  [
+                                                 {
+                                                     "command":  "powershell -NoProfile -ExecutionPolicy Bypass -File \"D:\\BagIdeaOffice\\app\\daemon\\hook.ps1\" -Type task.completed",
+                                                     "type":  "command"
+                                                 }
+                                             ]
+                               }
+                           ]
+              }
 }

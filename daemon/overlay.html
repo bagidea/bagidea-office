@@ -3219,7 +3219,7 @@
 
   function openEditor(id) {
     modal.classList.add("open");
-    const a = id ? ROSTER[id] : { name: "", role: REGROLES[2] || "Specialist", avatar: 1, prompt: "" };
+    const a = id ? (ROSTER[id] || {}) : { name: "", role: REGROLES[2] || "Specialist", avatar: 1, prompt: "" };
     const isUser = !!a.isUser;  // the CEO is YOU — no prompt/skills/tools
     let avatar = a.avatar || 1;
     let myAura = a.aura || "";

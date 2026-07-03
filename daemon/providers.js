@@ -185,7 +185,7 @@ function resolve(provider, model, reg = {}, opts = {}) {
     }
   }
 
-  out.env = { ANTHROPIC_BASE_URL: baseUrl, ANTHROPIC_AUTH_TOKEN: token };
+  out.env = { ANTHROPIC_BASE_URL: baseUrl, ANTHROPIC_AUTH_TOKEN: token, ANTHROPIC_API_KEY: token };
   let m = pc.model || model;
   if (!m && kind === "openai") {
     m = provider === "openai" ? "gpt-4o-mini" : provider === "gemini" ? "gemini-2.5-flash" : "";

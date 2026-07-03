@@ -1,3 +1,15 @@
 {
-  "hooks": {}
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"D:\\\\BagIdeaOffice\\\\app\\\\daemon\\\\perm.js\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
 }
