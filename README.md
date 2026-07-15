@@ -753,6 +753,9 @@ platform we couldn't reach.
     <td align="center" valign="top" width="120">
       <a href="https://github.com/misternay"><img src="https://github.com/misternay.png?size=100" width="72" alt="@misternay"><br><sub><b>@misternay</b></sub></a><br><sub>macOS / Linux fixes</sub>
     </td>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/skiyo0177-lgtm"><img src="https://github.com/skiyo0177-lgtm.png?size=100" width="72" alt="@skiyo0177-lgtm"><br><sub><b>@skiyo0177-lgtm</b></sub></a><br><sub>i18n (zh/en/ja UI)</sub>
+    </td>
   </tr>
 </table>
 
