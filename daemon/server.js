@@ -4740,10 +4740,17 @@ end tell`;
         // location anywhere on disk is fine. Lets the owner reveal media that lives
         // outside the workspace (the same files chat now previews from anywhere).
         if (!fs.existsSync(p)) { res.writeHead(404); return res.end("not found"); }
-        // explorer needs "/select," and the path as ONE argument or it ignores
-        // the selection and opens Documents. spawn passes argv as-is (no shell),
-        // so a single combined token is the reliable form (spaces included).
-        if (process.platform === "win32") spawn("explorer.exe", ["/select," + p], { detached: true });
+        // explorer.exe does NOT parse its command line with CRT rules: it wants
+        // exactly `/select,"C:\dir\file.ext"` — the switch bare, the path quoted.
+        // Passing "/select,<path>" as one argv token makes Node quote the WHOLE
+        // token ("/select,C:\dir\my file.png") whenever the path holds a space —
+        // explorer then fails to see /select at all and silently opens Documents.
+        // windowsVerbatimArguments hands the line over untouched, so the quotes
+        // land around the path only. A path can't contain `"` on Windows, so
+        // wrapping it is safe. Verified on a path with spaces AND commas.
+        if (process.platform === "win32")
+          spawn("explorer.exe", ['/select,"' + p + '"'],
+            { detached: true, windowsVerbatimArguments: true });
         else if (process.platform === "darwin") spawn("open", ["-R", p], { detached: true });
         else spawn("xdg-open", [path.dirname(p)], { detached: true });
         res.writeHead(200); res.end("ok");

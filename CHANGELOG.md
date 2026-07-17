@@ -4,6 +4,29 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.44] — 📂 "Open folder" opens the *real* folder again (Windows)
+
+**Fixed**
+- **The 📂 button under a media file in chat opened `Documents` instead of the
+  folder the file actually lives in** (Windows). It hit any path containing a
+  **space** — which is most real media: `uploads/`, an image dropped in from
+  elsewhere, a Thai filename, anything ChatGPT generated
+  (`ChatGPT Image Jul 1, 2026, 08_10_04 PM.png`). Paths without a space worked,
+  which is why this hid for so long.
+- Root cause: `explorer.exe` doesn't parse its command line by CRT rules — it
+  needs `/select,"C:\dir\file.ext"` with the switch bare and the path quoted.
+  We passed `"/select,<path>"` as a single argv token, so Node quoted the
+  **whole** token as soon as the path held a space. Explorer then never saw
+  `/select` at all and silently fell back to the default folder — `Documents`.
+  The line now hands the command line over verbatim, so the quotes land around
+  the path only.
+- Verified end-to-end against the real shipped line on three paths: spaces +
+  commas, a Thai name with spaces, and a plain no-space path (to prove the case
+  that already worked still does).
+- Scope: Windows `/reveal` only. The **Projects** 📂 button and "open in default
+  app" (⤢) use different, already-correct forms; macOS (`open -R`) and Linux
+  (`xdg-open`) were never affected.
+
 ## [0.9.43] — An opt-in fallback brain: agents survive a provider outage
 
 **Added**
