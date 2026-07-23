@@ -197,6 +197,21 @@
 
   #log { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 9px; }
   .msg { max-width: 82%; padding: 8px 12px; border-radius: 12px; white-space: pre-wrap; word-wrap: break-word; }
+  /* md()-rendered body: parent .msg keeps pre-wrap, but markdown lays out its own
+     spacing via <p>/<br>, so the body switches to normal + tight margins. <pre>
+     keeps its own pre formatting (overrides here) and wraps long code. */
+  .msg .mdbody { white-space: normal; overflow-wrap: anywhere; }
+  .msg .mdbody p { margin: 0 0 .3em; }
+  .msg .mdbody p:last-child { margin-bottom: 0; }
+  .msg .mdbody ul, .msg .mdbody ol { margin: .2em 0; padding-left: 1.3em; }
+  .msg .mdbody li { margin: .1em 0; }
+  .msg .mdbody pre { white-space: pre-wrap; word-break: break-word; margin: .2em 0; }
+  .msg .mdbody code { font: inherit; }
+  .msg .mdbody h1, .msg .mdbody h2, .msg .mdbody h3, .msg .mdbody h4, .msg .mdbody h5, .msg .mdbody h6 { font-size: 1em; font-weight: 700; margin: .4em 0 .2em; }
+  .msg .mdbody h1:first-child, .msg .mdbody h2:first-child, .msg .mdbody h3:first-child { margin-top: 0; }
+  .msg .mdbody a { color: var(--accent); }
+  .msg .mdbody blockquote { margin: .2em 0; padding-left: .8em; border-left: 2px solid rgba(255,255,255,.15); color: var(--dim); }
+  .msg .mdbody hr { border: none; border-top: 1px solid rgba(255,255,255,.12); margin: .4em 0; }
   .msg.you { align-self: flex-end; background: rgba(94,200,255,0.13); border: 1px solid var(--line); border-bottom-right-radius: 4px; }
   /* spoken command: same right-side bubble, voice-flavored */
   .msg.you.voice { border-color: rgba(255,110,130,0.55); background: rgba(255,110,130,0.10); }
@@ -1023,6 +1038,7 @@
   </div>
 </div>
 <div id="modal"><div id="modalCard"></div></div>
+<script src="/md.js"></script>
 
 <script>
   // dev error beacon → daemon log
@@ -1460,7 +1476,10 @@
       w.append(f, document.createTextNode(who.toUpperCase()));
       d.appendChild(w);
     }
-    d.appendChild(document.createTextNode(text));
+    const body = document.createElement("div");
+    body.className = "mdbody";
+    body.innerHTML = md(text);   // sanitized markdown - see /md.js invariant
+    d.appendChild(body);
     if (String(cls).includes("agent")) attachMediaPreviews(d, text);
     const tm = document.createElement("div");
     tm.className = "msgtime";
@@ -2093,7 +2112,7 @@
     }
     const body = document.createElement("div");
     body.className = "body";
-    body.textContent = String(text).slice(0, 220);
+    body.innerHTML = md(String(text).slice(0, 220));   // sanitized - see /md.js
     t.append(b, body);
     d.append(f, t);
     const empty = document.getElementById("feedEmpty");
@@ -2236,7 +2255,7 @@
       // so the chrome words won't be auto-translated — do it inline via tr().
       sum.innerHTML = `<span class="dot"></span>` +
         `<b>${tr("กำลังทำ %n งาน").replace("%n", items.length)}</b>` +
-        `<span class="latest">${nameOf(latest.agent)}: ${(latest.title || "…").replace(/</g, "&lt;")}</span>` +
+        `<span class="latest">${nameOf(latest.agent)}: ${esc(latest.title || "…")}</span>` +
         `<span class="caret">${NOW_OPEN ? tr("▲ พับ") : tr("▼ ดูทั้งหมด")}</span>`;
       sum.onclick = () => { NOW_OPEN = !NOW_OPEN; renderRunning(); };
       box.appendChild(sum);
@@ -2826,7 +2845,7 @@
       // Keep the stored choice visible even if it's momentarily disconnected.
       if (regAll.fallbackProvider && !opts.includes(regAll.fallbackProvider)) opts.push(regAll.fallbackProvider);
       fbProv.innerHTML = `<option value="none">— ${tr("ไม่มี (ปิด)")} —</option>` +
-        opts.map((id) => `<option value="${id}">${(LBL[id] || id).replace(/</g, "&lt;")}</option>`).join("");
+        opts.map((id) => `<option value="${id}">${esc(LBL[id] || id)}</option>`).join("");
       fbProv.value = regAll.fallbackProvider || "none";
       fbModel.value = regAll.fallbackModel || "";
       fbModel.style.display = fbProv.value === "none" ? "none" : "";
@@ -2877,7 +2896,7 @@
         </div>
         <div style="font-size:10.5px;color:var(--dim);margin-bottom:6px">${hint}</div>` +
         fields.map(([f, ph]) =>
-          `<input data-f="${f}" placeholder="${ph}" value="${(cfg[f] || "").replace(/"/g, "&quot;")}"
+          `<input data-f="${f}" placeholder="${ph}" value="${esc(cfg[f] || "")}"
             style="margin-bottom:5px" ${f === "token" || f === "secret" ? 'type="password"' : ""}>`).join("") +
         `<button class="bigbtn" style="margin-top:2px">💾 บันทึก + เชื่อมต่อ</button>`;
       const sw = card.querySelector(".switch");
@@ -3602,7 +3621,7 @@
         const f = modelInput.value.trim().toLowerCase();
         const opts = curModels.filter(Boolean).filter((m) => !f || m.toLowerCase().includes(f));
         modelMenu.innerHTML = opts.length
-          ? opts.map((m) => `<div class="cbopt">${String(m).replace(/</g, "&lt;")}</div>`).join("")
+          ? opts.map((m) => `<div class="cbopt">${esc(String(m))}</div>`).join("")
           : `<div class="cbopt" style="opacity:.55;cursor:default">${tr("พิมพ์ชื่อโมเดลเองได้")}</div>`;
         [...modelMenu.querySelectorAll(".cbopt")].forEach((o, i) => {
           if (opts[i] != null) o.onmousedown = (e) => { e.preventDefault(); modelInput.value = opts[i]; modelMenu.classList.remove("open"); };
@@ -3881,7 +3900,7 @@
       // author didn't include one, fall back to 🧩 so the row never looks empty.
       const pName = /^\p{Extended_Pictographic}/u.test(p.name || "") ? p.name : "🧩 " + (p.name || p.id);
       row.innerHTML = `<div class="meta"><b>${pName}</b>
-          <span>${(p.description || "").replace(/</g, "&lt;")} · v${p.version || "?"}` +
+          <span>${esc(p.description || "")} · v${p.version || "?"}` +
         (p.commands.length ? ` · ${p.commands.length} คำสั่ง` : "") + `</span></div>` +
         pinBtn("plugins", p.id) +
         (p.panel ? `<div class="winbtn" title="เปิดหน้าต่าง">⤢</div>` : "") +
@@ -4360,8 +4379,8 @@
             row.style.borderLeft = "3px solid #4ade80";
             row.style.background = "rgba(74,222,128,0.06)";
           }
-          row.innerHTML = `<div class="meta"><b>📁 ${p.name.replace(/</g, "&lt;")}</b>
-              <span>${p.dir.replace(/</g, "&lt;")} · ${st.join(" · ")}</span></div>` +
+          row.innerHTML = `<div class="meta"><b>📁 ${esc(p.name)}</b>
+              <span>${esc(p.dir)} · ${st.join(" · ")}</span></div>` +
             pinBtn("projects", projId(p)) + main +
             `<div class="winbtn" title="เทอร์มินัลเปล่า (ไม่นับว่าเปิดโปรเจค)">🖥</div>
             <div class="winbtn" title="เปิดโฟลเดอร์">📂</div>
@@ -4439,7 +4458,7 @@
               else {
                 row.dataset.del = "";
                 metaSpan().innerHTML =
-                  `<span style="color:#ff6258">${(await r.text()).replace(/</g, "&lt;")}</span>`;
+                  `<span style="color:#ff6258">${esc(await r.text())}</span>`;
                 setTimeout(opsRefresh, 6000);
               }
             } else {
@@ -4515,7 +4534,7 @@
       for (const n of placeNames) {
         const row = document.createElement("div");
         row.className = "arow";
-        row.innerHTML = `<div class="meta"><b>📍 ${n}</b><span>${r.places[n].replace(/</g, "&lt;")}</span></div>
+        row.innerHTML = `<div class="meta"><b>📍 ${n}</b><span>${esc(r.places[n])}</span></div>
           <div class="winbtn hide" title="ลบชื่อย่อ">✕</div>`;
         row.querySelector(".winbtn").onclick = () =>
           api("/places", { name: n, remove: true }).then(() => openOps("proj"));
@@ -4559,7 +4578,7 @@
             `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
                <label style="display:flex;align-items:flex-start;gap:7px;cursor:pointer;flex:1;min-width:0">
                  <input type="checkbox" class="prChk" style="margin-top:2px;cursor:pointer;flex:none">
-                 <b style="font-size:12.5px">💡 ${p.name.replace(/</g, "&lt;")}</b>
+                 <b style="font-size:12.5px">💡 ${esc(p.name)}</b>
                </label>
                <span style="display:flex;gap:6px;flex:none">
                  ${pinBtn("proposals", p.id)}
@@ -4568,7 +4587,7 @@
                </span>
              </div>
              <div style="font-size:10.5px;color:var(--dim);margin:3px 0 6px">เสนอโดย ${(p.agents || []).map(nameOf).join(", ")}</div>
-             <div style="white-space:pre-wrap;font-size:11.5px;line-height:1.55;max-height:40vh;overflow:auto;background:rgba(0,0,0,0.2);border:1px solid var(--line);border-radius:8px;padding:9px 11px">${(p.detail || "").replace(/</g, "&lt;")}</div>
+             <div style="white-space:normal;overflow-wrap:anywhere;font-size:11.5px;line-height:1.55;max-height:40vh;overflow:auto;background:rgba(0,0,0,0.2);border:1px solid var(--line);border-radius:8px;padding:9px 11px">${md(p.detail || "")}</div>
              <input class="prMsg" placeholder="ข้อความถึงทีม (ไม่บังคับ) — ใช้ทั้งตอนอนุมัติ/ไม่อนุมัติ"
                     style="width:100%;margin-top:7px;font:inherit;font-size:11px;color:var(--text);background:rgba(255,255,255,0.05);border:1px solid var(--line);border-radius:8px;padding:7px 9px;outline:none">`;
           const b = card.querySelectorAll(".winbtn:not(.pinbtn)");
@@ -4663,7 +4682,7 @@
             : j.mode === "at" ? `🕐 ${new Date(j.at).toLocaleString()}`
             : "⚡ ทันที";
           row.insertAdjacentHTML("beforeend",
-            `<div class="meta"><b>${j.prompt.slice(0, 56).replace(/</g, "&lt;")}</b>
+            `<div class="meta"><b>${esc(j.prompt.slice(0, 56))}</b>
                <span>${nameOf(j.agent)} · ${desc}${j.enabled === false ? " · ⏸ พัก" : ""}${(!j.running && j.lastRun) ? " · ล่าสุด " + new Date(j.lastRun).toLocaleTimeString() : ""}</span></div>` +
             (j.running ? "" :
               `<div class="winbtn" title="แก้ไข">✎</div>
@@ -4729,7 +4748,7 @@
           row.style.display = ""; row.style.opacity = past ? "0.5" : "1";
           row.style.borderLeft = reminded ? "3px solid #ffcf5e" : "";
           row.style.background = reminded ? "rgba(255,207,94,0.08)" : "";
-          row.innerHTML = `<div class="meta"><b>${past ? "✓ " : reminded ? "🔔 " : "📅 "}${c.title.replace(/</g, "&lt;")}</b>
+          row.innerHTML = `<div class="meta"><b>${past ? "✓ " : reminded ? "🔔 " : "📅 "}${esc(c.title)}</b>
               <span>${new Date(c.at).toLocaleString()} · เตือนก่อน ${c.remindMin} นาที${reminded ? " · ⚠ ใกล้ถึงแล้ว" : ""}</span></div>` +
             (past ? "" : `<div class="winbtn" title="แก้ไข">✎</div>`) +
             `<div class="winbtn hide" title="ลบ">✕</div>`;
@@ -4785,7 +4804,7 @@
       for (const n of (r.notes || []).slice().reverse()) {
         const row = document.createElement("div");
         row.className = "arow";
-        const safe = String(n.text).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+        const safe = esc(n.text);   // one-line preview - literal, not formatted (see /md.js)
         const del = (e) => { if (e) e.stopPropagation();
           api("/notes", { remove: n.id }).then(() => openOps("notes")); };
         // Collapsed: a one-line preview (long notes no longer overflow the row).
@@ -4869,7 +4888,8 @@
   let groupView = null;  // meeting key while reading/watching a group session
   function setThreadLabel(t) { document.getElementById("threadName").textContent = t; }
   function fmtTok(n) { n = +n || 0; return n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k" : String(n); }
-  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  // esc() and md() are provided globally by /md.js (loaded via <script src="/md.js"> above).
+  // All agent/user text renders through md() (prose) or esc() (inline labels) — see daemon/md.js.
   // The thread bar's brain + context-usage meter: which model, and how full its window
   // is (input tokens / context window). Updated live at end of each turn + on reload.
   function setThreadCtx(u) {
@@ -4932,7 +4952,7 @@
           if (actions && actions.length) {
             for (const a of actions) {
               const ownerName = (reg.agents[a.owner] || { name: a.owner }).name;
-              addMsg("you", null, `✅ <b>${ownerName}</b>: ${a.text}`, a.created, "· action item");
+              addMsg("you", null, `✅ **${esc(ownerName)}**: ${a.text}`, a.created, "· action item");
             }
           }
         }
@@ -5657,13 +5677,13 @@
     }
     else if (ev.type === "reminder") {
       if (!ev.replay) {
-        addChip(`🔔 <b>${tr("เตือนนัด:")}</b> ${String(ev.text).replace(/</g, "&lt;")} (${new Date(ev.at).toLocaleTimeString()})`);
-        addLog(`🔔 ${tr("เตือนนัด:")} <b>${String(ev.text).replace(/</g, "&lt;")}</b>`);
+        addChip(`🔔 <b>${tr("เตือนนัด:")}</b> ${esc(String(ev.text))} (${new Date(ev.at).toLocaleTimeString()})`);
+        addLog(`🔔 ${tr("เตือนนัด:")} <b>${esc(String(ev.text))}</b>`);
         uiSnd("alert");
       }
     }
     else if (ev.type === "job.started") {
-      if (!ev.replay) addLog(`📋 เริ่มงานที่สั่งไว้: <b>${String(ev.title || "").replace(/</g, "&lt;")}</b> — ${nameOf(ev.agent)}`);
+      if (!ev.replay) addLog(`📋 เริ่มงานที่สั่งไว้: <b>${esc(String(ev.title || ""))}</b> — ${nameOf(ev.agent)}`);
     }
     else if (ev.type === "notes.changed") {
       if (!ev.replay && ev.by === "agent") addLog(`📝 มี agent เขียนโน้ตบนกระดาน (${ev.count} ข้อ)`);

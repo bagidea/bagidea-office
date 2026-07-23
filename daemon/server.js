@@ -3588,6 +3588,14 @@ const server = http.createServer((req, res) => {
     try { res.end(fs.readFileSync(path.join(__dirname, "winlang.js"))); }
     catch { res.end("window.WinLang={build:async()=>({lang:'th',map:{},tr:s=>s,ensure:async()=>{}})};"); }
 
+  } else if (req.method === "GET" && req.url.split("?")[0] === "/md.js") {
+    // Universal agent-text renderer (marked + DOMPurify + esc/md helpers) shared by
+    // overlay/workflow/watch. Every agent/user text path funnels through md()/esc()
+    // so nothing bypasses sanitization - see daemon/md.js for the security invariant.
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
+    try { res.end(fs.readFileSync(path.join(__dirname, "md.js"))); }
+    catch { res.end("window.esc=function(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]});};window.md=function(t){if(t==null)t='';return window.esc(String(t)).replace(/\\n/g,'<br>');};"); }
+
   } else if (req.method === "GET" && req.url.split("?")[0] === "/watch") {
     // Read-only live activity stream for an agent (opened as its own window) —
     // it only listens on the WS, never sends, so it can't disturb the agent.

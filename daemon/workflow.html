@@ -69,7 +69,7 @@
   #side h3 { margin:0 0 2px; font-size:13px; }
   /* the plan/result takes the leftover height and scrolls inside itself, so long
      output never pushes the Run/Skill buttons off the panel */
-  #plan { white-space:pre-wrap; word-break:break-word; font-size:12.5px; color:#d6e2f0; background:#0a1020;
+  #plan { white-space:normal; overflow-wrap:anywhere; word-break:break-word; font-size:12.5px; color:#d6e2f0; background:#0a1020;
     border:1px solid var(--line); border-radius:10px; padding:11px; flex:1; min-height:80px; overflow:auto; }
   #side .muted { color:var(--dim); font-size:11px; }
   .acts { display:flex; gap:8px; margin-top:4px; } .acts button { flex:1; }
@@ -126,6 +126,7 @@
     </div>
   </div>
 <script src="/winlang.js"></script>
+<script src="/md.js"></script>
 <script>
   // ---- i18n: Thai is the source. English offices use the TR map; OTHER
   //      languages auto-translate via the daemon (/i18n, shared with the main
@@ -223,7 +224,7 @@
     const host = document.getElementById("tabs");
     host.innerHTML = tabs.map((t,i)=>
       `<div class="tab${i===active?" active":""}" onclick="switchTab(${i})">
-         ${t.example?'<span class="ex">📄</span>':''}<span class="nm">${(t.name||tr("(ไม่มีชื่อ)")).replace(/</g,"&lt;")}</span>
+         ${t.example?'<span class="ex">📄</span>':''}<span class="nm">${esc(t.name||tr("(ไม่มีชื่อ)"))}</span>
          <span class="cl" onclick="event.stopPropagation();closeTab(${i})">✕</span></div>`).join("")
       + `<div class="newt" onclick="newTab()">＋</div>`;
   }
@@ -260,7 +261,7 @@
     const opts = TYPES.map(([v,l]) => `<option value="${v}"${v===n.type?" selected":""}>${tr(l)}</option>`).join("");
     el.innerHTML = `<div class="port in"></div>` +
       `<div class="head"><select>${opts}</select><span class="x">✕</span></div>` +
-      `<textarea placeholder="${tr("พิมพ์สิ่งที่อยากให้ทำ…")}">${(n.text||"").replace(/</g,"&lt;")}</textarea>` +
+      `<textarea placeholder="${tr("พิมพ์สิ่งที่อยากให้ทำ…")}">${esc(n.text||"")}</textarea>` +
       `<div class="port out"></div>`;
     el.querySelector("select").onchange = (e) => { n.type = e.target.value; };
     el.querySelector("textarea").oninput = (e) => { n.text = e.target.value; drawEdges(); };
@@ -413,14 +414,14 @@
     const plan = document.getElementById("plan"); plan.textContent = tr("⏳ Director กำลังวิเคราะห์…");
     fetch("/workflows/analyze", { method:"POST", headers:{"content-type":"application/json"},
       body: JSON.stringify({ name: nameInp.value, nodes, edges }) })
-      .then(r=>r.json()).then(j=>{ plan.textContent = j.analysis || "—"; }).catch(()=>{ plan.textContent=tr("วิเคราะห์ไม่สำเร็จ ลองใหม่"); });
+      .then(r=>r.json()).then(j=>{ plan.innerHTML = md(j.analysis || "—"); }).catch(()=>{ plan.textContent=tr("วิเคราะห์ไม่สำเร็จ ลองใหม่"); });
   }
   function runWf() {
     if (!nodes.length) return flash("เพิ่ม node ก่อนนะ");
     const plan = document.getElementById("plan"); plan.textContent = tr("⏳ ทีมกำลังทำงานตาม workflow…");
     fetch("/workflows/run", { method:"POST", headers:{"content-type":"application/json"},
       body: JSON.stringify({ name: nameInp.value, nodes, edges }) })
-      .then(r=>r.json()).then(j=>{ plan.textContent = tr("✅ ผลลัพธ์:")+"\n\n" + (j.result || "—"); }).catch(()=>{ plan.textContent=tr("รันไม่สำเร็จ ลองใหม่"); });
+      .then(r=>r.json()).then(j=>{ plan.innerHTML = md(tr("✅ ผลลัพธ์:")+"\n\n" + (j.result || "—")); }).catch(()=>{ plan.textContent=tr("รันไม่สำเร็จ ลองใหม่"); });
   }
   function makeSkill() {
     if (!nodes.length) return flash("เพิ่ม node ก่อนนะ");
