@@ -108,6 +108,9 @@ enum UserEvent {
     HideOverlay,
     MiniToggle,
     LargeToggle, // big resizable window (min size = FULL) for reading / real work
+    ResizeDrag(String), // large mode: JS edge-zones start an OS resize drag (the
+                        // webview covers the whole window, so native borders never
+                        // see the mouse — "resize:<n|s|e|w|ne|nw|se|sw>")
     FeedToggle,
     SetHotkey(String),
     PttKey(bool), // global voice hotkey: true = pressed, false = released
@@ -2206,6 +2209,8 @@ fn main() {
                     "hide" => p_overlay.send_event(UserEvent::HideOverlay),
                     "mini" => p_overlay.send_event(UserEvent::MiniToggle),
                     "large" => p_overlay.send_event(UserEvent::LargeToggle),
+                    s if s.starts_with("resize:") =>
+                        p_overlay.send_event(UserEvent::ResizeDrag(s[7..].to_string())),
                     s if s.starts_with("hotkey:") =>
                         p_overlay.send_event(UserEvent::SetHotkey(s[7..].to_string())),
                     s if s.starts_with("open-window:") =>
@@ -2423,7 +2428,12 @@ fn main() {
                         let s = overlay.inner_size().to_logical::<f64>(overlay.scale_factor());
                         (s.width, s.height)
                     } else if feed { (FEED_W, feed_h) } else if mini { MINI } else { FULL };
-                    platform::region_round(&overlay, w, h, if feed { 14.0 } else { 18.0 });
+                    // Fullscreen large = square corners (rounded ones would nick the
+                    // screen edges); anything smaller keeps the house radius.
+                    let r = if feed { 14.0 }
+                        else if large && w >= logical_w - 2.0 && h >= logical_h - 2.0 { 0.0 }
+                        else { 18.0 };
+                    platform::region_round(&overlay, w, h, r);
                 } else if window_id == orb_id {
                     // Re-clip the orb to its circle on any DPI / monitor change so the
                     // transparent corners keep falling through to the desktop.
@@ -2493,16 +2503,12 @@ fn main() {
                         large = !large;
                         if large {
                             mini = false;
-                            let w = (logical_w * LARGE_FRAC).max(FULL.0);
-                            let h = (logical_h * LARGE_FRAC).max(FULL.1);
+                            // Owner's call: large OPENS FULLSCREEN — whoever wants it
+                            // smaller drags an edge down (never below FULL, the floor).
                             overlay.set_resizable(true);
-                            // The floor: large can stretch to fullscreen but never
-                            // shrink below the normal window.
                             overlay.set_min_inner_size(Some(LogicalSize::new(FULL.0, FULL.1)));
-                            overlay.set_inner_size(LogicalSize::new(w, h));
-                            overlay.set_outer_position(LogicalPosition::new(
-                                ((logical_w - w) / 2.0).max(0.0),
-                                (((logical_h - h) / 2.0) - 20.0).max(10.0)));
+                            overlay.set_inner_size(LogicalSize::new(logical_w, logical_h));
+                            overlay.set_outer_position(LogicalPosition::new(0.0, 0.0));
                             overlay.set_focus();
                             // Resized fires next and clips the region to the real size.
                         } else {
@@ -2514,6 +2520,17 @@ fn main() {
                         let _ = overlay_view.evaluate_script(&format!(
                             "window.setLargeMode && setLargeMode({})", large));
                         raise_orb(&orb);
+                    }
+                }
+                UserEvent::ResizeDrag(d) => {
+                    if large {
+                        use tao::window::ResizeDirection as RD;
+                        let dir = match d.as_str() {
+                            "n" => RD::North, "s" => RD::South, "e" => RD::East, "w" => RD::West,
+                            "ne" => RD::NorthEast, "nw" => RD::NorthWest, "sw" => RD::SouthWest,
+                            _ => RD::SouthEast,
+                        };
+                        let _ = overlay.drag_resize_window(dir);
                     }
                 }
                 UserEvent::FeedToggle => {

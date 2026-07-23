@@ -4,6 +4,23 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.46] — ⛶ Large window: opens fullscreen, drag any edge to resize
+
+**Changed**
+- **Large window mode now opens fullscreen** (was ~86% centered) and you shrink it
+  by dragging — same floor as before: it never goes below the normal window size.
+- **You can actually resize it now.** The chat webview covers the whole frameless
+  window, so the OS never showed native resize handles — dragging an edge did
+  nothing. Large mode now has invisible drag strips on all four edges and corners
+  that start a real OS resize (`drag_resize_window`), so you can pull it to any
+  size you like. Corners round again the moment it's smaller than the full screen.
+- **The mini / restore-size button is hidden while large is open** (it's meaningless
+  there) and comes back the moment you leave large mode.
+
+> Shell + overlay change — arrives with `bagidea update` (the prebuilt shell from
+> this release's assets). 0.9.45's large button on an un-updated shell couldn't
+> resize; this is the fix.
+
 ## [0.9.45] — zero-Anthropic-account fix · 📦 move-to-a-new-machine · Gemini tool-use fix · large window · two hide levels · 🌱 eco mode
 
 **Added**

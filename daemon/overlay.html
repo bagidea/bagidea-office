@@ -47,6 +47,20 @@
   }
   .winbtn svg { width: 15px; height: 15px; display: block; }
   .winbtn:hover { background: rgba(94,200,255,0.25); border-color: var(--accent); }
+  /* Large mode: invisible resize strips along every edge/corner. The webview
+     covers the whole frameless window, so the OS never shows native resize
+     handles — these zones start an OS resize drag via IPC instead. */
+  #resizeEdges { display: none; }
+  body.largemode #resizeEdges { display: contents; }
+  #resizeEdges div { position: fixed; z-index: 100000; }
+  .rz-n  { top:0; left:12px; right:12px; height:6px; cursor:n-resize; }
+  .rz-s  { bottom:0; left:12px; right:12px; height:6px; cursor:s-resize; }
+  .rz-e  { right:0; top:12px; bottom:12px; width:6px; cursor:e-resize; }
+  .rz-w  { left:0; top:12px; bottom:12px; width:6px; cursor:w-resize; }
+  .rz-ne { top:0; right:0; width:14px; height:14px; cursor:ne-resize; }
+  .rz-nw { top:0; left:0; width:14px; height:14px; cursor:nw-resize; }
+  .rz-se { bottom:0; right:0; width:14px; height:14px; cursor:se-resize; }
+  .rz-sw { bottom:0; left:0; width:14px; height:14px; cursor:sw-resize; }
   .winbtn.hide:hover { background: rgba(255,84,72,0.3); border-color: #ff5448; }
   /* "stop the agent to take over" pill — wider, labelled; arms on first click. */
   .winbtn.work { width: auto; padding: 0 9px; gap: 4px; font-size: 11px;
@@ -5944,10 +5958,25 @@
     const ICON_LARGE = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="1.6"/><path d="M9.5 6.5 12 4M4 12l2.5-2.5" /></svg>';
     largeBtn.innerHTML = ICON_LARGE;
     largeBtn.onclick = () => shellPost("large");
+    // Invisible edge/corner strips (see .rz-* CSS) — mousedown starts an OS
+    // resize drag in the shell. Only live while body.largemode is set.
+    const edges = document.createElement("div");
+    edges.id = "resizeEdges";
+    for (const d of ["n", "s", "e", "w", "ne", "nw", "se", "sw"]) {
+      const z = document.createElement("div");
+      z.className = "rz-" + d;
+      z.addEventListener("mousedown", (e) => {
+        e.preventDefault(); e.stopPropagation(); shellPost("resize:" + d);
+      });
+      edges.appendChild(z);
+    }
+    document.body.appendChild(edges);
     window.setLargeMode = (on) => {
+      document.body.classList.toggle("largemode", on);
       largeBtn.title = on ? "Back to normal window" : "Large window (resizable)";
-      largeBtn.style.opacity = on ? "1" : "";
       largeBtn.style.color = on ? "var(--accent)" : "";
+      // Mini/restore makes no sense inside large — hidden until large is left.
+      miniBtn.style.display = on ? "none" : "";
     };
     // The ◱/⛶ glyphs DON'T render on Windows 10 (no font coverage) — the restore
     // button showed up EMPTY there, so people couldn't find their way back from mini.
