@@ -154,7 +154,7 @@
   "d_install_manual_h": "Build manual",
   "d_install_manual_p": "Klon repositori, arahkan path hook Claude ke klon-mu, lalu bangun shell Rust:",
   "d_install_first_h": "Pertama kali dijalankan",
-  "d_install_first_p": "Masuk ke Claude sekali, lalu mulai kantor. Wallpaper-mu menjadi kantor langsung; kepala obrolan dan ikon baki muncul.",
+  "d_install_first_p": "Pilih otak lalu jalan — login Claude bersifat opsional. Agen bisa berjalan di GLM, DeepSeek, Qwen, Kimi, dan lainnya cukup dengan API key penyedia tersebut di Pengaturan; login ke Claude hanya jika Anda memakai model Claude. Mulai kantornya — wallpaper Anda menjadi kantor langsung; muncul kepala chat dan ikon tray.",
   "d_install_plat": "Dukungan platform: Windows 11 (stabil, WorkerW), macOS 13+ (beta, DYLD shim), dan Linux (eksperimental — penyatuan desktop via X11 EWMH; di Wayland beralih ke jendela layar penuh yang disematkan di paling bawah).",
   "d_using_h": "Menggunakannya",
   "d_chat_h": "Obrolan & CEO",
@@ -329,5 +329,7 @@
   "sc_s3_h": "3 · Buka PR",
   "sc_s3_p": "Kami meninjau dan menggabungkannya dengan tetap menjaga kepengarangan kamu, sehingga kamu masuk ke grafik Contributors dan kartumu muncul di sini.",
   "sc_submit_cta": "Baca panduan pengiriman →",
-  "sc_edit_cta": "Edit showcase.json →"
+  "sc_edit_cta": "Edit showcase.json →",
+  "d_migrate_h": "Pindah ke mesin baru",
+  "d_migrate_p": "Pindah ke mesin baru? <code>bagidea export</code> mengemas seluruh kantor Anda — agen, skill, memori, proyek, plugin — menjadi satu file. Instal BagIdea Office di mesin baru lalu jalankan <code>bagidea import</code> untuk menghadirkan kembali tim yang sama."
 }

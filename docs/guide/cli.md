@@ -57,9 +57,33 @@ AI features (use main API keys)
   bagidea key rm <NAME> | test [NAME]   Remove a key / test one works
   bagidea channels                  Status of Telegram · Discord · LINE · Slack · WhatsApp · Messenger
 
+Move to a new machine
+  bagidea export [file]         Pack agents · skills · memory · projects · plugins → one .tgz
+  bagidea import <file>         Restore an exported office here (asks before overwriting)
+
+Cost control
+  bagidea eco [on|off]          🌱 Eco mode — cut idle token burn: background rhythms
+                                stretch (heartbeat ≥3h, social ≥6h, pitches ≥6h) and the
+                                delegated-work QA double-pass is skipped. Your direct
+                                orders are never slowed.
+
 Maintenance
   bagidea fixmic                Reset a stuck Windows mic panel
 ```
+
+## Moving your office to a new machine
+
+`bagidea export` writes `bagidea-office-backup-YYYY-MM-DD.tgz` with everything that
+makes your office *yours*: the team (agents, roles, skills, brains, API keys), agent
+memory, meetings, projects, uploads and installed plugins. Junk (node_modules,
+temp/staging dirs) is left out automatically.
+
+On the new machine: install BagIdea Office normally, copy the file over, then
+`bagidea import <file>` — it shows what's inside, asks for a `yes`, backs up the
+existing registry, restores everything and restarts the office. Same team, new desk.
+
+> ⚠ The export file contains your **API keys** — treat it like a password: keep it
+> private and delete it after the import succeeds.
 
 ## Real-world examples
 

@@ -154,7 +154,7 @@
   "d_install_manual_h": "Build manual",
   "d_install_manual_p": "Clone o repositório, aponte os caminhos de hook do Claude para o seu clone e então compile o shell Rust:",
   "d_install_first_h": "Primeira execução",
-  "d_install_first_p": "Faça login no Claude uma vez e então inicie o escritório. Seu papel de parede se torna o escritório ao vivo; um ícone de chat e um ícone na bandeja aparecem.",
+  "d_install_first_p": "Escolha um cérebro e pronto — o login na Claude é opcional. Os agentes rodam com GLM, DeepSeek, Qwen, Kimi e outros só com a chave de API do provedor em Configurações; faça login na Claude apenas se usar modelos Claude. Inicie o escritório e seu papel de parede vira o escritório ao vivo; aparecem uma cabeça de chat e um ícone na bandeja.",
   "d_install_plat": "Suporte de plataforma: Windows 11 (estável, WorkerW), macOS 13+ (beta, DYLD shim) e Linux (experimental — integração à área de trabalho via X11 EWMH; no Wayland recorre a uma janela em tela cheia fixada por baixo).",
   "d_using_h": "Como usar",
   "d_chat_h": "Chat & CEO",
@@ -329,5 +329,7 @@
   "sc_s3_h": "3 · Abra um PR",
   "sc_s3_p": "Nós revisamos e fazemos o merge preservando sua autoria, então você entra no grafo de Contributors e seu cartão aparece aqui.",
   "sc_submit_cta": "Leia o guia de envio →",
-  "sc_edit_cta": "Editar showcase.json →"
+  "sc_edit_cta": "Editar showcase.json →",
+  "d_migrate_h": "Mudar para uma nova máquina",
+  "d_migrate_p": "Vai mudar de máquina? O <code>bagidea export</code> empacota todo o seu escritório — agentes, habilidades, memória, projetos, plugins — em um único arquivo. Instale o BagIdea Office na máquina nova e rode <code>bagidea import</code> para trazer a mesma equipe de volta."
 }

@@ -889,6 +889,7 @@
   <button id="setBtn" title="Office settings — agents, roles" style="margin-left:6px">⚙</button>
   <button id="moreBtn" title="เพิ่มเติม" style="margin-left:6px">⋯</button>
   <button id="sideBtn" title="Security Center & Mission Control" style="margin-left:6px">🛡<span id="permBadge"></span></button>
+  <div class="winbtn" id="largeBtn" title="Large window (resizable)" style="margin-left:6px"></div>
   <div class="winbtn" id="miniBtn" title="Mini window" style="margin-left:6px"></div>
   <div class="winbtn hide" id="hideBtn" title="Hide (chat head brings it back)">—</div>
 </header>
@@ -5936,6 +5937,18 @@
     const miniBtn = document.getElementById("miniBtn");
     miniBtn.onclick = () => shellPost("mini");
     document.getElementById("hideBtn").onclick = () => shellPost("hide");
+    // Large mode: resizable big window (min = normal size, max = your screen).
+    // The shell drives the actual window; it reports state back via setLargeMode
+    // so the button reflects reality (e.g. feed mode force-exits large).
+    const largeBtn = document.getElementById("largeBtn");
+    const ICON_LARGE = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="1.6"/><path d="M9.5 6.5 12 4M4 12l2.5-2.5" /></svg>';
+    largeBtn.innerHTML = ICON_LARGE;
+    largeBtn.onclick = () => shellPost("large");
+    window.setLargeMode = (on) => {
+      largeBtn.title = on ? "Back to normal window" : "Large window (resizable)";
+      largeBtn.style.opacity = on ? "1" : "";
+      largeBtn.style.color = on ? "var(--accent)" : "";
+    };
     // The ◱/⛶ glyphs DON'T render on Windows 10 (no font coverage) — the restore
     // button showed up EMPTY there, so people couldn't find their way back from mini.
     // Use inline SVG icons (identical everywhere). State via the same media query the
@@ -5954,6 +5967,7 @@
   } else {
     // plain browser: the OS window has its own chrome
     document.getElementById("miniBtn").style.display = "none";
+    document.getElementById("largeBtn").style.display = "none";
     document.getElementById("hideBtn").style.display = "none";
     document.body.style.borderRadius = "0";
     document.body.style.border = "none";

@@ -131,3 +131,38 @@ test("upstreamFor: providerConfig.token overrides the main-key env", () => {
 });
 
 // Bug 2 (issue #15) proxy upstream timeout tests live in proxy-timeout.test.js.
+
+// --- Gemini thought signatures (400 "missing thought_signature in functionCall") --
+const { SIG_DUMMY } = require("../proxy");
+
+test("gemini: thought_signature captured from response and echoed on history tool_calls", () => {
+  const sigs = new Map();
+  // 1) Gemini replies with a signed tool call → toAnthropic remembers the signature
+  toAnthropic({ choices: [{ message: { content: null, tool_calls: [
+    { id: "tc9", type: "function", function: { name: "WebSearch", arguments: "{}" },
+      extra_content: { google: { thought_signature: "SIGabc" } } },
+  ] }, finish_reason: "tool_calls" }] }, "gemini-3-pro", { sigs });
+  assert.strictEqual(sigs.get("tc9"), "SIGabc");
+  // 2) claude echoes the history → toOpenAI re-attaches the exact signature
+  const o = toOpenAI({ messages: [
+    { role: "assistant", content: [{ type: "tool_use", id: "tc9", name: "WebSearch", input: {} }] },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "tc9", content: "ok" }] },
+  ] }, "gemini-3-pro", { gemini: true, sigs });
+  const tc = o.messages.find((m) => m.role === "assistant").tool_calls[0];
+  assert.deepStrictEqual(tc.extra_content, { google: { thought_signature: "SIGabc" } });
+});
+
+test("gemini: unsigned history tool_call falls back to the documented dummy signature", () => {
+  const o = toOpenAI({ messages: [
+    { role: "assistant", content: [{ type: "tool_use", id: "old1", name: "Read", input: {} }] },
+  ] }, "gemini-3-pro", { gemini: true, sigs: new Map() });
+  assert.strictEqual(o.messages[0].tool_calls[0].extra_content.google.thought_signature, SIG_DUMMY);
+});
+
+test("non-gemini providers get NO extra_content on tool_calls (strict APIs reject it)", () => {
+  const sigs = new Map([["tc9", "SIGabc"]]);
+  const o = toOpenAI({ messages: [
+    { role: "assistant", content: [{ type: "tool_use", id: "tc9", name: "get", input: {} }] },
+  ] }, "gpt-4o", { sigs });   // no opts.gemini
+  assert.strictEqual(o.messages[0].tool_calls[0].extra_content, undefined);
+});

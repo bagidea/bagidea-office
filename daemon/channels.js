@@ -10,6 +10,8 @@
 const https = require("https");
 const tls = require("tls");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 
 // ---- tiny https JSON request ------------------------------------------------
 function jreq(method, host, path, headers, body, cb, timeoutMs) {
@@ -149,10 +151,49 @@ module.exports = function initChannels(ctx) {
     poll();
     log("telegram poller started");
   }
+  // Image paths an agent mentioned in its reply (server-side twin of the
+  // overlay's MEDIA_RE, images only). "/uploads/x.png" is a daemon URL, not a
+  // disk path — resolve it via ctx.uploadsDir so the bytes can be uploaded.
+  function imagePaths(text) {
+    const re = /((?:[A-Za-z]:[\\/]|\/(?:uploads|Users|home|Volumes|mnt|media|tmp|data|opt|srv|var|root|workspace)\/)[^\r\n"'`<>|?*]+?\.(?:png|jpe?g|gif|webp|bmp))/gi;
+    const out = [];
+    let m;
+    while ((m = re.exec(String(text))) && out.length < 3) {
+      let p = m[1];
+      if (/^\/uploads\//.test(p) && ctx.uploadsDir) p = path.join(ctx.uploadsDir, p.slice("/uploads/".length));
+      try {
+        if (fs.existsSync(p) && fs.statSync(p).size < 10 * 1048576 && !out.includes(p)) out.push(p);
+      } catch {}
+    }
+    return out;
+  }
+  // Telegram's URL form of sendPhoto needs a PUBLIC url — ours are localhost —
+  // so upload the actual bytes as multipart/form-data.
+  function sendTelegramPhoto(token, chatId, file, cb) {
+    let buf;
+    try { buf = fs.readFileSync(file); } catch { return cb && cb(); }
+    const name = file.replace(/^.*[\\/]/, "");
+    const ext = (name.match(/\.(\w+)$/) || [, "png"])[1].toLowerCase();
+    const boundary = "----bagidea" + Date.now();
+    const head = Buffer.from(
+      `--${boundary}\r\ncontent-disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n` +
+      `--${boundary}\r\ncontent-disposition: form-data; name="photo"; filename="${name}"\r\n` +
+      `content-type: image/${ext === "jpg" ? "jpeg" : ext}\r\n\r\n`);
+    const body = Buffer.concat([head, buf, Buffer.from(`\r\n--${boundary}--\r\n`)]);
+    const r = https.request({ host: "api.telegram.org", path: `/bot${token}/sendPhoto`, method: "POST",
+      headers: { "content-type": "multipart/form-data; boundary=" + boundary, "content-length": body.length } },
+      (res) => { res.resume(); res.on("end", () => cb && cb()); });
+    r.on("error", () => cb && cb());
+    r.end(body);
+  }
   function sendTelegram(token, chatId, text) {
     const parts = chunk(String(text), 3900);
+    // Any preview image the message references rides along as a real photo
+    // (after the text, so the caption context arrives first).
+    const photos = imagePaths(text);
+    const sendPhotos = (i) => { if (i < photos.length) sendTelegramPhoto(token, chatId, photos[i], () => sendPhotos(i + 1)); };
     const sendNext = (i) => {
-      if (i >= parts.length) return;
+      if (i >= parts.length) return sendPhotos(0);
       jreq("POST", "api.telegram.org", `/bot${token}/sendMessage`, null,
         { chat_id: chatId, text: parts[i] }, () => sendNext(i + 1));
     };

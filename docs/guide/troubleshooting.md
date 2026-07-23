@@ -101,8 +101,17 @@ the installer** (re-running is safe; no data is lost).
 - `bagidea status` tells you whether the daemon is up.
 
 **Want to temporarily hide the office (meeting/screen recording)**
-- Right-click the tray icon → **Hide office** — the wallpaper returns to normal, sound goes quiet,
-  but agents keep working in the background — click again to bring it back.
+- Right-click the tray icon — two hide levels, and agents keep working under both:
+  - **Hide everything** — wallpaper, chat window and chat head all disappear.
+  - **Hide chat + button (wallpaper stays)** — only the chat window and the floating
+    chat head disappear; the wallpaper office keeps living on your desktop.
+- Click the item again to bring things back.
+
+**The 3D Editor won't open on this machine**
+- Fixed in 0.9.45: the launcher now checks every place the Godot engine can live
+  (the app's own copy, `BAGIDEA_GODOT`, the installer's tools folder) and tells you
+  when none exists instead of failing silently. If you still see an error, re-run the
+  installer or point `BAGIDEA_GODOT` at a Godot 4.6.x executable.
 
 **How to close the program completely**
 - The only way is the tray icon → **Exit BagIdea Office** (or `bagidea stop`) —

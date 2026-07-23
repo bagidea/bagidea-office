@@ -93,6 +93,9 @@ const ORB_SIZE: f64 = 78.0;  // window; the orb art is inset ~3px so a thin tran
                              // clip then cuts empty space, not the glow against the wallpaper.
 const FULL: (f64, f64) = (560.0, 700.0);
 const MINI: (f64, f64) = (390.0, 430.0);
+// Large mode: free-resizable reading/working window. Opens at ~86% of the
+// screen, centered; can never shrink below FULL (that's what MINI is for).
+const LARGE_FRAC: f64 = 0.86;
 const FEED_W: f64 = 330.0;
 const PARK: (f64, f64) = (-9000.0, 100.0);
 const SPLASH_SIZE: f64 = 210.0;
@@ -104,6 +107,7 @@ enum UserEvent {
     DragOverlay,
     HideOverlay,
     MiniToggle,
+    LargeToggle, // big resizable window (min size = FULL) for reading / real work
     FeedToggle,
     SetHotkey(String),
     PttKey(bool), // global voice hotkey: true = pressed, false = released
@@ -514,8 +518,23 @@ mod platform {
         if branded.exists() {
             return branded.to_string_lossy().into_owned();
         }
-        std::env::var("BAGIDEA_GODOT")
-            .unwrap_or_else(|_| r"E:\Tools\Godot\Godot_v4.6.3-stable_win64.exe".into())
+        // BAGIDEA_GODOT only counts when it actually points at a file — the
+        // installer used to set it even when the Godot download failed.
+        if let Ok(g) = std::env::var("BAGIDEA_GODOT") {
+            if std::path::Path::new(&g).exists() {
+                return g;
+            }
+        }
+        // Installer's real download location (branding step may have been skipped).
+        if let Ok(la) = std::env::var("LOCALAPPDATA") {
+            let p = std::path::PathBuf::from(la)
+                .join("BagIdeaOffice").join("tools").join("godot")
+                .join("Godot_v4.6.3-stable_win64.exe");
+            if p.exists() {
+                return p.to_string_lossy().into_owned();
+            }
+        }
+        r"E:\Tools\Godot\Godot_v4.6.3-stable_win64.exe".into()
     }
 
     pub fn office_args(c: &mut Command, root: &PathBuf, cx: i32, cy: i32) {
@@ -2101,13 +2120,18 @@ fn main() {
     // ---- system tray: the only true exit
     let tray_menu = Menu::new();
     let open_item = MenuItem::new("Open Office Chat", true, None);
-    let hide_item = CheckMenuItem::new("Hide office (agents keep working)", true, false, None);
+    // Two hide levels — the office keeps WORKING under both; only visibility changes:
+    //   hide_item     = everything gone (wallpaper + chat + chat-head)
+    //   hidechat_item = chat + chat-head gone, wallpaper stays alive
+    let hide_item = CheckMenuItem::new("Hide everything (agents keep working)", true, false, None);
+    let hidechat_item = CheckMenuItem::new("Hide chat + button (wallpaper stays)", true, false, None);
     let restart_item = MenuItem::new("Restart office", true, None);
     let autostart_item = CheckMenuItem::new(platform::AUTOSTART_LABEL, true, platform::is_autostart(), None);
     let exit_item = MenuItem::new("Exit BagIdea Office", true, None);
     let _ = tray_menu.append_items(&[
         &open_item,
         &hide_item,
+        &hidechat_item,
         &restart_item,
         &autostart_item,
         &PredefinedMenuItem::separator(),
@@ -2121,6 +2145,7 @@ fn main() {
         .expect("tray");
     let open_id = open_item.id().clone();
     let hide_id = hide_item.id().clone();
+    let hidechat_id = hidechat_item.id().clone();
     let restart_id = restart_item.id().clone();
     let autostart_id = autostart_item.id().clone();
     let exit_id = exit_item.id().clone();
@@ -2180,6 +2205,7 @@ fn main() {
                     "drag-overlay" => p_overlay.send_event(UserEvent::DragOverlay),
                     "hide" => p_overlay.send_event(UserEvent::HideOverlay),
                     "mini" => p_overlay.send_event(UserEvent::MiniToggle),
+                    "large" => p_overlay.send_event(UserEvent::LargeToggle),
                     s if s.starts_with("hotkey:") =>
                         p_overlay.send_event(UserEvent::SetHotkey(s[7..].to_string())),
                     s if s.starts_with("open-window:") =>
@@ -2241,12 +2267,15 @@ fn main() {
     let mut popups: Vec<(tao::window::WindowId, String, Window, wry::WebView)> = Vec::new();
     let mut mini = false;
     let mut feed = false;
+    let mut large = false;
     let mut editor_pid: u32 = 0;
+    let mut editor_child: Option<Child> = None; // reaped on reopen → kills the PID-recycling focus bug
     let mut world_ready = false;
     // Tracks whether the wallpaper is believed visible (30 fps) vs throttled
     // (2 fps). Driven by the manual "Hide office" tray item AND auto-occlusion.
     let mut vis_on = true;
     let mut last_watch = std::time::Instant::now();
+    let mut last_alive = std::time::Instant::now();
     event_loop.run(move |event, target, control_flow| {
         // Unix signal (SIGTERM/SIGINT) → same cleanup as tray Exit.
         if SIGNAL_SHUTDOWN.load(Ordering::Relaxed) {
@@ -2266,11 +2295,19 @@ fn main() {
         *control_flow = ControlFlow::WaitUntil(
             std::time::Instant::now() + std::time::Duration::from_millis(250),
         );
+        // Freshness heartbeat: the daemon trusts bagidea_shell_alive only while
+        // its mtime is recent — a crash leaves a STALE flag, and the daemon's
+        // own editor-launch fallback takes over instead of waiting forever on a
+        // shell that isn't there. (The flag used to be written once at boot.)
+        if last_alive.elapsed().as_secs() >= 5 {
+            last_alive = std::time::Instant::now();
+            let _ = std::fs::write(std::env::temp_dir().join("bagidea_shell_alive"), "1");
+        }
         // Chat-head watchdog — THROTTLED. Re-asserting window state every tick
         // pins a CPU core on macOS (each level/visibility poke wakes the loop),
         // so we only check every ~2s and only touch the window when the orb has
         // genuinely drifted off-screen after the world is up.
-        if world_ready && !hide_item.is_checked()
+        if world_ready && !hide_item.is_checked() && !hidechat_item.is_checked()
             && last_watch.elapsed().as_millis() >= 2000
         {
             last_watch = std::time::Instant::now();
@@ -2302,12 +2339,23 @@ fn main() {
                 if hidden {
                     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
                     orb.set_outer_position(LogicalPosition::new(PARK.0, PARK.1 + 200.0));
-                } else {
+                } else if !hidechat_item.is_checked() {
+                    // Don't resurrect the orb if the chat-only hide still wants it gone.
                     orb.set_outer_position(LogicalPosition::new(orb_x, orb_y));
                     raise_orb(&orb);
                 }
                 vis_on = !hidden;
                 post_visibility(!hidden);
+            } else if ev.id == hidechat_id {
+                // Level 2: chat + chat-head vanish, the wallpaper world keeps
+                // rendering (and the office keeps working either way).
+                if hidechat_item.is_checked() {
+                    overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
+                    orb.set_outer_position(LogicalPosition::new(PARK.0, PARK.1 + 200.0));
+                } else if !hide_item.is_checked() {
+                    orb.set_outer_position(LogicalPosition::new(orb_x, orb_y));
+                    raise_orb(&orb);
+                }
             } else if ev.id == restart_id {
                 // The daemon does a detached relaunch that outlives us being killed.
                 post_restart();
@@ -2322,12 +2370,12 @@ fn main() {
             }
         }
 
-        let do_toggle = |feed_now: bool| {
+        let do_toggle = |feed_now: bool, large_now: bool| {
             // Browser-chat mode (Linux/ARM64): the embedded overlay is blank here,
             // so open/focus the chat in an external browser instead of toggling it.
             if browser_chat() {
                 open_chat_browser();
-                let _ = feed_now;
+                let _ = (feed_now, large_now);
                 return;
             }
             let hidden = overlay
@@ -2335,7 +2383,11 @@ fn main() {
                 .map(|p| p.x < -2000)
                 .unwrap_or(true);
             if hidden {
-                let (px, py) = if feed_now { (feed_x, feed_y) } else { (overlay_x, overlay_y) };
+                let (px, py) = if large_now {
+                    // Large keeps whatever size the user stretched it to — re-center that.
+                    let s = overlay.inner_size().to_logical::<f64>(overlay.scale_factor());
+                    (((logical_w - s.width) / 2.0).max(0.0), (((logical_h - s.height) / 2.0) - 20.0).max(10.0))
+                } else if feed_now { (feed_x, feed_y) } else { (overlay_x, overlay_y) };
                 overlay.set_outer_position(LogicalPosition::new(px, py));
                 overlay.set_focus();
                 raise_orb(&orb);
@@ -2346,7 +2398,7 @@ fn main() {
         };
 
         if toggle {
-            do_toggle(feed);
+            do_toggle(feed, large);
         }
 
         match event {
@@ -2365,7 +2417,12 @@ fn main() {
             }
             Event::WindowEvent { window_id, event: WindowEvent::Resized(_), .. } => {
                 if window_id == overlay_id {
-                    let (w, h) = if feed { (FEED_W, feed_h) } else if mini { MINI } else { FULL };
+                    // Large is free-resizable — clip to the ACTUAL size, not a mode
+                    // constant, or the rounded region crops the stretched window.
+                    let (w, h) = if large {
+                        let s = overlay.inner_size().to_logical::<f64>(overlay.scale_factor());
+                        (s.width, s.height)
+                    } else if feed { (FEED_W, feed_h) } else if mini { MINI } else { FULL };
                     platform::region_round(&overlay, w, h, if feed { 14.0 } else { 18.0 });
                 } else if window_id == orb_id {
                     // Re-clip the orb to its circle on any DPI / monitor change so the
@@ -2388,7 +2445,16 @@ fn main() {
                     }
                 }
                 UserEvent::EditorOpening => {
-                    if platform::focus_pid(editor_pid) {
+                    // PID-recycling guard: if our last editor child has exited, forget
+                    // its pid — else focus_pid() may "focus" whatever unrelated process
+                    // Windows handed that number to, and the editor never opens again.
+                    if let Some(c) = editor_child.as_mut() {
+                        if c.try_wait().ok().flatten().is_some() {
+                            editor_pid = 0;
+                            editor_child = None;
+                        }
+                    }
+                    if editor_pid != 0 && platform::focus_pid(editor_pid) {
                         let _ = std::fs::write(std::env::temp_dir().join("bagidea_editor_ready"), "focused");
                     } else {
                         editor_pid = 0;
@@ -2396,18 +2462,25 @@ fn main() {
                         splash.set_always_on_top(true);
                         if let Some(child) = spawn_editor(&root, phys_w / 2, phys_h / 2 - 30) {
                             editor_pid = child.id();
+                            editor_child = Some(child);
+                        } else {
+                            // No Godot exe found → resolve the handshake NOW instead of
+                            // leaving the splash hanging for the 60s watcher timeout.
+                            eprintln!("[shell] editor: godot exe not found (see BAGIDEA_GODOT)");
+                            let _ = std::fs::write(std::env::temp_dir().join("bagidea_editor_ready"), "no-exe");
+                            splash.set_visible(false);
                         }
                     }
                 }
                 UserEvent::EditorReady => {
                     splash.set_visible(false);
                 }
-                UserEvent::Toggle => do_toggle(feed),
+                UserEvent::Toggle => do_toggle(feed, large),
                 UserEvent::HideOverlay => {
                     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
                 }
                 UserEvent::MiniToggle => {
-                    if !feed {
+                    if !feed && !large {
                         mini = !mini;
                         let (w, h) = if mini { MINI } else { FULL };
                         overlay.set_inner_size(LogicalSize::new(w, h));
@@ -2415,7 +2488,41 @@ fn main() {
                         raise_orb(&orb);
                     }
                 }
+                UserEvent::LargeToggle => {
+                    if !feed {
+                        large = !large;
+                        if large {
+                            mini = false;
+                            let w = (logical_w * LARGE_FRAC).max(FULL.0);
+                            let h = (logical_h * LARGE_FRAC).max(FULL.1);
+                            overlay.set_resizable(true);
+                            // The floor: large can stretch to fullscreen but never
+                            // shrink below the normal window.
+                            overlay.set_min_inner_size(Some(LogicalSize::new(FULL.0, FULL.1)));
+                            overlay.set_inner_size(LogicalSize::new(w, h));
+                            overlay.set_outer_position(LogicalPosition::new(
+                                ((logical_w - w) / 2.0).max(0.0),
+                                (((logical_h - h) / 2.0) - 20.0).max(10.0)));
+                            overlay.set_focus();
+                            // Resized fires next and clips the region to the real size.
+                        } else {
+                            overlay.set_resizable(false);
+                            overlay.set_inner_size(LogicalSize::new(FULL.0, FULL.1));
+                            overlay.set_outer_position(LogicalPosition::new(overlay_x, overlay_y));
+                            platform::region_round(&overlay, FULL.0, FULL.1, 18.0);
+                        }
+                        let _ = overlay_view.evaluate_script(&format!(
+                            "window.setLargeMode && setLargeMode({})", large));
+                        raise_orb(&orb);
+                    }
+                }
                 UserEvent::FeedToggle => {
+                    if large {
+                        // Feed replaces large — drop resizability before shrinking.
+                        large = false;
+                        overlay.set_resizable(false);
+                        let _ = overlay_view.evaluate_script("window.setLargeMode && setLargeMode(false)");
+                    }
                     feed = !feed;
                     let _ = overlay_view.evaluate_script(&format!(
                         "window.setFeedMode && setFeedMode({})", feed));
@@ -2444,7 +2551,10 @@ fn main() {
                             .map(|p| p.x < -2000)
                             .unwrap_or(true);
                         if hidden {
-                            let (px, py) = if feed {
+                            let (px, py) = if large {
+                                let s = overlay.inner_size().to_logical::<f64>(overlay.scale_factor());
+                                (((logical_w - s.width) / 2.0).max(0.0), (((logical_h - s.height) / 2.0) - 20.0).max(10.0))
+                            } else if feed {
                                 (feed_x, feed_y)
                             } else {
                                 (overlay_x, overlay_y)

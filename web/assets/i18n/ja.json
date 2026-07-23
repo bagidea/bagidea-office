@@ -154,7 +154,7 @@
   "d_install_manual_h": "手動ビルド",
   "d_install_manual_p": "リポジトリをクローンし、Claude フックパスをクローンに向けてから Rust シェルをビルドします:",
   "d_install_first_h": "初回起動",
-  "d_install_first_p": "Claude に一度ログインしてからオフィスを起動します。壁紙がライブオフィスになり、チャットヘッドとトレイアイコンが表示されます。",
+  "d_install_first_p": "ブレインを選んですぐ開始 — Claude ログインは任意です。設定にそのプロバイダの API キーを入れるだけで、エージェントは GLM・DeepSeek・Qwen・Kimi などで動きます。Claude モデルを使う場合のみ Claude にログインしてください。オフィスを起動すると壁紙がライブオフィスに変わり、チャットヘッドとトレイアイコンが現れます。",
   "d_install_plat": "プラットフォーム対応: Windows 11（安定版、WorkerW）、macOS 13+（beta、DYLD shim）、Linux（実験的 — X11 EWMH によるデスクトップ組み込み。Wayland では最背面に固定された全画面ウィンドウにフォールバック）。",
   "d_using_h": "使い方",
   "d_chat_h": "チャットと CEO",
@@ -329,5 +329,7 @@
   "sc_s3_h": "3 · PR を開く",
   "sc_s3_p": "あなたの著作者情報を保ったままレビューしてマージするので、Contributors グラフに載り、あなたのカードがここに表示されます。",
   "sc_submit_cta": "投稿ガイドを読む →",
-  "sc_edit_cta": "showcase.json を編集 →"
+  "sc_edit_cta": "showcase.json を編集 →",
+  "d_migrate_h": "新しいマシンへ引っ越し",
+  "d_migrate_p": "新しいマシンへ引っ越し？<code>bagidea export</code> はオフィス全体 — エージェント・スキル・記憶・プロジェクト・プラグイン — を1つのファイルにまとめます。新しいマシンに BagIdea Office をインストールし、<code>bagidea import</code> を実行すれば同じチームが戻ってきます。"
 }

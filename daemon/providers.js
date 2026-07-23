@@ -24,9 +24,12 @@
 // `models` is a hint list for the settings UI — any string is accepted.
 const PROVIDERS = {
   claude: {
+    // The ONLY provider with no live /models fetch (subscription auth has no
+    // listing endpoint) — keep this hint list current by hand on every release.
     label: "Claude · Anthropic", format: "anthropic", direct: true, baseUrl: null,
     models: ["", "opus", "sonnet", "haiku",
-             "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
+             "claude-fable-5", "claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5",
+             "claude-sonnet-4-6"],
   },
   glm: {
     label: "GLM · Z.AI", format: "anthropic", direct: true,

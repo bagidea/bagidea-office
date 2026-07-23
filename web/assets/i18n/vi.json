@@ -154,7 +154,7 @@
   "d_install_manual_h": "Xây dựng thủ công",
   "d_install_manual_p": "Sao chép kho lưu trữ, trỏ đường dẫn hook Claude vào bản sao của bạn, sau đó xây dựng shell Rust:",
   "d_install_first_h": "Lần chạy đầu tiên",
-  "d_install_first_p": "Đăng nhập vào Claude một lần, sau đó khởi động văn phòng. Hình nền của bạn trở thành văn phòng trực tiếp; đầu trò chuyện và biểu tượng khay hệ thống xuất hiện.",
+  "d_install_first_p": "Chọn một bộ não rồi bắt đầu — đăng nhập Claude là tuỳ chọn. Agent chạy được trên GLM, DeepSeek, Qwen, Kimi… chỉ với API key của nhà cung cấp đó trong Cài đặt; chỉ cần đăng nhập Claude nếu bạn dùng mô hình Claude. Khởi động văn phòng — hình nền trở thành văn phòng trực tiếp; xuất hiện đầu chat và biểu tượng khay.",
   "d_install_plat": "Hỗ trợ nền tảng: Windows 11 (ổn định, WorkerW), macOS 13+ (beta, DYLD shim) và Linux (thử nghiệm — gắn vào desktop qua X11 EWMH; trên Wayland chuyển sang cửa sổ toàn màn hình được ghim bên dưới).",
   "d_using_h": "Sử dụng",
   "d_chat_h": "Trò chuyện & CEO",
@@ -329,5 +329,7 @@
   "sc_s3_h": "3 · Mở một PR",
   "sc_s3_p": "Chúng tôi xem xét và hợp nhất nó trong khi giữ nguyên quyền tác giả của bạn, nên bạn xuất hiện trên đồ thị Contributors và thẻ của bạn hiện ở đây.",
   "sc_submit_cta": "Đọc hướng dẫn gửi bài →",
-  "sc_edit_cta": "Chỉnh sửa showcase.json →"
+  "sc_edit_cta": "Chỉnh sửa showcase.json →",
+  "d_migrate_h": "Chuyển sang máy mới",
+  "d_migrate_p": "Chuyển sang máy mới? <code>bagidea export</code> đóng gói toàn bộ văn phòng — agent, kỹ năng, trí nhớ, dự án, plugin — vào một tệp duy nhất. Cài BagIdea Office trên máy mới rồi chạy <code>bagidea import</code> để đưa đúng đội ngũ đó trở lại."
 }

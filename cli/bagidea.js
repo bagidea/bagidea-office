@@ -111,11 +111,16 @@ function help() {
 
   head("Configure");
   row("lang [code]", "Show / set the office language (14 languages)");
+  row("eco [on|off]", "🌱 Cut idle token burn (rhythms stretch, QA pass off)");
   row("keys", "List configured API keys (values hidden)");
   row("key set <NAME> <value>", "Add a key · key rm <NAME> · key test [NAME]");
   row("channels", "Telegram / Discord / LINE status");
   row("plugins", "Installed plugins");
   row("plugin install <git-url>", "Add a plugin · plugin remove <id>");
+
+  head("Move to a new machine");
+  row("export [file]", "Pack agents · skills · memory · plugins → one .tgz");
+  row("import <file>", "Restore an exported office here (overwrites)");
 
   head("Maintenance");
   row("fixmic", "Reset Windows voice-typing if it's stuck");
@@ -232,8 +237,25 @@ async function main() {
 
   if (cmd === "editor") {
     if (!(await daemonUp())) return NOT_RUNNING();
-    await req("POST", "/editor/open", {});
+    const r = await req("POST", "/editor/open", {});
+    if (r && r.error) return bad(r.error);   // e.g. Godot engine missing on this machine
     return ok("Opening the 3D Office Editor (separate window) — save when you're done");
+  }
+
+  if (cmd === "eco") {
+    // 🌱 Eco mode — one switch that cuts idle token burn (rhythms stretch,
+    // QA double-pass off). Direct orders are never throttled.
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const arg = (rest[0] || "").toLowerCase();
+    if (!arg) {
+      const s = await req("GET", "/registry");
+      return info(`Eco mode is ${s && s.ecoMode ? c.ok + "ON" : c.gray + "OFF"}${c.reset} ${c.gray}— bagidea eco on|off${c.reset}`);
+    }
+    if (!["on", "off"].includes(arg)) return bad("usage: bagidea eco on|off");
+    const r = await req("POST", "/registry/eco", { on: arg === "on" });
+    return r && r.eco
+      ? ok("Eco mode ON — idle rhythms stretched, QA double-pass off (your direct orders are never slowed)")
+      : ok("Eco mode OFF — full office rhythm restored");
   }
 
   if (cmd === "fixmic") {
@@ -267,6 +289,92 @@ async function main() {
     info("Updating… (the app will restart itself)");
     spawn("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps],
       { cwd: ROOT, detached: true, stdio: "inherit" });
+    return;
+  }
+
+  // --- migrate: pack the whole office → move it to another machine ------------
+  // Everything that makes an office YOURS lives in three places: daemon/*.json
+  // state (registry = agents/skills/keys/brains, plus jobs/notes/calendar/…),
+  // workspace/ (agent memory, meetings, projects, uploads) and plugins/.
+  // We tar those relative to ROOT with the system tar — it ships with
+  // Windows 10+, macOS and Linux, so the CLI stays zero-dependency.
+  const exportPaths = () => {
+    const daemonState = ["registry.json", "jobs.json", "notes.json", "calendar.json",
+      "layout.json", "projects.json", "proposals.json", "paused.json", "assets.json",
+      "mcp_main.json"].map((f) => "daemon/" + f);
+    return [...daemonState, "daemon/i18n", "workspace", "plugins"]
+      .filter((p) => fs.existsSync(path.join(ROOT, p)));
+  };
+  // node_modules are reinstallable, _trash/temp/staging are scratch — real
+  // offices carry 100+ MB of them for nothing. Both pattern shapes so any tar
+  // flavor (bsdtar on Win/mac, GNU on Linux) drops them at every depth.
+  const TAR_SKIP = ["--exclude=node_modules", "--exclude=*/node_modules",
+    "--exclude=_trash", "--exclude=*/_trash", "--exclude=.DS_Store",
+    "--exclude=workspace/temp", "--exclude=workspace/staging"];
+  // Run tar from the archive's own folder and pass -f a bare basename: GNU tar
+  // reads "C:\…" as a REMOTE host:path (bsdtar doesn't take --force-local, so
+  // the flag can't fix it portably) — a colon-free -f dodges it on every tar.
+  const tarRun = (dir, args) =>
+    execFileSync("tar", args, { cwd: dir, stdio: ["ignore", "inherit", "inherit"] });
+
+  if (cmd === "export") {
+    const out = path.resolve(rest.find((a) => !a.startsWith("-")) ||
+      `bagidea-office-backup-${new Date().toISOString().slice(0, 10)}.tgz`);
+    const paths = exportPaths();
+    if (!paths.includes("daemon/registry.json"))
+      return bad("nothing to export — daemon/registry.json not found (has the office ever run?)");
+    info("Packing: " + paths.join(" · "));
+    try {
+      tarRun(path.dirname(out), [...TAR_SKIP, "-czf", path.basename(out), "-C", ROOT, ...paths]);
+    } catch (e) { return bad("tar failed: " + (e && e.message)); }
+    const mb = (fs.statSync(out).size / 1048576).toFixed(1);
+    ok(`Exported → ${c.accent}${out}${c.reset} ${c.gray}(${mb} MB)${c.reset}`);
+    warn("This file contains your API keys and agent data — keep it private, delete it after importing.");
+    info(`On the new machine: install BagIdea Office, then run ${c.accent}bagidea import "${path.basename(out)}"${c.reset}`);
+    return;
+  }
+
+  if (cmd === "import") {
+    const file = rest.find((a) => !a.startsWith("-"));
+    if (!file) return bad("usage: bagidea import <backup.tgz>");
+    const abs = path.resolve(file);
+    if (!fs.existsSync(abs)) return bad("not found: " + abs);
+    let names = [];
+    try {
+      names = execFileSync("tar", ["-tzf", path.basename(abs)],
+        { cwd: path.dirname(abs), encoding: "utf8", maxBuffer: 64 * 1048576 })
+        .split("\n").map((n) => n.trim()).filter(Boolean);
+    } catch (e) { return bad("not a readable backup: " + (e && e.message)); }
+    if (!names.includes("daemon/registry.json"))
+      return bad("this archive has no daemon/registry.json — not a bagidea export");
+    // Only our three roots, only relative paths — refuse anything a crafted
+    // archive could use to write outside the install (absolute, .., drive:).
+    const stray = names.find((n) =>
+      !/^(daemon|workspace|plugins)(\/|$)/.test(n) || n.split("/").includes("..") || n.includes(":"));
+    if (stray) return bad("archive contains an unexpected path: " + stray);
+    const doImport = async () => {
+      info("Stopping the office…");
+      await killAll();
+      await new Promise((r) => setTimeout(r, 2500));
+      const regNow = path.join(ROOT, "daemon", "registry.json");
+      if (fs.existsSync(regNow)) {
+        const bak = regNow + ".pre-import-" + new Date().toISOString().slice(0, 10);
+        fs.copyFileSync(regNow, bak);
+        info(`Current team backed up → ${c.accent}${path.basename(bak)}${c.reset}`);
+      }
+      try { tarRun(path.dirname(abs), ["-xzf", path.basename(abs), "-C", ROOT]); }
+      catch (e) { return bad("extract failed: " + (e && e.message)); }
+      ok(`Imported ${names.length} files`);
+      if (await startOffice("starting the office")) ok("The office is back — same team, new machine 🏢");
+    };
+    if (rest.includes("-y") || rest.includes("--yes")) return doImport();
+    warn(`This OVERWRITES this machine's office — agents, skills, memory, keys, plugins (${names.length} files).`);
+    const rl = require("readline").createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(`  ${c.warn}Type 'yes' to import:${c.reset} `, (ans) => {
+      rl.close();
+      if (String(ans).trim().toLowerCase() === "yes") doImport();
+      else info("Cancelled — nothing was changed.");
+    });
     return;
   }
 

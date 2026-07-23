@@ -154,7 +154,7 @@
   "d_install_manual_h": "手动构建",
   "d_install_manual_p": "克隆仓库，将 Claude 钩子路径指向你的克隆，然后构建 Rust shell：",
   "d_install_first_h": "首次运行",
-  "d_install_first_p": "登录 Claude 一次，然后启动办公室。你的壁纸将变成实时办公室；聊天头和托盘图标随即出现。",
+  "d_install_first_p": "选一个大脑就能开工 — Claude 登录是可选的。只需在设置里填入对应提供商的 API 密钥，智能体即可运行在 GLM、DeepSeek、Qwen、Kimi 等之上；只有使用 Claude 模型时才需要登录 Claude。启动办公室，壁纸即变成实时办公室；聊天头像和托盘图标随之出现。",
   "d_install_plat": "平台支持：Windows 11（稳定版，WorkerW）、macOS 13+（beta，DYLD shim）以及 Linux（实验性 —— X11 EWMH 桌面嵌入；在 Wayland 上回退为固定在最底层的全屏窗口）。",
   "d_using_h": "使用方法",
   "d_chat_h": "聊天与 CEO",
@@ -329,5 +329,7 @@
   "sc_s3_h": "3 · 发起一个 PR",
   "sc_s3_p": "我们会在保留你署名的前提下审核并合并它，因此你会出现在 Contributors 图谱上，你的卡片也会显示在这里。",
   "sc_submit_cta": "阅读提交指南 →",
-  "sc_edit_cta": "编辑 showcase.json →"
+  "sc_edit_cta": "编辑 showcase.json →",
+  "d_migrate_h": "迁移到新电脑",
+  "d_migrate_p": "要换新电脑？<code>bagidea export</code> 会把整个办公室 — 智能体、技能、记忆、项目、插件 — 打包成一个文件。在新电脑上安装 BagIdea Office，运行 <code>bagidea import</code>，同一支团队就回来了。"
 }

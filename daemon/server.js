@@ -130,10 +130,18 @@ function loadReg() {
   if (reg.heartbeatMin === undefined) reg.heartbeatMin = 60; // Director check-in
   if (reg.socialMin === undefined) reg.socialMin = 120;      // agents socialize (economical default)
   if (reg.proposalMin === undefined) reg.proposalMin = 120;  // min gap between CEO pitches
+  if (reg.channelNotify === undefined) reg.channelNotify = true; // work milestones → Telegram/Discord/…
   saveReg();
 }
 function saveReg() { fs.writeFileSync(REGISTRY, JSON.stringify(reg, null, 2)); }
 loadReg();
+
+// 🌱 Eco mode (reg.ecoMode): ONE switch that cuts the office's idle token burn —
+// self-driven rhythms stretch to gentle floors (heartbeat ≥3h, social ≥6h,
+// pitches ≥6h) and the delegated-work QA double-pass is skipped. Direct orders
+// are never throttled: eco only slows what the office does BY ITSELF.
+// 0 still means "off entirely" for any rhythm the owner disabled.
+function ecoFloor(v, floor) { return reg.ecoMode && v !== 0 ? Math.max(v, floor) : v; }
 
 // Live (not journaled): registry.json is the persistence; every WS client
 // also gets a fresh snapshot on connect.
@@ -237,6 +245,7 @@ function rosterEvt() {
     tools: reg.tools, builtinTools: BUILTIN_TOOLS, mcp: reg.mcpServers,
     skills: reg.skills, autoSkills: reg.autoSkills !== false,
     verifyDelegated: reg.verifyDelegated === true,
+    ecoMode: reg.ecoMode === true,
     sound: reg.sound !== false, heartbeatMin: Number(reg.heartbeatMin || 0),
     features: featuresMap(), tts: reg.tts !== false,
     socialMin: Number(reg.socialMin !== undefined ? reg.socialMin : 60),
@@ -792,6 +801,19 @@ try {
   } catch {}
 })();
 
+// Is a process with this image name running? Sync (~100ms) — used only on the
+// rare editor-open fallback path, to grace OLD shells whose alive-flag was
+// written once at boot and never refreshed.
+function procAlive(name) {
+  try {
+    const { execFileSync } = require("child_process");
+    if (process.platform === "win32")
+      return execFileSync("tasklist", ["/FI", `IMAGENAME eq ${name}.exe`, "/NH"],
+        { encoding: "utf8", timeout: 4000 }).toLowerCase().includes(name.toLowerCase());
+    return execFileSync("pgrep", ["-f", name], { encoding: "utf8", timeout: 4000 }).trim().length > 0;
+  } catch { return false; }
+}
+
 function memFile(agent) {
   return path.join(MEM_DIR, String(agent).replace(/[^\w-]/g, "_") + ".md");
 }
@@ -1137,13 +1159,42 @@ function projectDir(id) {
   return p ? p.dir : null;
 }
 
+// ~/.claude.json is where the Claude Code CLI keeps its first-run state. We read
+// it in two places (onboarding + per-project trust); a never-logged-in user has
+// no such file at all, so tolerate a missing/corrupt file by starting fresh
+// instead of throwing (the old JSON.parse-inside-try silently no-op'd, leaving
+// the very stalls these helpers exist to prevent).
+function claudeJsonPath() { return path.join(require("os").homedir(), ".claude.json"); }
+function readClaudeJson() {
+  try { return JSON.parse(fs.readFileSync(claudeJsonPath(), "utf8")) || {}; }
+  catch { return {}; }
+}
+
+// The CLI is our agent runtime for EVERY brain — GLM/DeepSeek/Qwen included; only
+// the model behind it changes (providers.js). But it stalls on its interactive
+// first-run wizard until ~/.claude.json marks onboarding done. A user who never
+// logged into Claude has no such file, so every headless `claude -p` spawn — even
+// one routed to GLM via ANTHROPIC_AUTH_TOKEN — hangs on a prompt it can't show,
+// dying BEFORE it ever reaches the third-party model. Seeding this one flag lets a
+// pure third-party-brain user (zero Anthropic account) run agents. It's exactly the
+// flag the wizard sets on completion; we never downgrade an existing value.
+function ensureOnboarded() {
+  try {
+    const j = readClaudeJson();
+    if (j.hasCompletedOnboarding === true) return;
+    j.hasCompletedOnboarding = true;
+    fs.writeFileSync(claudeJsonPath(), JSON.stringify(j, null, 2));
+    console.log("[claude] seeded hasCompletedOnboarding — skip first-run wizard");
+  } catch (e) { console.error("[claude] onboarding seed failed:", e && e.message); }
+}
+
 // Headless claude in an untrusted folder stalls on the trust dialog it can
 // never show. Pre-trust project dirs in ~/.claude.json (same flag the
-// interactive "Yes, I trust this folder" sets).
+// interactive "Yes, I trust this folder" sets). Creates the file if absent.
 function ensureTrusted(dir) {
   try {
-    const file = path.join(require("os").homedir(), ".claude.json");
-    const j = JSON.parse(fs.readFileSync(file, "utf8"));
+    const file = claudeJsonPath();
+    const j = readClaudeJson();
     j.projects = j.projects || {};
     const key = String(dir).replace(/\\/g, "/").replace(/\/+$/, "");
     const cur = j.projects[key] || {};
@@ -1447,7 +1498,7 @@ setInterval(() => {
         { noSub: true, logPrompt: `🔔 เตือนนัด: ${c.title}` });
     }
   }
-  const hb = Number(reg.heartbeatMin || 0);
+  const hb = ecoFloor(Number(reg.heartbeatMin || 0), 180);
   if (hb > 0 && now - lastHeartbeat >= hb * 60000 && agentBusy.size === 0)
     heartbeat();
   resumePausedTick(now);
@@ -2207,6 +2258,7 @@ function makeDelegateFilter(depth, session, onHit) {
       }
       if (tgt && tgt !== "ceo" && tgt !== "main") {
         broadcast({ type: "task.delegated", agent: "main", target: tgt });
+        notifyChannels(`🕊 → ${(reg.agents[tgt] && reg.agents[tgt].name) || tgt}: ${String(m[3] || "").trim().slice(0, 200)}`);
         if (onHit) onHit();
         const inst = m[3];
         const t = tgt;
@@ -2255,7 +2307,9 @@ function makeDelegateFilter(depth, session, onHit) {
 // the assignee ONCE (resuming their thread), then reports. Never recurses; never blocks
 // (any reviewer failure ships the original result).
 function verifyThenReport(fromId, task, out, ok, depth, session, proj) {
-  if (!reg.verifyDelegated || !ok) return reportToMain(fromId, out, ok, depth, session);
+  // Eco mode skips the QA double-pass — it re-runs a whole review turn per
+  // delegated task, the single biggest optional token cost in the office.
+  if (!reg.verifyDelegated || reg.ecoMode || !ok) return reportToMain(fromId, out, ok, depth, session);
   const a = reg.agents[fromId] || { name: fromId };
   // Snapshot the assignee's WORK thread now — before the review run spawns a new one.
   const wl = sess[fromId] || [];
@@ -2317,8 +2371,12 @@ function reportToMain(fromId, text, ok, depth, session) {
       onDone: (_finalText, fOk) => {
         release();
         // No further hand-offs → that WAS the summary: walk it to the boss.
-        if (!delegatedMore && fOk)
+        if (!delegatedMore && fOk) {
           broadcast({ type: "ceo.report", agent: "main" });
+          // Follow-from-the-phone: the finished-work summary (with any preview
+          // images ridden along as photos) also lands on Telegram/Discord/….
+          notifyChannels(_finalText && "📨 " + _finalText);
+        }
       },
     });
   });
@@ -3012,6 +3070,7 @@ function channelCommand(text) {
 
 const channels = require("./channels")({
   getConfig: () => reg.channels || {},
+  uploadsDir: path.join(WORKSPACE, "uploads"),   // resolve "/uploads/…" for Telegram photo upload
   log: (s) => console.log(s),
   onMessage(channel, from, text, reply, typing) {
     broadcast({ type: "channel.message", channel, from,
@@ -3047,6 +3106,15 @@ const channels = require("./channels")({
   },
 });
 channels.restart();
+
+// Work milestones → every connected channel (Telegram/Discord/…): delegation,
+// finished-work reports, new pitches — so long-running work is followable from
+// the phone. Hoisted function so earlier-in-file call sites can use it.
+// reg.channelNotify=false mutes (default on).
+function notifyChannels(text) {
+  if (reg.channelNotify === false || !text) return;
+  try { channels.relay(String(text)); } catch (e) { console.error("[chan] notify", e && e.message); }
+}
 
 // ---------------------------------------------------------------- plugins
 const plugins = require("./plugins")({
@@ -3088,7 +3156,7 @@ const BANTER = [
 
 let lastSocial = Date.now();
 function socialTick(now) {
-  const min = Number(reg.socialMin !== undefined ? reg.socialMin : 120);
+  const min = ecoFloor(Number(reg.socialMin !== undefined ? reg.socialMin : 120), 360);
   if (!min || activeDiscussions > 0 || agentBusy.size > 0) return;
   if (now - lastSocial < min * 60000) return;
   const staff = Object.keys(reg.agents).filter((id) => id !== "ceo" && id !== "main");
@@ -3178,7 +3246,7 @@ function ambientTick(now) {
 // discuss freely — only the pitches that REACH the owner are throttled.
 let lastProposalAt = 0;
 function addProposal(by, agents, name, detail) {
-  const gap = Number(reg.proposalMin !== undefined ? reg.proposalMin : 120);
+  const gap = ecoFloor(Number(reg.proposalMin !== undefined ? reg.proposalMin : 120), 360);
   if (gap && Date.now() - lastProposalAt < gap * 60000) return null;  // too soon
   lastProposalAt = Date.now();
   const p = { id: "pr" + Date.now(), by, agents, name: String(name).slice(0, 60),
@@ -3186,6 +3254,7 @@ function addProposal(by, agents, name, detail) {
   proposals.push(p);
   saveProposals();
   broadcast({ type: "proposal.created", agent: by, name: p.name, proposal: p.id });
+  notifyChannels(`💡 ${(reg.agents[by] && reg.agents[by].name) || by} pitched: ${p.name} — decide in the app or "bagidea proposals"`);
   return p;
 }
 
@@ -4891,26 +4960,49 @@ end tell`;
       const tmp = require("os").tmpdir();
       try { fs.unlinkSync(path.join(tmp, "bagidea_editor_ready")); } catch {}
       fs.writeFileSync(path.join(tmp, "bagidea_editor_open_request"), String(Date.now()));
-      // fallback: if the shell isn't running, launch directly after a beat
+      // fallback: if the shell isn't running, launch directly after a beat.
+      // Try every place a Godot engine could really be — the installer's tools
+      // dir included ("some machines can't open the editor" was these fallbacks
+      // pointing at paths no install ever uses, then failing SILENTLY).
       const gdir = path.join(__dirname, "..", "godot");
+      const first = (list) => list.find((p) => p && fs.existsSync(p)) || "";
       let godot = "";
       if (process.platform === "win32") {
-        const branded = path.join(gdir, "bin", "BagIdeaOffice.exe");
-        godot = fs.existsSync(branded) ? branded
-          : (process.env.BAGIDEA_GODOT || "C:\\Program Files\\Godot\\Godot_v4.6.3-stable_win64.exe");
+        godot = first([
+          path.join(gdir, "bin", "BagIdeaOffice.exe"),
+          process.env.BAGIDEA_GODOT,
+          path.join(process.env.LOCALAPPDATA || "", "BagIdeaOffice", "tools", "godot", "Godot_v4.6.3-stable_win64.exe"),
+          "C:\\Program Files\\Godot\\Godot_v4.6.3-stable_win64.exe",
+        ]);
       } else if (process.platform === "darwin") {
-        const app = path.join(gdir, "bin-mac", "Godot.app", "Contents", "MacOS", "Godot");
-        godot = fs.existsSync(app) ? app : "Godot";
+        godot = first([
+          path.join(gdir, "bin-mac", "Godot.app", "Contents", "MacOS", "Godot"),
+          process.env.BAGIDEA_GODOT,
+          "/Applications/Godot.app/Contents/MacOS/Godot",
+        ]);
       } else {
-        // Linux/other: a bundled binary under godot/bin-linux/, else $BAGIDEA_GODOT,
-        // else rely on `godot` on PATH (installed by install-linux.sh).
-        const bin = path.join(gdir, "bin-linux", "godot");
-        godot = fs.existsSync(bin) ? bin : (process.env.BAGIDEA_GODOT || "godot");
+        godot = first([path.join(gdir, "bin-linux", "godot"), process.env.BAGIDEA_GODOT,
+          "/usr/local/bin/godot", "/usr/bin/godot"]);
       }
-      const shellUp = fs.existsSync(path.join(tmp, "bagidea_shell_alive"));
-      if (!shellUp && fs.existsSync(godot)) {
-        spawn(godot, ["--path", gdir, "--", "--editor3d"],
-          { detached: true, stdio: "ignore", windowsHide: false }).unref();
+      // The shell's alive-flag is only proof while FRESH (it re-touches every 5s
+      // since 0.9.45; a crash used to leave a stale flag that muted this fallback
+      // forever). Old shells wrote it once — grace them with a long window.
+      let shellUp = false;
+      try {
+        const st = fs.statSync(path.join(tmp, "bagidea_shell_alive"));
+        shellUp = Date.now() - st.mtimeMs < 15000 ||
+          (Date.now() - st.mtimeMs < 6 * 3600 * 1000 && !!procAlive("bagidea-office-shell"));
+      } catch {}
+      if (!shellUp) {
+        if (!godot) {
+          res.writeHead(500, { "content-type": "application/json; charset=utf-8" });
+          return res.end(JSON.stringify({ error:
+            "Godot engine not found — re-run the installer, or set BAGIDEA_GODOT to your Godot 4.6 executable" }));
+        }
+        const child = spawn(godot, ["--path", gdir, "--", "--editor3d"],
+          { detached: true, stdio: "ignore", windowsHide: false });
+        child.on("error", (e) => console.error("[editor] spawn failed:", e && e.message));
+        child.unref();
       }
       broadcast({ type: "editor.opening" }, false);
       res.writeHead(200); res.end("ok");
@@ -5200,6 +5292,17 @@ end tell`;
         saveReg();
         pushRoster();
         res.writeHead(200); res.end("ok");
+      } catch { res.writeHead(400); res.end("bad json"); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/eco") {
+    // 🌱 Eco mode on/off — see ecoFloor(). CLI: `bagidea eco on|off`.
+    readBody(req, (body) => {
+      try {
+        reg.ecoMode = !!JSON.parse(body).on;
+        saveReg();
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, eco: reg.ecoMode }));
       } catch { res.writeHead(400); res.end("bad json"); }
     });
 
@@ -6163,6 +6266,9 @@ const OEP_PORT = process.env.OEP_PORT || 8787;  // override only for isolated te
 // skips the installer's wire-hooks script (clone-and-run dev workflow).
 try { wireWorkspaceSettings(WORKSPACE, __dirname); }
 catch (e) { console.error("[startup] wireWorkspaceSettings failed:", e && e.message); }
+// Let a never-logged-in user (GLM/DeepSeek-only) run agents: skip the CLI's
+// interactive first-run wizard that would otherwise hang every headless spawn.
+ensureOnboarded();
 server.listen(OEP_PORT, "127.0.0.1", () => {
   console.log(`[oep] http+ws listening :${OEP_PORT}`);
   // Fresh boot ⇒ nothing is running (runChildren starts empty). A task.started left

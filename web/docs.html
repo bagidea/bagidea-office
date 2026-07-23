@@ -139,7 +139,7 @@ cd bagidea-office\shell
 cargo build --release   # → shell/target/release/bagidea-office-shell.exe</code></pre>
 
     <h3 id="install-first" data-i18n="d_install_first_h">First run</h3>
-    <p data-i18n="d_install_first_p">Log in to Claude once, then start the office. Your wallpaper becomes the live office; a chat head and tray icon appear.</p>
+    <p data-i18n="d_install_first_p">Pick a brain and go — Claude login is optional. Agents can run on GLM, DeepSeek, Qwen, Kimi and more with just that provider's API key in Settings; log in to Claude only if you use Claude models. Start the office and your wallpaper becomes the live office; a chat head and tray icon appear.</p>
     <pre><code>claude          # sign in (first time only)
 bagidea start   # launch the office</code></pre>
 
@@ -242,11 +242,18 @@ bagidea start   # launch the office</code></pre>
       <tr><td><code>bagidea image "&lt;prompt&gt;"</code></td><td>Generate an AI image into the office</td></tr>
       <tr><td><code>bagidea channels · keys</code></td><td>Channel + API-key status</td></tr>
       <tr><td><code>bagidea feed</code></td><td>Live office event stream in your terminal</td></tr>
+      <tr><td><code>bagidea editor</code></td><td>Open the 3D Office Editor</td></tr>
+      <tr><td><code>bagidea eco [on|off]</code></td><td>🌱 Eco mode — cut idle token burn (rhythms stretch, QA pass off)</td></tr>
+      <tr><td><code>bagidea export [file]</code></td><td>Pack agents · skills · memory · plugins into one .tgz</td></tr>
+      <tr><td><code>bagidea import &lt;file&gt;</code></td><td>Restore an exported office on this machine</td></tr>
       <tr><td><code>bagidea startup [on|off]</code></td><td>Launch the office with Windows (show / set)</td></tr>
       <tr><td><code>bagidea update · version</code></td><td>Update to the latest release · show current version</td></tr>
       <tr><td><code>bagidea --help · --version</code></td><td>Full command list / current build</td></tr>
     </table>
     <img src="img/cli.png" alt="bagidea CLI help">
+
+    <h3 id="migrate" data-i18n="d_migrate_h">Move to a new machine</h3>
+    <p data-i18n="d_migrate_p">Moving to a new machine? <code>bagidea export</code> packs your whole office — agents, skills, memory, projects, plugins — into one file. Install BagIdea Office on the new machine and run <code>bagidea import</code> to bring the same team back.</p>
 
     <h2 id="faq" data-i18n="d_faq_h">FAQ</h2>
     <h3 data-i18n="d_faq_q1">Does it cost money to run?</h3>

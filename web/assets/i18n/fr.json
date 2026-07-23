@@ -154,7 +154,7 @@
   "d_install_manual_h": "Compilation manuelle",
   "d_install_manual_p": "Clonez le dépôt, pointez les chemins des hooks Claude vers votre clone, puis compilez le shell Rust :",
   "d_install_first_h": "Premier lancement",
-  "d_install_first_p": "Connectez-vous à Claude une fois, puis démarrez le bureau. Votre fond d'écran devient le bureau en direct ; une bulle de chat et une icône dans la barre d'état système apparaissent.",
+  "d_install_first_p": "Choisissez un cerveau et c'est parti — la connexion à Claude est facultative. Les agents peuvent tourner sur GLM, DeepSeek, Qwen, Kimi et plus avec la seule clé API du fournisseur dans les Réglages ; connectez-vous à Claude uniquement si vous utilisez des modèles Claude. Lancez le bureau : votre fond d'écran devient le bureau en direct ; une tête de chat et une icône de barre apparaissent.",
   "d_install_plat": "Prise en charge des plateformes : Windows 11 (stable, WorkerW), macOS 13+ (beta, DYLD shim) et Linux (expérimental — intégration au bureau via X11 EWMH ; sous Wayland, repli sur une fenêtre plein écran épinglée en dessous).",
   "d_using_h": "Utilisation",
   "d_chat_h": "Chat & CEO",
@@ -329,5 +329,7 @@
   "sc_s3_h": "3 · Ouvrez une PR",
   "sc_s3_p": "Nous la relisons et la fusionnons en préservant votre paternité, vous apparaissez donc sur le graphe Contributors et votre carte s’affiche ici.",
   "sc_submit_cta": "Lire le guide de soumission →",
-  "sc_edit_cta": "Modifier showcase.json →"
+  "sc_edit_cta": "Modifier showcase.json →",
+  "d_migrate_h": "Migrer vers une nouvelle machine",
+  "d_migrate_p": "Vous changez de machine ? <code>bagidea export</code> emballe tout votre bureau — agents, compétences, mémoire, projets, plugins — dans un seul fichier. Installez BagIdea Office sur la nouvelle machine puis lancez <code>bagidea import</code> pour retrouver la même équipe."
 }

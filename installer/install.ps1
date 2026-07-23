@@ -263,12 +263,16 @@ else {
     if (Test-Path $gexe) { Ok "installed" } else { Warn "extracted but exe not found" }
   } catch { Warn "download failed - check your connection and re-run" }
 }
-[Environment]::SetEnvironmentVariable("BAGIDEA_GODOT", $gexe, "User")
-$env:BAGIDEA_GODOT = $gexe
+# Only publish the env var when the exe is REAL — a pointer at a failed
+# download used to poison every Godot fallback (shell + daemon trusted it).
+if (Test-Path $gexe) {
+  [Environment]::SetEnvironmentVariable("BAGIDEA_GODOT", $gexe, "User")
+  $env:BAGIDEA_GODOT = $gexe
+}
 
 Step 6 "Claude Code CLI (the brain of every agent)"
 if (Have "claude") { Skip "already installed" }
-elseif (Have "npm") { Write-Host "      installing via npm (about a minute)..." -ForegroundColor DarkGray; npm install -g @anthropic-ai/claude-code; Sync-Path; Ok "installed - log in later by running: claude" }
+elseif (Have "npm") { Write-Host "      installing via npm (about a minute)..." -ForegroundColor DarkGray; npm install -g @anthropic-ai/claude-code; Sync-Path; Ok "installed - Claude login is OPTIONAL: only if you run Claude models. GLM/DeepSeek/etc. need only their API key in Settings" }
 else { Warn "npm not on PATH yet - reopen a terminal and run: npm install -g @anthropic-ai/claude-code" }
 
 # ---- handy CLI tools the agents can use (optional, best-effort) ---------------

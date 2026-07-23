@@ -84,5 +84,19 @@ the internet into your machine — the easiest is cloudflared:
 
 - *"Can you check how project X is coming along?"* — the Director checks the office status for you
 - *"Tell Flamingo to build a landing page in project Y"* — actually delegate work from your phone
-- For now, the reply sent back = the Director's first response (the plan/answer) — the detailed
-  output from the team can be followed in the app (a full round-trip back to the channel is on the roadmap)
+
+## Work updates land in your channels (0.9.45+)
+
+The office now pushes milestones out to every connected channel, so long-running
+work is followable from your phone:
+
+- **🕊 delegation** — the moment the Director hands a task to an agent
+- **📨 finished-work report** — when the delegated work completes, the Director's
+  summary arrives in the channel (not just in the app)
+- **💡 new pitch** — when the team proposes a project, you hear about it immediately
+
+**Images ride along on Telegram** — if a reply or report references a preview image
+(a generated image, an uploaded screenshot, any image path an agent produced), the
+actual photo is uploaded to your Telegram chat after the text, not just a file path.
+
+Mute everything with `"channelNotify": false` in `daemon/registry.json` (default is on).

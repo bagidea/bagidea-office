@@ -4,6 +4,85 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.45] — zero-Anthropic-account fix · 📦 move-to-a-new-machine · Gemini tool-use fix · large window · two hide levels · 🌱 eco mode
+
+**Added**
+- **📦 Move your office to a new machine** — `bagidea export` packs everything that
+  makes an office *yours* (agents, roles, skills, brains + keys, agent memory,
+  meetings, projects, uploads, plugins) into one `.tgz`; `bagidea import <file>`
+  on the new machine restores it (previews contents, asks for `yes`, backs up the
+  existing registry first, refuses archives with paths outside the install).
+  Zero-dependency — uses the `tar` that ships with Win10+/macOS/Linux.
+- **⛶ Large window mode** — a fourth window mode next to normal/mini/feed: a big
+  **resizable** chat window (opens at ~86% of your screen, centered) for reading
+  long threads and real work. Stretch it to fullscreen; it can never shrink below
+  the normal window size. New ⛶ title-bar button; feed mode gracefully exits it.
+- **Two hide levels** (tray) — the office keeps working under both:
+  **Hide everything** (wallpaper + chat + chat head) and new
+  **Hide chat + button (wallpaper stays)** — the world lives on your desktop while
+  the chat UI gets out of the way.
+- **Work updates now reach your channels** — delegation (🕊), the finished-work
+  report (📨) and new team pitches (💡) are pushed to every connected channel
+  (Telegram/Discord/LINE/…), so long-running work is followable from the phone.
+  Mute with `channelNotify: false` in the registry.
+- **🖼 Telegram gets real photos** — when a reply or report references a preview
+  image (generated image, uploaded screenshot, any image path), the actual file is
+  uploaded via `sendPhoto` after the text — not just a path string.
+- **🌱 Eco mode** — `bagidea eco on`: one switch that cuts idle token burn.
+  Self-driven rhythms stretch to floors (heartbeat ≥3h, social ≥6h, pitches ≥6h)
+  and the delegated-work QA double-pass is skipped. Direct orders are never
+  throttled. `POST /registry/eco` for the API-minded.
+
+**Fixed**
+- **Gemini brains died with `400 … missing thought_signature in functionCall parts`**
+  the moment an agent used a tool. Gemini thinking models sign each tool call and
+  REQUIRE the signature echoed back with the conversation history — the built-in
+  proxy dropped it in both directions. It now remembers each tool call's
+  `thought_signature` and re-attaches it on the history echo (with Google's
+  documented `skip_thought_signature_validator` fallback for pre-fix history).
+  Gemini-only; other providers get no extra fields.
+- **"The 3D Editor won't open on some machines"** — three real causes, all fixed:
+  (1) every Godot fallback path pointed at dev-machine locations no install uses —
+  the launcher (shell + daemon) now also checks the installer's actual tools dir,
+  ignores a `BAGIDEA_GODOT` that points at a missing file (and the installer no
+  longer sets it when the download failed); (2) a stale `bagidea_shell_alive` flag
+  from a crashed shell muted the daemon's fallback launcher forever — the shell now
+  re-touches the flag every 5s and the daemon only trusts a FRESH one; (3) a PID-
+  recycling bug could "focus" an unrelated process instead of launching. And when
+  no engine exists at all, `bagidea editor` / the UI now say so plainly instead of
+  pretending to open.
+- **Claude model picker missed the Claude 5 family** — `claude-fable-5` and
+  `claude-sonnet-5` added to the hint list (Claude is the one provider with no live
+  /models fetch; every other provider pulls its live list on Connect — verified
+  across all 19).
+- **English-first for fresh installs** — 37 UI strings (meeting controls, permission
+  prompts, fallback-brain/connect status, plugin updates, voice hints…) had no
+  English seed and stayed Thai for a brand-new EN user without a Gemini key. The
+  bundled English seed now covers them; website "First run" copy that still said
+  "log in to Claude once" rewritten in all 14 languages.
+
+**Fixed (the headline one)**
+- **A user who never logged into Claude couldn't run *any* agent — even one routed
+  to GLM, DeepSeek, Qwen, or another provider.** The office's agent runtime is
+  always the Claude Code CLI (only the *model behind it* changes — we point
+  `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN` at the chosen backend). But the CLI
+  runs an **interactive first-run wizard** until `~/.claude.json` marks onboarding
+  done — and a headless `claude -p` spawn has no terminal to answer it, so it hangs
+  and dies **before it ever reaches the third-party model**. A machine that logged
+  into Claude even once (then stopped using it) sailed past this; a never-logged-in
+  machine hit it on every single spawn, whatever brain was selected.
+- The office now **seeds `hasCompletedOnboarding: true` in `~/.claude.json` on
+  daemon boot** (creating the file if absent, never downgrading an existing value),
+  so a pure GLM/DeepSeek user with **no Anthropic account at all** can run agents.
+  It's exactly the flag the interactive wizard sets on completion.
+- Second stall fixed on the same path: `ensureTrusted()` (the folder pre-trust that
+  avoids the CLI's "Do you trust this folder?" prompt) used to `JSON.parse` an
+  existing `~/.claude.json` and silently no-op when the file was **missing** — so a
+  fresh user's project dirs were never pre-trusted either. It now creates the file.
+- Installer wording corrected: it no longer implies you must "log in later by
+  running: claude". Claude login is **optional** — needed only if you actually run
+  Claude models; every other provider needs just its API key in Settings.
+
 ## [0.9.44] — 📂 "Open folder" opens the *real* folder again (Windows)
 
 **Fixed**

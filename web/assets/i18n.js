@@ -163,7 +163,9 @@ const I18N = {
     d_install_manual_h:"Manual build",
     d_install_manual_p:"Clone the repository, point the Claude hook paths at your clone, then build the Rust shell:",
     d_install_first_h:"First run",
-    d_install_first_p:"Log in to Claude once, then start the office. Your wallpaper becomes the live office; a chat head and tray icon appear.",
+    d_install_first_p:"Pick a brain and go — Claude login is optional. Agents can run on GLM, DeepSeek, Qwen, Kimi and more with just that provider's API key in Settings; log in to Claude only if you use Claude models. Start the office and your wallpaper becomes the live office; a chat head and tray icon appear.",
+    d_migrate_h:"Move to a new machine",
+    d_migrate_p:"Moving to a new machine? <code>bagidea export</code> packs your whole office — agents, skills, memory, projects, plugins — into one file. Install BagIdea Office on the new machine and run <code>bagidea import</code> to bring the same team back.",
     d_install_plat:"Platform support: Windows 11 (stable, WorkerW), macOS 13+ (beta, DYLD shim), and Linux (experimental — X11 EWMH desktop attach; on Wayland it falls back to a fullscreen window pinned below).",
 
     d_using_h:"Using it",
@@ -413,7 +415,9 @@ const I18N = {
     d_install_manual_h:"Manueller Build",
     d_install_manual_p:"Klonen Sie das Repository, zeigen Sie die Claude-Hook-Pfade auf Ihren Klon und bauen Sie dann die Rust-Shell:",
     d_install_first_h:"Erste Ausführung",
-    d_install_first_p:"Melden Sie sich einmal bei Claude an, dann starten Sie das Büro. Ihr Hintergrundbild wird zum live Büro; ein Chat-Kopf und ein Tray-Icon erscheinen.",
+    d_install_first_p:"Gehirn wählen und los — die Claude-Anmeldung ist optional. Agenten laufen auf GLM, DeepSeek, Qwen, Kimi und mehr, nur mit dem API-Schlüssel des Anbieters in den Einstellungen; bei Claude anmelden müssen Sie sich nur, wenn Sie Claude-Modelle nutzen. Starten Sie das Büro — Ihr Hintergrundbild wird zum Live-Büro; ein Chat-Kopf und ein Tray-Icon erscheinen.",
+    d_migrate_h:"Umzug auf einen neuen Rechner",
+    d_migrate_p:"Umzug auf einen neuen Rechner? <code>bagidea export</code> packt Ihr ganzes Büro — Agenten, Skills, Gedächtnis, Projekte, Plugins — in eine Datei. Installieren Sie BagIdea Office auf dem neuen Rechner und holen Sie mit <code>bagidea import</code> dasselbe Team zurück.",
     d_install_plat:"Plattformunterstützung: Windows 11 (stabil, die Einbettung des Hintergrundbilds nutzt die WorkerW-Technik), macOS 13+ (beta, DYLD-Shim) und Linux (experimentell — X11-EWMH-Desktop-Einbindung; unter Wayland weicht es auf ein unten fixiertes Vollbildfenster aus).",
 
     d_using_h:"Nutzung",
@@ -588,7 +592,9 @@ const I18N = {
     d_install_manual_h:"ติดตั้งเอง",
     d_install_manual_p:"clone repo, ชี้ path ของ Claude hook มาที่ clone ของคุณ แล้ว build Rust shell:",
     d_install_first_h:"เปิดครั้งแรก",
-    d_install_first_p:"ล็อกอิน Claude หนึ่งครั้ง แล้วเปิดออฟฟิศ วอลเปเปอร์จะกลายเป็นออฟฟิศสด พร้อมหัวแชทและไอคอนถาดระบบ",
+    d_install_first_p:"เลือกสมองแล้วลุยได้เลย — ล็อกอิน Claude เป็นแค่ตัวเลือก agent รันบน GLM, DeepSeek, Qwen, Kimi ฯลฯ ได้ด้วย API key ของค่ายนั้นในหน้าตั้งค่า จะล็อกอิน Claude ก็ต่อเมื่อใช้โมเดล Claude เท่านั้น เปิดออฟฟิศแล้ววอลเปเปอร์จะกลายเป็นออฟฟิศสด พร้อมหัวแชทและไอคอนถาดระบบ",
+    d_migrate_h:"ย้ายเครื่อง",
+    d_migrate_p:"จะย้ายเครื่อง? <code>bagidea export</code> แพ็คทั้งออฟฟิศ — agents, สกิล, ความจำ, โปรเจค, ปลั๊กอิน — เป็นไฟล์เดียว ติดตั้ง BagIdea Office บนเครื่องใหม่แล้วรัน <code>bagidea import</code> ทีมเดิมก็กลับมาครบ",
     d_install_plat:"แพลตฟอร์มที่รองรับ: Windows 11 (stable, WorkerW), macOS 13+ (beta, DYLD shim) และ Linux (experimental — ผูกเป็น desktop wallpaper บน X11; บน Wayland เป็นหน้าต่างเต็มจออยู่ล่างสุด)",
 
     d_using_h:"การใช้งาน",

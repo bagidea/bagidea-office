@@ -154,7 +154,7 @@
   "d_install_manual_h": "수동 빌드",
   "d_install_manual_p": "저장소를 복제하고, Claude 훅 경로를 복제본으로 지정한 후, Rust 셸을 빌드하세요:",
   "d_install_first_h": "첫 실행",
-  "d_install_first_p": "Claude에 한 번 로그인하고, 사무실을 시작하세요. 배경화면이 라이브 사무실로 바뀌고; 채팅 헤드와 트레이 아이콘이 나타납니다.",
+  "d_install_first_p": "브레인을 고르고 바로 시작 — Claude 로그인은 선택 사항입니다. 설정에 해당 제공자의 API 키만 넣으면 에이전트가 GLM, DeepSeek, Qwen, Kimi 등에서 동작합니다. Claude 모델을 쓸 때만 Claude에 로그인하세요. 오피스를 시작하면 배경화면이 라이브 오피스가 되고, 챗 헤드와 트레이 아이콘이 나타납니다.",
   "d_install_plat": "플랫폼 지원: Windows 11(안정, WorkerW), macOS 13+(beta, DYLD shim), Linux(실험적 — X11 EWMH 데스크톱 통합; Wayland에서는 맨 아래에 고정된 전체 화면 창으로 대체).",
   "d_using_h": "사용법",
   "d_chat_h": "채팅 & CEO",
@@ -329,5 +329,7 @@
   "sc_s3_h": "3 · PR을 여세요",
   "sc_s3_p": "당신의 저작자 정보를 유지한 채 검토하고 머지하므로, Contributors 그래프에 오르고 당신의 카드가 여기에 표시됩니다.",
   "sc_submit_cta": "제출 가이드 읽기 →",
-  "sc_edit_cta": "showcase.json 편집 →"
+  "sc_edit_cta": "showcase.json 편집 →",
+  "d_migrate_h": "새 컴퓨터로 이사",
+  "d_migrate_p": "새 컴퓨터로 옮기시나요? <code>bagidea export</code>는 오피스 전체 — 에이전트, 스킬, 기억, 프로젝트, 플러그인 — 를 파일 하나로 담습니다. 새 컴퓨터에 BagIdea Office를 설치하고 <code>bagidea import</code>를 실행하면 같은 팀이 돌아옵니다."
 }
