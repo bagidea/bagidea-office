@@ -18,7 +18,7 @@ const os = require("os");
 const pkg = require("./package.json");
 
 const REPO = "https://github.com/bagidea/bagidea-office";
-const RAW = "https://raw.githubusercontent.com/bagidea/bagidea-office/main/installer";
+const RAW = "https://raw.githubusercontent.com/bagidea/bagidea-office/v" + pkg.version + "/installer";
 
 const arg = (process.argv[2] || "").toLowerCase();
 
@@ -48,7 +48,7 @@ This downloads and runs the official installer for your platform:
 You'll need Claude Code (https://claude.com/claude-code). After install, manage
 the office with the 'bagidea' command (start / stop / restart / update).
 
-Repo: ${REPO}
+Repo: https://github.com/bagidea/bagidea-office
 `);
   process.exit(0);
 }
@@ -60,13 +60,13 @@ console.log("\n🏢  BagIdea Office installer — your wallpaper goes to work.\n
 let cmd, args;
 if (platform === "win32") {
   cmd = "powershell";
-  args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", `irm ${RAW}/install.ps1 | iex`];
+  args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "irm " + RAW + "/install.ps1 | iex"];
 } else if (platform === "darwin") {
   cmd = "bash";
-  args = ["-c", `curl -fsSL ${RAW}/install-mac.sh | bash`];
+  args = ["-c", "curl --proto '=https' --tlsv1.2 -fsSL " + RAW + "/install-mac.sh | bash"];
 } else if (platform === "linux") {
   cmd = "bash";
-  args = ["-c", `curl -fsSL ${RAW}/install-linux.sh | bash`];
+  args = ["-c", "curl --proto '=https' --tlsv1.2 -fsSL " + RAW + "/install-linux.sh | bash"];
 } else {
   console.error(`Unsupported platform: ${platform}.\nSee ${REPO} for manual install instructions.`);
   process.exit(1);
