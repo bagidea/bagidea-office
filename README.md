@@ -759,6 +759,9 @@ platform we couldn't reach.
     <td align="center" valign="top" width="120">
       <a href="https://github.com/skiyo0177-lgtm"><img src="https://github.com/skiyo0177-lgtm.png?size=100" width="72" alt="@skiyo0177-lgtm"><br><sub><b>@skiyo0177-lgtm</b></sub></a><br><sub>i18n (zh/en/ja UI)</sub>
     </td>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/bmdy5"><img src="https://github.com/bmdy5.png?size=100" width="72" alt="@bmdy5"><br><sub><b>@bmdy5</b></sub></a><br><sub>Markdown rendering</sub>
+    </td>
   </tr>
 </table>
 

@@ -33,6 +33,11 @@ early macOS support, when the project was Windows-only:
   the whole status string before splitting, a `loadTR()` priority fix so the dictionary
   wins over a stale cache, and the missing status-label seed entries
   ([#35](https://github.com/bagidea/bagidea-office/pull/35)).
+- **[@bmdy5](https://github.com/bmdy5)** — unified agent-text rendering: a shared
+  vendored `md.js` (marked + DOMPurify) served at `/md.js`, so agent output (chat,
+  feed, workflow analysis/results, proposals, notes) renders as real markdown through
+  one XSS-safe path instead of showing raw markdown and stray `<b>` tags as literal
+  text ([#36](https://github.com/bagidea/bagidea-office/pull/36)).
 
 > Want to be on this list? Open a PR — see [docs/guide/plugin-hub.md](docs/guide/plugin-hub.md)
 > for plugins, or fix anything in the repo. Every merged contribution is credited here
