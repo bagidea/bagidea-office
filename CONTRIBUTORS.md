@@ -38,6 +38,10 @@ early macOS support, when the project was Windows-only:
   feed, workflow analysis/results, proposals, notes) renders as real markdown through
   one XSS-safe path instead of showing raw markdown and stray `<b>` tags as literal
   text ([#36](https://github.com/bagidea/bagidea-office/pull/36)).
+- **[@anupamme](https://github.com/anupamme)** — TLS-hardened the npm bootstrapper:
+  the installer fetch now forces HTTPS + TLS 1.2 (`curl --proto '=https' --tlsv1.2`),
+  so the install script can't be pulled over a downgraded channel
+  ([#37](https://github.com/bagidea/bagidea-office/pull/37)).
 
 > Want to be on this list? Open a PR — see [docs/guide/plugin-hub.md](docs/guide/plugin-hub.md)
 > for plugins, or fix anything in the repo. Every merged contribution is credited here

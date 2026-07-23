@@ -63,10 +63,12 @@ if (platform === "win32") {
   args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", `irm ${RAW}/install.ps1 | iex`];
 } else if (platform === "darwin") {
   cmd = "bash";
-  args = ["-c", `curl -fsSL ${RAW}/install-mac.sh | bash`];
+  // --proto '=https' --tlsv1.2: refuse any non-HTTPS redirect and reject pre-TLS-1.2,
+  // so the installer script can't be fetched over a downgraded/plaintext channel.
+  args = ["-c", `curl --proto '=https' --tlsv1.2 -fsSL ${RAW}/install-mac.sh | bash`];
 } else if (platform === "linux") {
   cmd = "bash";
-  args = ["-c", `curl -fsSL ${RAW}/install-linux.sh | bash`];
+  args = ["-c", `curl --proto '=https' --tlsv1.2 -fsSL ${RAW}/install-linux.sh | bash`];
 } else {
   console.error(`Unsupported platform: ${platform}.\nSee ${REPO} for manual install instructions.`);
   process.exit(1);
