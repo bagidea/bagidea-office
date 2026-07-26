@@ -56,9 +56,15 @@ if [ "$PREBUILT" != "1" ] && ! command -v cargo &> /dev/null; then
     # The 'rustup' homebrew formula is deprecated/removed in many taps.
     # We use the official rustup installer instead.
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
-    source "$HOME/.cargo/env"
+    if [ -f "$HOME/.cargo/env" ]; then . "$HOME/.cargo/env"; fi
 fi
-source "$HOME/.cargo/env" 2>/dev/null || true
+# macOS ships /bin/bash 3.2, where `.`/`source` is a POSIX *special* builtin: a
+# missing-file failure exits the shell IMMEDIATELY, before `|| true` can catch it.
+# With a prebuilt shell, Rust is never installed and this file never exists — so we
+# MUST test first, not guard with `|| true` (which silently killed installs — #38,
+# and the same line reported under #2). The `if` form (not `[ -f … ] && …`) is
+# required so an absent file doesn't leave a false exit status that trips `set -e`.
+if [ -f "$HOME/.cargo/env" ]; then . "$HOME/.cargo/env"; fi
 
 # ---- 2. Download Godot -------------------------------------------------------
 GODOT_DIR="$ROOT/godot/bin-mac"

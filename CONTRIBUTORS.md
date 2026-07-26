@@ -42,6 +42,12 @@ early macOS support, when the project was Windows-only:
   the installer fetch now forces HTTPS + TLS 1.2 (`curl --proto '=https' --tlsv1.2`),
   so the install script can't be pulled over a downgraded channel
   ([#37](https://github.com/bagidea/bagidea-office/pull/37)).
+- **[@lyfer-bob](https://github.com/lyfer-bob)** — pinpointed the silent macOS install
+  failure with a full root-cause: on system bash 3.2 `.`/`source` is a POSIX *special*
+  builtin, so `source ~/.cargo/env || true` on the prebuilt-shell path (where Rust is
+  never installed) aborts the whole installer before `|| true` can run — plus the exact
+  version-independent fix ([#38](https://github.com/bagidea/bagidea-office/issues/38),
+  a bug report + diagnosis).
 
 > Want to be on this list? Open a PR — see [docs/guide/plugin-hub.md](docs/guide/plugin-hub.md)
 > for plugins, or fix anything in the repo. Every merged contribution is credited here
