@@ -131,6 +131,7 @@ function loadReg() {
   if (reg.socialMin === undefined) reg.socialMin = 120;      // agents socialize (economical default)
   if (reg.proposalMin === undefined) reg.proposalMin = 120;  // min gap between CEO pitches
   if (reg.channelNotify === undefined) reg.channelNotify = true; // work milestones → Telegram/Discord/…
+  if (reg.autoApprove === undefined) reg.autoApprove = false; // auto-allow every tool prompt (unattended runs)
   saveReg();
 }
 function saveReg() { fs.writeFileSync(REGISTRY, JSON.stringify(reg, null, 2)); }
@@ -246,6 +247,7 @@ function rosterEvt() {
     skills: reg.skills, autoSkills: reg.autoSkills !== false,
     verifyDelegated: reg.verifyDelegated === true,
     ecoMode: reg.ecoMode === true,
+    autoApprove: reg.autoApprove === true,
     sound: reg.sound !== false, heartbeatMin: Number(reg.heartbeatMin || 0),
     features: featuresMap(), tts: reg.tts !== false,
     socialMin: Number(reg.socialMin !== undefined ? reg.socialMin : 60),
@@ -629,13 +631,27 @@ function claudeText(prompt, opts = {}) {
       env: { ...process.env, ...(reg.apiKeys || {}), ...route.env, OFFICE_ADAPTER: "1",
         ...(opts.env || {}) },
     });
+    // opts.track {agent, title}: surface this headless run (a meeting turn, a
+    // break-room chat) as a REAL task row so the owner sees WHO is working, not a
+    // silent background process. Best-effort — the terminal event always fires.
+    let tid = null;
+    if (opts.track && opts.track.agent) {
+      tid = "t" + ++taskCounter;
+      broadcast({ type: "task.started", agent: opts.track.agent, task: tid,
+        title: String(opts.track.title || "งาน").replace(/\s+/g, " ").slice(0, 90) });
+    }
+    const endTask = (ok) => {
+      if (!tid) return;
+      broadcast({ type: ok ? "task.completed" : "task.failed", agent: opts.track.agent, task: tid });
+      tid = null;
+    };
     child.stdin.write(prompt);
     child.stdin.end();
     let out = "";
     child.stdout.setEncoding("utf8");   // multibyte-safe across chunk boundaries (Thai etc.)
     child.stdout.on("data", (c) => (out += c));
-    child.on("close", () => resolve(out.trim()));
-    child.on("error", () => resolve(""));
+    child.on("close", () => { endTask(true); resolve(out.trim()); });
+    child.on("error", () => { endTask(false); resolve(""); });
   });
 }
 
@@ -1374,7 +1390,11 @@ setInterval(sweepProjects, 5000);
 const agentBusy = new Set();
 const jobQueue = [];
 function dispatchJob(job) {
-  if (agentBusy.has(job.agent) || agentBusy.size >= 2) {
+  // Office-wide concurrency for SCHEDULED jobs so the machine breathes. One agent's
+  // limit shouldn't wedge the whole queue behind a cap of two — bump the default and
+  // let it be tuned (reg.maxJobs); eco mode keeps it to a single lane.
+  const jobCap = reg.ecoMode ? 1 : Math.max(1, reg.maxJobs || 3);
+  if (agentBusy.has(job.agent) || agentBusy.size >= jobCap) {
     if (!jobQueue.includes(job)) jobQueue.push(job);
     return;
   }
@@ -1833,14 +1853,19 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     autoRecoverOverflow(agent, prompt, opts, entry);
     return true;
   };
-  // OPT-IN failover: this run's brain has been overloaded (5xx) for FAILOVER_AFTER
-  // sustained retries and the owner set an office fallback brain → stop hammering the
-  // dead brain and re-run the SAME task on the fallback. No fallback / already-failed-over
-  // → returns false and the CLI keeps retrying exactly as before (unchanged behavior).
+  // OPT-IN failover: this run's brain has been unusable — a server overload (5xx)
+  // OR a sustained rate/usage limit (429) — for FAILOVER_AFTER retries, and the owner
+  // set an office fallback brain → stop hammering it and re-run the SAME task on the
+  // fallback. This is the answer to "one agent hits a limit and the whole office
+  // stops": with a spare brain configured, a limited agent (incl. the Director, whose
+  // stall otherwise jams every report-back) keeps working instead of sitting in the
+  // CLI's ~2-min retry. No fallback / already-failed-over → returns false and the CLI
+  // retries exactly as before (a plain 429 then pauses+auto-resumes; unchanged).
   let failedOver = false;
   const tryFailover = (st) => {
     if (failedOver || brainDead || recovering || doneFired || opts._failedOver) return false;
-    if (!(typeof st === "number" && st >= 500)) return false;   // only server-side overload/unavailable
+    // Server-side overload/unavailable (>=500) or a rate/usage ceiling (429).
+    if (!(typeof st === "number" && (st >= 500 || st === 429))) return false;
     if (apiRetries < FAILOVER_AFTER) return false;              // wait until it's SUSTAINED, not a one-off
     const fb = officeFallback(mprov);
     if (!fb) return false;
@@ -1852,8 +1877,9 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     broadcast({ type: "task.completed", agent, task, session: entry.key }); // clear the stalled row
     const an = (reg.agents[agent] || {}).name || agent;
     const toTag = fb.model ? fb.provider + "/" + fb.model : fb.provider;
+    const why = st === 429 ? "ติดลิมิต (rate/usage) ต่อเนื่อง" : "โดน overload ต่อเนื่อง";
     broadcast({ type: "chat.message", agent, task, session: entry.key, model: mtag,
-      text: `🛟 สมองของ ${an} (${mtag}) โดน overload ต่อเนื่อง — สลับไปสมองสำรอง ${toTag} ให้ชั่วคราว แล้วทำงานเดิมต่อ (ปรับได้ในการตั้งค่า)` });
+      text: `🛟 สมองของ ${an} (${mtag}) ${why} — สลับไปสมองสำรอง ${toTag} ให้ชั่วคราว แล้วทำงานเดิมต่อ (ปรับได้ในการตั้งค่า)` });
     // Re-run the SAME task on the fallback brain. Fresh thread (the down brain can't be
     // summarized through); onDone rides along so a delegation still reports back normally.
     runClaude(agent, prompt, { ...opts, session: "new", _brainOverride: fb, _failedOver: true });
@@ -2221,6 +2247,26 @@ function pumpDirector() {
   dirQueue.shift()(() => { dirBusy = false; pumpDirector(); });
 }
 
+// Appended to EVERY delegated instruction. A teammate is a one-shot `claude -p`
+// process, so the daemon can't "nudge it to keep going" — the only lever is the
+// prompt. Without this, an agent tends to do the first step and stop, waiting for
+// the Director to hand it the next one (the "งานไม่ต่อเนื่อง" the owner reported).
+// This tells it to OWN the task end-to-end and decide within its remit, while
+// PRESERVING the real gates (irreversible / outward actions still need approval).
+const DELEGATE_NOTE = `
+
+<work-autonomy>
+นี่คืองานที่ Director มอบให้คุณทำ "จนจบ" — ไม่ใช่ทำก้าวแรกแล้วหยุดรอคำสั่งถัดไป.
+ทำให้ครบทุกขั้นด้วยตัวเองจนเสร็จจริงและ verify แล้ว: วางแผนย่อยเอง, ตัดสินใจรายละเอียดที่อยู่ใน
+ขอบเขตความเชี่ยวชาญ/บทบาทของคุณได้เลยโดยไม่ต้องถามกลับ, เจอทางเลือกเล็กๆ ให้เลือกอย่างสมเหตุสมผล
+แล้วเดินหน้าต่อ. หยุดเพื่อ "ถามกลับ Director" เฉพาะเมื่อจำเป็นจริงๆ 3 กรณีเท่านั้น:
+(ก) ขาด credential/สิทธิ์เข้าถึงที่หาเองไม่ได้, (ข) โจทย์กำกวมจนถ้าเดาผิดผลจะออกผิดทางไปเลย,
+(ค) ต้องทำสิ่งที่ย้อนกลับยาก/ส่งออกนอก (push git หรือ Hub, ลบของ, ส่งข้อความออกภายนอก, ใช้จ่ายเงิน)
+ซึ่งต้องให้เจ้าของอนุมัติก่อนเสมอ. เมื่อทำเสร็จให้รายงานผลที่เสร็จจริง — ไม่ใช่รายงานความคืบหน้ากลางคัน.
+ถ้าติดตามข้อยกเว้นข้างบน ให้รายงานสั้นๆ ว่าติดตรงไหนและต้องการอะไร แล้วรอ.
+In short: own the task end-to-end, decide within your remit, only ask back when truly blocked.
+</work-autonomy>`;
+
 // DELEGATE:-line parser shared by the CEO order and every report-back turn.
 // onHit fires per dispatched assignment ("did he hand off more work?").
 function makeDelegateFilter(depth, session, onHit) {
@@ -2284,13 +2330,15 @@ function makeDelegateFilter(depth, session, onHit) {
           }
           const tl = sess[t] || [];
           const te = tl.length ? tl.reduce((a, b) => (a.ts > b.ts ? a : b)) : null;
-          runClaude(t, inst, {
+          // Carry the autonomy mandate on both the first run AND any auto-resume.
+          const dinst = inst + DELEGATE_NOTE;
+          runClaude(t, dinst, {
             project: proj,
             // No project → a FRESH workspace thread so the agent never inherits a
             // stale project binding from its previous task. With a project, fork a
             // new thread only when the agent's latest one lives elsewhere.
             session: proj ? ((!te || te.proj !== proj) ? "new" : undefined) : "new",
-            resumable: true, resumePrompt: inst,   // delegated work auto-resumes after a limit/restart
+            resumable: true, resumePrompt: dinst,   // delegated work auto-resumes after a limit/restart
             onDone: (out, ok) => verifyThenReport(t, inst, out, ok, depth, session, proj),
           });
         }, 4500);
@@ -3443,7 +3491,9 @@ async function runDiscussion(ids, topic, rounds, social, preKey) {
             `(WebSearch / WebFetch / Read) — เฉพาะตอนที่จำเป็นจริงๆ เท่านั้น ไม่ต้องค้นพร่ำเพรื่อ ` +
             `และตอบกลับเป็นข้อความสนทนาตามปกติ.` +
             (social ? SOCIAL_PROPOSAL_INSTRUCTION : ""),
-            { tools: social ? "" : "WebSearch,WebFetch,Read,Glob,Grep", provider: a && a.provider, model: a && a.model, env: { OFFICE_AGENT: id, OFFICE_TASK: task } });
+            { tools: social ? "" : "WebSearch,WebFetch,Read,Glob,Grep", provider: a && a.provider, model: a && a.model, env: { OFFICE_AGENT: id, OFFICE_TASK: task },
+              // Show each participant's turn as a live task row (meeting/break-room).
+              track: { agent: id, title: (social ? "☕ พักเบรก: " : "🗣 ประชุม: ") + String(topic || "").slice(0, 60) } });
           let line = text.split("\n").filter(Boolean).join(" ").slice(0, 500);
           // If the owner pressed End while this claude call was in flight, drop the
           // lagging reply entirely — otherwise it would surface as a ghost message
@@ -5345,6 +5395,21 @@ end tell`;
       }
     });
 
+  } else if (req.method === "POST" && req.url === "/registry/autoapprove") {
+    // 🔓 Auto-allow every tool prompt so unattended work never stalls (opt-in, default off).
+    readBody(req, (body) => {
+      try {
+        reg.autoApprove = !!JSON.parse(body).enabled;
+        saveReg();
+        pushRoster();
+        res.writeHead(200);
+        res.end("ok");
+      } catch {
+        res.writeHead(400);
+        res.end("bad json");
+      }
+    });
+
   } else if (req.method === "POST" && req.url === "/registry/autoskills") {
     readBody(req, (body) => {
       try {
@@ -5675,6 +5740,16 @@ end tell`;
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ decision: "allow" }));
         broadcast({ type: "perm.approved", agent, task, tool, perm: id, via: "rule" });
+        return;
+      }
+      // Unattended mode (opt-in, reg.autoApprove): the owner can't come click Allow
+      // — e.g. they queued work and stepped out — so every prompt is auto-approved
+      // instead of stalling 50s then denying. Still broadcast (via:"auto") so the
+      // feed/board shows exactly what was allowed. Off by default; owner toggles it.
+      if (reg.autoApprove) {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ decision: "allow" }));
+        broadcast({ type: "perm.approved", agent, task, tool, perm: id, via: "auto" });
         return;
       }
       broadcast({ type: "perm.requested", agent, task, tool, perm: id, input });

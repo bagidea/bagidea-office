@@ -868,7 +868,7 @@ func _ops_spot(id: String) -> Vector3:
 	return base + Vector3(-0.9 + 0.6 * float(col), 0.0, 0.6 * float(row))
 
 func _walk_to_spot(node: Sprite3D, spot: Vector3, face_dir := -1) -> float:
-	return node.walk_to(world.path_between(node.position, spot), face_dir)
+	return node.walk_to(world.path_between(node.position, _exec_clear(node, spot)), face_dir)
 
 ## Finished delegated work gets WALKED to the Director — a real hand-back.
 func _deliver_to_main(a: Dictionary) -> void:
@@ -945,11 +945,57 @@ func _clear_status_later(a: Dictionary, delay: float) -> void:
 const EXEC_ONLY_WP := ["exec_c", "ceo_desk", "lead_desk", "pace_a", "pace_b"]
 
 ## True only for the two bodies allowed in the executive room.
-func _is_exec_resident(node: Sprite3D) -> bool:
+func _is_exec_resident(node: Node3D) -> bool:
 	if node == ceo:
 		return true
 	var m: Dictionary = agents.get("main", {})
 	return m.has("node") and is_instance_valid(m.get("node")) and m.node == node
+
+# Spatial companion to EXEC_ONLY_WP. _walk() fences NAMED exec waypoints, but the
+# idle SOCIAL behaviours steer an agent to another BODY'S raw position (a Vector3 —
+# e.g. chatting/high-fiving/tagging the Director, who legitimately loiters in the
+# CEO room), and those never pass through _walk. This box, derived once from the
+# exec waypoints, lets every raw-position move reject a non-resident whose
+# destination lands inside the CEO room. Walking THROUGH on the way elsewhere is
+# still fine — only END-points (where a body would stop and loiter) are fenced.
+var _exec_lo := Vector3.ZERO
+var _exec_hi := Vector3.ZERO
+var _exec_box := false
+
+func _exec_bounds() -> void:
+	var pts: Array = []
+	for wp in EXEC_ONLY_WP:
+		var p: Vector3 = world.wp(wp)
+		if p != Vector3.ZERO:
+			pts.append(p)
+	if pts.is_empty():
+		return   # world not ready yet — stay off; recomputed on the next query
+	var lo: Vector3 = pts[0]
+	var hi: Vector3 = pts[0]
+	for p in pts:
+		lo = Vector3(minf(lo.x, p.x), 0.0, minf(lo.z, p.z))
+		hi = Vector3(maxf(hi.x, p.x), 0.0, maxf(hi.z, p.z))
+	# Pad out to the room's edges so a spot just beside a desk still counts inside.
+	var pad := 1.8
+	_exec_lo = Vector3(lo.x - pad, 0.0, lo.z - pad)
+	_exec_hi = Vector3(hi.x + pad, 0.0, hi.z + pad)
+	_exec_box = true
+
+## True when a world position falls inside the reserved executive room.
+func _in_exec(p: Vector3) -> bool:
+	if not _exec_box:
+		_exec_bounds()
+	return _exec_box and p.x >= _exec_lo.x and p.x <= _exec_hi.x \
+		and p.z >= _exec_lo.z and p.z <= _exec_hi.z
+
+## A destination cleared of the CEO room for anyone who isn't the CEO/Director: a
+## staff body about to STOP inside the exec room is redirected to the lobby instead.
+## Residents, and any non-exec destination, pass straight through untouched.
+func _exec_clear(node: Node3D, pos: Vector3) -> Vector3:
+	if not _in_exec(pos) or _is_exec_resident(node):
+		return pos
+	var lobby: Vector3 = world.wp("lobby_c")
+	return lobby if lobby != Vector3.ZERO else pos
 
 func _walk(node: Sprite3D, target: String, face_dir := -1) -> float:
 	# Guard the executive room: anyone who isn't the CEO or the Director aimed at an
@@ -1310,7 +1356,7 @@ func _free_gather_center() -> String:
 
 ## Walk to a free world position (not a named anchor) via the A* graph.
 func _walk_to_pos(node: Node3D, pos: Vector3, face_dir := -1) -> float:
-	return node.walk_to(world.path_between(node.position, pos), face_dir)
+	return node.walk_to(world.path_between(node.position, _exec_clear(node, pos)), face_dir)
 
 ## A translucent stand-in that joins a huddle while the real agent stays put.
 func _spawn_collab_ghost(id: String, spot: Vector3) -> Sprite3D:
@@ -1503,14 +1549,18 @@ func _act_pet(a: Dictionary) -> void:
 	_clear_status_later(a, 7.0)
 
 func _act_chat(a: Dictionary, pool: Array) -> void:
-	var others := pool.filter(func(o): return o.id != a.id and o.state == "idle")
+	# Never follow a teammate into the CEO room: a non-resident won't pick a partner
+	# who is standing inside the exec room (that's how staff piled in behind the Director).
+	var resident := _is_exec_resident(a.node)
+	var others := pool.filter(func(o): return o.id != a.id and o.state == "idle" \
+		and (resident or not _in_exec(o.node.position)))
 	if others.is_empty():
 		return
 	var b: Dictionary = others.pick_random()
 	a.node.set_status(ui("คุยเล่น 💬"))
 	b.node.set_status(ui("คุยเล่น 💬"))
 	var d: float = a.node.walk_to(world.path_between(a.node.position,
-		b.node.position + Vector3(0.6, 0, 0.35)))
+		_exec_clear(a.node, b.node.position + Vector3(0.6, 0, 0.35))))
 	await get_tree().create_timer(d + 0.3).timeout
 	if a.state == "idle" and is_instance_valid(a.node):
 		_fx(a, "music")
@@ -1558,7 +1608,9 @@ func _act_idea(a: Dictionary) -> void:
 
 ## Two idle agents meet up for a high-five.
 func _act_highfive(a: Dictionary, pool: Array) -> void:
-	var others := pool.filter(func(o): return o.id != a.id and o.state == "idle")
+	var resident := _is_exec_resident(a.node)
+	var others := pool.filter(func(o): return o.id != a.id and o.state == "idle" \
+		and (resident or not _in_exec(o.node.position)))
 	if others.is_empty():
 		_act_yawn(a)
 		return
@@ -1566,7 +1618,7 @@ func _act_highfive(a: Dictionary, pool: Array) -> void:
 	a.node.set_status(ui("ไฮไฟว์! ✋"))
 	b.node.set_status(ui("ไฮไฟว์! ✋"))
 	var d: float = a.node.walk_to(world.path_between(a.node.position,
-		b.node.position + Vector3(0.6, 0, 0.3)))
+		_exec_clear(a.node, b.node.position + Vector3(0.6, 0, 0.3))))
 	await get_tree().create_timer(d + 0.2).timeout
 	if is_instance_valid(a.node):
 		Fx.spawn(a.node, "sparkle", Vector3(0, 1.2, 0), 0.03)
@@ -1613,7 +1665,9 @@ func _clamp_floor(p: Vector3) -> Vector3:
 
 ## Two idle agents play tag — one chases, the other dashes away. Pure fun.
 func _act_chase(a: Dictionary, pool: Array) -> void:
-	var others := pool.filter(func(o): return o.id != a.id and o.state == "idle")
+	var resident := _is_exec_resident(a.node)
+	var others := pool.filter(func(o): return o.id != a.id and o.state == "idle" \
+		and (resident or not _in_exec(o.node.position)))
 	if others.is_empty():
 		return
 	var b: Dictionary = others.pick_random()
@@ -1635,10 +1689,12 @@ func _act_chase(a: Dictionary, pool: Array) -> void:
 		var away: Vector3 = b.node.position - a.node.position
 		away = (Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized()
 			if away.length() < 0.1 else away.normalized())
-		var flee: Vector3 = _clamp_floor(b.node.position + away * randf_range(7.0, 11.0))
+		# Keep the tag game out of the CEO room: the runner's dash and the chaser's
+		# home-in both bend around it (for non-residents), so a chase never spills in.
+		var flee: Vector3 = _exec_clear(b.node, _clamp_floor(b.node.position + away * randf_range(7.0, 11.0)))
 		var db: float = b.node.walk_to(world.path_between(b.node.position, flee))
 		# Chaser homes on the runner's current position — closing the gap.
-		var da: float = a.node.walk_to(world.path_between(a.node.position, b.node.position))
+		var da: float = a.node.walk_to(world.path_between(a.node.position, _exec_clear(a.node, b.node.position)))
 		if i % 2 == 0: _fx(b, "music")   # comic puffs as they tear around
 		# Let the dash actually PLAY OUT before re-targeting — re-home at ~80% of
 		# the longer leg so it stays a continuous sprint, never a twitch-in-place.
@@ -1775,6 +1831,8 @@ func _take_nap(a: Dictionary) -> void:
 
 func _pulse_security() -> void:
 	var l: OmniLight3D = world.sec_light
+	if not is_instance_valid(l):
+		return   # no security light in this world build — skip the flash, don't crash the tween
 	var tw := create_tween()
 	for i in 3:
 		tw.tween_property(l, "light_energy", 5.0, 0.4)

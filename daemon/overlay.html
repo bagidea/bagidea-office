@@ -1303,7 +1303,7 @@
   const ROLES = ["Researcher", "Engineer", "Designer", "Analyst", "Operator", "Specialist"];
   const NPCS = [1, 2, 3, 4, 5, 6, 9, 10, 11, 12];
   // Live registry from the daemon (roster.sync) — identity source of truth.
-  let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true, VERIFY = false;
+  let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true, VERIFY = false, AUTOAPPROVE = false;
   let BUILTIN_DESC = {}, REGMCP = {}, SOUND = true, HEARTBEAT = 0;
   let FEATURES = { openai: false, gemini: false, stt: false, tts: false, live: false, image: false };
   let TTSON = true, SOCIALMIN = 60, MAXSTAFF = 18, PROPOSALMIN = 120;
@@ -2225,19 +2225,34 @@
   function trackRunning(ev) {
     // Daemon (re)started → nothing is running; drop any stale/replayed entries.
     if (ev.type === "task.reset") { RUNNING.clear(); renderRunning(); return; }
+    // Sub-agent (ghost) fan-out: surface each parallel ghost as its OWN live row so
+    // the owner sees the whole crew working, not just the parent. Keyed by ghost id
+    // (contains '#') — handled BEFORE the '#' filter below, which drops other traffic.
+    if (ev.type === "subagent.spawned") {
+      const pid = String(ev.agent || "").split("#")[0];
+      const tag = String(ev.sub || "").includes("#") ? ev.sub.split("#")[1].toUpperCase() : "SUB";
+      RUNNING.set(ev.sub, { agent: pid, ghost: true, task: ev.sub, session: ev.session || "",
+        ts: ev.ts || Date.now(), title: "👻 " + tag + ": " + String(ev.text || "").slice(0, 70) });
+      renderRunning(); return;
+    }
+    if (ev.type === "subagent.done") { if (RUNNING.delete(ev.sub)) renderRunning(); return; }
+    if (ev.type === "subagent.progress") { const g = RUNNING.get(ev.sub); if (g) g.ts = ev.ts || Date.now(); return; }
     if (ev.theater || String(ev.agent || "").includes("#")) return;
     if (ev.type === "task.started")
       RUNNING.set(ev.task, { agent: ev.agent, title: ev.title || "",
         session: ev.session || "", ts: ev.ts || Date.now(), task: ev.task });
     else if (ev.type === "task.completed" || ev.type === "task.failed")
       RUNNING.delete(ev.task);
+    // A long run kept alive by tool activity: refresh its timestamp so the 60-min
+    // idle sweep in renderRunning() never drops a task that is genuinely still going.
+    else if (ev.type === "task.progress") { const r = RUNNING.get(ev.task); if (r) r.ts = ev.ts || Date.now(); return; }
     else return;
     renderRunning();
   }
   let NOW_OPEN = false;  // expanded? (shared across both modes, sticky)
   function renderRunning() {
     const now = Date.now();
-    for (const [k, v] of RUNNING) if (now - v.ts > 30 * 60000) RUNNING.delete(k);
+    for (const [k, v] of RUNNING) if (now - v.ts > 60 * 60000) RUNNING.delete(k);
     const items = [...RUNNING.values()].reverse();  // newest first
     const strip = document.getElementById("nowStrip");
     const ftask = document.getElementById("feedTasks");
@@ -2972,7 +2987,9 @@
         <input id="sFilter" class="filterbox" placeholder="🔍 ค้นหา skill…">
         <div id="slist" class="biglist"></div><button class="bigbtn" id="newSkill">＋ New skill</button>`;
     } else if (tab === "tools") {
-      bodyHtml = `<input id="tFilter" class="filterbox" placeholder="🔍 ค้นหาเครื่องมือ / MCP server…">
+      bodyHtml = `<div class="switch ${AUTOAPPROVE ? "on" : ""}" id="autoApproveSw">
+          <div class="knob"></div> ${tr("🔓 อนุมัติอัตโนมัติ: ให้ทุกคำขอใช้เครื่องมือผ่านเองโดยไม่ต้องกด Allow — เหมาะตอนสั่งงานทิ้งไว้แล้วไม่ได้เฝ้า (ยังเห็นใน feed ว่าอนุมัติอะไรบ้าง · ปิดไว้ = ปลอดภัยกว่า)")}</div>
+        <input id="tFilter" class="filterbox" placeholder="🔍 ค้นหาเครื่องมือ / MCP server…">
         <div class="field"><label>⚡ SYSTEM TOOLS — ความสามารถกลางของออฟฟิศ (agents เรียกใช้เองได้)</label>
           <div id="systools"></div></div>
         <div class="field"><label>🔧 BUILT-IN — เครื่องมือมาตรฐานของ Claude (ลบไม่ได้ · เปิด/ปิดรายตัวในหน้าแก้ไข agent)</label>
@@ -3143,6 +3160,12 @@
       modalCard.querySelector("#newSkill").onclick = () => openSkillEditor(null);
       wireFilter(modalCard.querySelector("#sFilter"), list);
     } else if (tab === "tools") {
+      const aaSw = modalCard.querySelector("#autoApproveSw");
+      if (aaSw) aaSw.onclick = async () => {
+        await api("/registry/autoapprove", { enabled: !AUTOAPPROVE });
+        AUTOAPPROVE = !AUTOAPPROVE;
+        aaSw.classList.toggle("on", AUTOAPPROVE);
+      };
       // ⚡ system tools — capability + which MAIN key unlocks it.
       const SYS = [
         ["🎤 ถอดเสียงพูด (voice → text)", "ปุ่มไมค์ / Right Ctrl", FEATURES.stt, "OPENAI หรือ GEMINI"],
@@ -5438,6 +5461,7 @@
       REGMCP = ev.mcp || {};
       AUTOSKILLS = ev.autoSkills !== false;
       VERIFY = ev.verifyDelegated === true;
+      AUTOAPPROVE = ev.autoApprove === true;
       SOUND = ev.sound !== false;
       if (typeof ev.monitor === "number") monMode = ev.monitor;
       if (typeof ev.monitors === "number") monCount = Math.max(1, ev.monitors);
