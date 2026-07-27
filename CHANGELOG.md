@@ -4,6 +4,71 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [0.9.47] — ↻ Model lists that stay current · agents that don't stall waiting for you
+
+**Added**
+- **↻ Live model lists — Claude included.** The pickers used to show whatever was
+  hardcoded on release day, so a model that shipped *today* stayed invisible until
+  the next office release. Every provider's list is now pulled from its own
+  `/models` **20 s after boot and every 12 h**, plus on demand: **⚙ → CONNECT →
+  `↻ Refresh model list`** (all providers at once, with counts + when it last ran)
+  and the `↻` beside the **Model** field (that provider only). Claude was the one
+  provider with **no live fetch at all** — Anthropic's list needs your own
+  credentials rather than a provider key, so the office uses `ANTHROPIC_API_KEY`
+  when you've set one and otherwise the Claude Code CLI's existing login on this
+  machine (read-only; sent nowhere but `api.anthropic.com`, macOS Keychain
+  included). The newest model becomes the pre-selected default — and **no existing
+  agent's brain is ever rewritten for you**. New `POST /registry/models/refresh`.
+- **🔓 Auto-approve tool permissions (opt-in, ⚙ → TOOLS).** Hand out work, walk
+  away: a permission prompt with nobody there to click Allow used to park the job
+  for 50 s and then be **denied**. With the switch on, requests are allowed
+  automatically. Off by default — it is a real trade-off, so it's your call.
+- **Every running task is visible now**, including the ones that used to run
+  silently: 👻 **sub-agents (ghosts) get their own live rows**, and meetings /
+  coffee breaks report as tasks like everything else.
+
+**Changed**
+- **Delegated work is owned end-to-end.** Teammates now carry a `<work-autonomy>`
+  mandate: decide what's within your remit and keep going — come back only when
+  genuinely blocked (a missing credential, a truly ambiguous requirement, an
+  irreversible outward action that needs the owner's call). Work no longer stalls
+  on questions the teammate could have answered itself.
+- **One agent hitting a limit no longer stops the floor.** A sustained **429**
+  (rate/usage ceiling) now triggers the same failover as a sustained 5xx — the task
+  moves to the fallback brain if you've set one — and the job pool runs **3 lanes**
+  (`reg.maxJobs`; 🌱 eco mode still keeps it to one), so the rest of the team keeps
+  working while one agent waits out its limit and comes back by itself.
+- **Unified markdown rendering for all agent text** — chat, feed, workflow analysis
+  and results, proposals and notes now go through one vendored, XSS-safe `md.js`
+  (marked + DOMPurify) instead of showing raw markdown and literal `<b>` tags.
+  Thanks **[@bmdy5](https://github.com/bmdy5)**
+  ([#36](https://github.com/bagidea/bagidea-office/pull/36)).
+
+**Fixed**
+- **The macOS installer could die silently** right after downloading the shell —
+  printing a success line while never installing Godot, the Claude hooks or the
+  `bagidea` CLI. macOS ships **bash 3.2**, where `.`/`source` is a POSIX *special*
+  builtin: sourcing a missing file exits the shell **before `|| true` can catch
+  it** — and on the prebuilt-shell path Rust is never installed, so `~/.cargo/env`
+  never exists. All four such lines now test the file first. Root-caused, with the
+  exact version-independent fix, by
+  **[@lyfer-bob](https://github.com/lyfer-bob)**
+  ([#38](https://github.com/bagidea/bagidea-office/issues/38)).
+- **The team stopped gathering in the CEO's room.** The exec-room fence was only
+  enforced on *named* waypoints, so social behaviours (chat, high-five, chase)
+  walked agents straight in on raw coordinates. Every destination now passes
+  through the fence: non-residents are rerouted to the lobby and only the CEO +
+  Director stand there. Walking past is still fine.
+- **A missing security light crashed the patrol tween** (`rp_target` on a freed
+  object) on world builds that don't have one — now guarded, so the flash is
+  skipped instead of erroring.
+- **The npm bootstrapper forces HTTPS + TLS 1.2** when fetching the install script,
+  so it can't be pulled over a downgraded channel. Thanks
+  **[@anupamme](https://github.com/anupamme)**
+  ([#37](https://github.com/bagidea/bagidea-office/pull/37)).
+
+> No shell change in this release — `bagidea update` picks it all up.
+
 ## [0.9.46] — ⛶ Large window: opens fullscreen, drag any edge to resize
 
 **Changed**
