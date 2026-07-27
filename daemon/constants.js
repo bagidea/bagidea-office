@@ -291,8 +291,10 @@ const SKILL_LIBRARY = {
 const DEFAULT_MAIN_AGENT = {
   name: "Shino", role: "Director", avatar: 7, protected: true,
   aura: "nature", voice: "boyish", tier: 2,
-  // Explicit brain (never the blank/implicit model): Opus 4.8 — flagship, 1M context.
-  provider: "claude", model: "claude-opus-4-8",
+  // Explicit brain (never the blank/implicit model): the Claude flagship, 1M context.
+  // Seed only — an office that already exists keeps whatever the owner picked, and the
+  // live model refresh never rewrites an agent's brain.
+  provider: "claude", model: "claude-opus-5",
   prompt:
     "You are Shino, the Director of this BagIdea Office — the owner's (the " +
     "CEO's) second-in-command and the one who actually runs the floor. The CEO " +

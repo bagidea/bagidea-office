@@ -38,13 +38,35 @@ until it turns ✅ (the system "tests the key + fetches the model list" automati
 
 > 🧠 A ghost (sub-agent) uses the same provider as its parent agent automatically
 
+## ↻ The model list stays current by itself
+
+A model released today should be pickable today — you should never have to wait for an
+office release to see it. So the office pulls each provider's **live** model list
+(`/models`) instead of trusting a list baked into the code:
+
+- **on start-up**, and **every 12 hours**, for Claude + every connected provider
+- **⚙ → CONNECT → 🧠 MODELS / PROVIDERS → `↻ Refresh model list`** — pulls every provider
+  right now, and shows what came back (`✓ claude 11 · openai 80 · …`) plus when it last ran
+- **the `↻` button next to the Model field** (AGENTS → edit an agent) — re-pulls just the
+  provider selected there, so a brand-new model appears in that dropdown immediately
+
+**Claude is included.** Anthropic's `/v1/models` needs your own credentials rather than a
+provider key, so the office authenticates with `ANTHROPIC_API_KEY` when you've set one, and
+otherwise with the Claude Code CLI's existing login on this machine (read-only; it is sent
+nowhere except `api.anthropic.com`). That's what puts a same-day Claude release in the
+picker. If neither is available, the built-in list is used and nothing breaks.
+
+The newest model is pre-selected as the default when you pick a provider — you can always
+drop back to an older one from the dropdown, and an **agent's saved model is never changed
+for you**.
+
 ## Supported providers
 
 ### 🟢 Direct (Anthropic-compatible) — nothing in between
 
 | Provider | Recommended model | Endpoint (global) | Get a key |
 |---|---|---|---|
-| **Claude** (default) | opus / sonnet / haiku | — (uses your login/plan) | claude.ai or ANTHROPIC_API_KEY |
+| **Claude** (default) | `claude-opus-5` · or the `opus`/`sonnet`/`haiku` aliases | — (uses your login/plan) | claude.ai or ANTHROPIC_API_KEY |
 | **GLM** (Z.AI) | `glm-5.2[1m]` / `glm-5.2` | `https://api.z.ai/api/anthropic` | z.ai (has a key-based coding plan) |
 | **DeepSeek** | `deepseek-v4-pro` / `-flash` | `https://api.deepseek.com/anthropic` | platform.deepseek.com |
 | **Qwen** (Alibaba) | `qwen3-coder-plus` | `https://dashscope-intl.aliyuncs.com/apps/anthropic` | Alibaba Model Studio |

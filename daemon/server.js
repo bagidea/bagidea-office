@@ -595,6 +595,120 @@ function captureModelCtx(provider, data) {
     saveReg();
   } catch {}
 }
+
+// ------------------------------------------------------------ LIVE model lists
+// Every provider's picker should show what the vendor serves TODAY, not what was
+// hardcoded on release day. Everyone but Anthropic exposes an OpenAI-style
+// /models that takes their own key. Anthropic's needs the machine's Claude auth:
+//   1) ANTHROPIC_API_KEY (registry or env) — the documented way, and
+//   2) the Claude Code CLI's own local token, since most offices run on a
+//      subscription login and have no API key at all. It is the same credential
+//      `claude` already uses on this machine, read-only, and it is sent nowhere
+//      but api.anthropic.com.
+// Failure NEVER breaks anything — the curated fallback list in providers.js stays.
+function claudeCliToken() {
+  const pick = (raw) => {
+    try {
+      const j = JSON.parse(raw);
+      const o = j.claudeAiOauth || j;
+      if (!o || !o.accessToken) return null;
+      // Expired: let the CLI refresh it on its next run rather than using a dead one.
+      if (o.expiresAt && Number(o.expiresAt) < Date.now()) return null;
+      return String(o.accessToken);
+    } catch { return null; }
+  };
+  try {
+    const f = path.join(require("os").homedir(), ".claude", ".credentials.json");
+    if (fs.existsSync(f)) { const t = pick(fs.readFileSync(f, "utf8")); if (t) return t; }
+  } catch {}
+  if (process.platform === "darwin") {
+    // macOS stores them in the Keychain instead of a file.
+    try {
+      const out = require("child_process").execFileSync("security",
+        ["find-generic-password", "-s", "Claude Code-credentials", "-w"],
+        { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "ignore"] });
+      const t = pick(out); if (t) return t;
+    } catch {}
+  }
+  return null;
+}
+function claudeAuthHeaders() {
+  const key = (reg.apiKeys || {}).ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+  if (key) return { "x-api-key": key, "anthropic-version": "2023-06-01" };
+  const tok = claudeCliToken();
+  if (tok) return { authorization: "Bearer " + tok, "anthropic-version": "2023-06-01",
+                    "anthropic-beta": "oauth-2025-04-20" };
+  return null;
+}
+async function fetchClaudeModels(signal) {
+  const h = claudeAuthHeaders();
+  if (!h) return { ok: false, msg: "ยังไม่มี Claude API key / login ให้ดึงรายชื่อโมเดล" };
+  const url = (providers.PROVIDERS.claude || {}).modelsUrl || "https://api.anthropic.com/v1/models?limit=100";
+  const r = await fetch(url, { headers: h, signal });
+  if (!r.ok) return { ok: false, msg: "Anthropic ตอบ HTTP " + r.status };
+  const j = await r.json();
+  // The API returns newest-first, which is exactly the picker order we want.
+  const models = proxy.cleanModels((j.data || []).map((m) => m.id));
+  return models.length ? { ok: true, models } : { ok: false, msg: "รายชื่อว่าง" };
+}
+// Pull ONE provider's live list and cache it on reg.providerConfig[id].models.
+// Used by the ↻ buttons and by the boot + 12h sweep, so a model that shipped
+// today shows up without waiting for an office release.
+async function refreshProviderModels(id) {
+  const spec = providers.PROVIDERS[id];
+  reg.providerConfig = reg.providerConfig || {};
+  const pc = reg.providerConfig[id] || {};
+  const kind = spec ? spec.format : pc.kind;
+  const signal = AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined;
+  const store = (models) => {
+    reg.providerConfig[id] = reg.providerConfig[id] || {};
+    reg.providerConfig[id].models = models;
+    reg.providerConfig[id].modelsAt = Date.now();
+    try { saveReg(); } catch {}
+    broadcast({ type: "models.refreshed", provider: id, models, at: Date.now() }, false);
+    return { ok: true, n: models.length, models };
+  };
+  const fail = (msg) => ({ ok: false, n: 0, msg });
+  try {
+    if (id === "claude") {
+      const r = await fetchClaudeModels(signal);
+      return r.ok ? store(r.models) : fail(r.msg);
+    }
+    if (!kind) return fail("ไม่รู้จัก provider นี้");
+    let murl, headers;
+    if (kind === "openai") {
+      const up = proxy.upstreamFor(id, reg);
+      murl = up && up.models;
+      if (!murl) return fail("ไม่พบ endpoint");
+      if (!up.key && !(spec && spec.local)) return fail("ยังไม่ได้วาง key");
+      headers = up.key ? { authorization: "Bearer " + up.key } : {};
+    } else {
+      murl = pc.modelsUrl || (spec && spec.modelsUrl);
+      if (!murl) return fail("provider นี้ไม่มี /models ให้ดึง");
+      if (!pc.token) return fail("ยังไม่ได้วาง key");
+      headers = { authorization: "Bearer " + pc.token };
+    }
+    const r = await fetch(murl, { headers, signal });
+    if (!r.ok) return fail("HTTP " + r.status);
+    const j = await r.json();
+    captureModelCtx(id, j.data);
+    const models = proxy.cleanModels((j.data || []).map((m) => m.id)).slice(0, 300);
+    return models.length ? store(models) : fail("รายชื่อว่าง");
+  } catch (e) { return fail(String((e && e.message) || e)); }
+}
+// Claude + every connected provider. Serial on purpose: a handful of GETs, no rush.
+async function refreshAllModels(reason) {
+  const out = {};
+  const ids = ["claude"].concat(Object.keys(reg.providerConfig || {}).filter(
+    (id) => id !== "claude" && reg.providerConfig[id] && reg.providerConfig[id].connected));
+  for (const id of ids) out[id] = await refreshProviderModels(id);
+  const ok = Object.values(out).filter((r) => r && r.ok).length;
+  console.log(`[models] refreshed ${ok}/${ids.length} provider(s)${reason ? " (" + reason + ")" : ""}`);
+  return out;
+}
+setTimeout(() => { refreshAllModels("boot").catch(() => {}); }, 20000);
+setInterval(() => { refreshAllModels("12h").catch(() => {}); }, 12 * 3600000);
+
 function ctxWindow(agent) {
   const a = reg.agents && reg.agents[agent];
   const p = (a && a.provider) || reg.defaultProvider || "claude";
@@ -3987,11 +4101,24 @@ const server = http.createServer((req, res) => {
     // declares modelsUrl).
     const providerCatalog = {};
     for (const [id, spec] of Object.entries(providers.PROVIDERS)) {
-      const models = (spec.models || []).slice();
+      const hint = (spec.models || []).slice();
+      const pc = (reg.providerConfig || {})[id] || {};
+      const live = (pc.models || []).filter(Boolean);
+      // Claude: the LIVE list from api.anthropic.com wins outright (newest-first),
+      // keeping only the aliases the API never lists ("" = provider default, plus
+      // opus/sonnet/haiku). That's what makes a same-day model appear in the picker.
+      // Other providers keep their curated order here — the UI appends their live
+      // ids after it — because a vendor's /models order isn't newest-first.
+      const models = (id === "claude" && live.length)
+        ? [...hint.filter((m) => !m || !/\d/.test(m)), ...live]
+        : hint;
       providerCatalog[id] = {
         models,
-        best: id === "claude" ? "claude-opus-4-8" : (models.filter(Boolean)[0] || ""),
+        best: id === "claude"
+          ? (live.find((m) => /^claude-/.test(m)) || "claude-opus-5")
+          : (hint.filter(Boolean)[0] || ""),
         hasModelsUrl: !!spec.modelsUrl || spec.format === "openai",
+        modelsAt: pc.modelsAt || 0,
       };
     }
     res.writeHead(200, { "content-type": "application/json" });
@@ -4699,6 +4826,31 @@ end tell`;
         res.writeHead(200, { "content-type": "application/json" });
         res.end("{}");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/models/refresh") {
+    // ↻ Pull the LIVE model list for one provider, or "all" (claude + every
+    // connected one). Anthropic included — that list used to be hand-maintained
+    // per release, which is why a just-released model could stay invisible.
+    readBody(req, async (body) => {
+      let p = "all";
+      try { p = JSON.parse(body || "{}").provider || "all"; } catch {}
+      try {
+        const out = p === "all" ? await refreshAllModels("ui") : { [p]: await refreshProviderModels(p) };
+        const results = {};
+        for (const [k, v] of Object.entries(out)) results[k] = { ok: !!(v && v.ok), n: (v && v.n) || 0, msg: (v && v.msg) || "" };
+        const one = p === "all" ? null : out[p];
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({
+          ok: p === "all" ? Object.values(results).some((r) => r.ok) : !!(one && one.ok),
+          models: (one && one.models) || null,
+          msg: (one && one.msg) || "",
+          results,
+        }));
+      } catch (e) {
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, models: null, msg: String((e && e.message) || e), results: {} }));
+      }
     });
 
   } else if (req.method === "POST" && req.url === "/registry/provider/test") {

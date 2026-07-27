@@ -1063,6 +1063,14 @@
   // DICT["thai"] = { en, zh, ja }
   const DICT = {
     "ยกเลิก": { en: "Cancel", zh: "取消", ja: "キャンセル" },
+    // ↻ live model lists (CONNECT tab) — the rest of the languages are filled at runtime
+    "↻ อัปเดตรายชื่อโมเดล": { en: "↻ Refresh model list", zh: "↻ 刷新模型列表", ja: "↻ モデル一覧を更新" },
+    "อัปเดตล่าสุด": { en: "updated", zh: "更新于", ja: "更新" },
+    "เมื่อครู่": { en: "just now", zh: "刚刚", ja: "たった今" },
+    "นาทีที่แล้ว": { en: "min ago", zh: "分钟前", ja: "分前" },
+    "ชม.ที่แล้ว": { en: "h ago", zh: "小时前", ja: "時間前" },
+    "วันที่แล้ว": { en: "d ago", zh: "天前", ja: "日前" },
+    "ยังไม่เคยดึง — กดเพื่อดึงรายชื่อโมเดลล่าสุดจากผู้ให้บริการ": { en: "Never pulled — click to fetch each provider's latest model list.", zh: "尚未获取 — 点击以拉取各服务商的最新模型列表。", ja: "未取得 — クリックして各プロバイダーの最新モデル一覧を取得します。" },
     // destructive-delete confirmations + proposal bulk-clear
     "ลบ": { en: "Delete", zh: "删除", ja: "削除" },
     "ลบ role": { en: "Delete role", zh: "删除角色", ja: "ロールを削除" },
@@ -2687,6 +2695,38 @@
       const v = modalCard.querySelector("#kVal").value.trim();
       if (n && v) api("/registry/key", { name: n, value: v }).then(() => renderConnectTab());
     };
+    // ── ↻ Refresh EVERY brain's model list on demand (claude + all connected
+    // providers). The office also does this on boot and every 12h, so the pickers
+    // follow what the vendors actually serve — this button is for "a new model
+    // dropped today and I want it right now".
+    {
+      const rBtn = modalCard.querySelector("#refreshAllModels");
+      const rHint = modalCard.querySelector("#modelsAllHint");
+      const when = (ts) => {
+        const m = Math.floor((Date.now() - ts) / 60000);
+        return m < 1 ? tr("เมื่อครู่") : m < 60 ? m + " " + tr("นาทีที่แล้ว")
+          : m < 1440 ? Math.floor(m / 60) + " " + tr("ชม.ที่แล้ว") : Math.floor(m / 1440) + " " + tr("วันที่แล้ว");
+      };
+      if (rHint) {
+        const ats = Object.values(regAll.providerCatalog || {}).map((c) => c.modelsAt || 0);
+        const last = ats.length ? Math.max(...ats) : 0;
+        const nClaude = (((regAll.providerConfig || {}).claude || {}).models || []).length;
+        rHint.textContent = last
+          ? tr("อัปเดตล่าสุด") + " " + when(last) + (nClaude ? " · Claude " + nClaude : "")
+          : tr("ยังไม่เคยดึง — กดเพื่อดึงรายชื่อโมเดลล่าสุดจากผู้ให้บริการ");
+      }
+      if (rBtn) rBtn.onclick = async () => {
+        rBtn.disabled = true;
+        if (rHint) rHint.textContent = "…";
+        const r = await api("/registry/models/refresh", { provider: "all" }).catch(() => null);
+        const res = (r && r.results) || {};
+        const okIds = Object.keys(res).filter((k) => res[k].ok);
+        if (rHint) rHint.textContent = okIds.length
+          ? "✓ " + okIds.map((k) => k + " " + res[k].n).join(" · ")
+          : "⚠ " + (Object.values(res).map((v) => v.msg).filter(Boolean)[0] || "");
+        rBtn.disabled = false;
+      };
+    }
     // ── 🧠 model providers: paste key → Connect → live connected state.
     const provbox = modalCard.querySelector("#provbox");
     if (provbox) {
@@ -3018,6 +3058,10 @@
             <button class="sparkle" id="addKey">＋</button>
           </div></div>
         <div class="field"><label>🧠 MODELS / PROVIDERS — สมองของ agent (วาง key แล้วกด Connect · ตั้ง provider ต่อ agent ในหน้า AGENTS)</label>
+          <div class="assistrow" style="gap:8px;margin:0 0 7px">
+            <button class="send" id="refreshAllModels" type="button" style="flex:0 0 auto">↻ อัปเดตรายชื่อโมเดล</button>
+            <span id="modelsAllHint" style="color:var(--dim);font-size:10.5px;flex:1 1 auto"></span>
+          </div>
           <div id="provbox"></div></div>
         <div class="field"><label>🛟 สมองสำรอง (ทั้งออฟฟิศ) — ถ้าสมองของ agent ไหน overload ต่อเนื่อง จะสลับงานมารันบนตัวนี้ชั่วคราวอัตโนมัติ</label>
           <div class="assistrow" style="gap:6px;flex-wrap:wrap">
@@ -3567,7 +3611,7 @@
       // FALLBACK ONLY — the authoritative curated list now comes from the backend
       // catalog (CATALOG, served by /registry from providers.js). These inline maps
       // are used only if that fetch fails; do not rely on them staying current.
-      const MODELS = { claude: ["", "opus", "sonnet", "haiku"], glm: ["glm-4.6", "glm-4.5"],
+      const MODELS = { claude: ["", "opus", "sonnet", "haiku", "claude-opus-5", "claude-sonnet-5"], glm: ["glm-4.6", "glm-4.5"],
         deepseek: ["deepseek-v4-pro", "deepseek-v4-flash"],
         qwen: ["qwen3-coder-plus", "qwen3-coder-next", "qwen3-coder-flash"],
         minimax: ["MiniMax-M3"], moonshot: ["kimi-k2.6", "kimi-k2.5", "kimi-k2", "kimi-latest"],
@@ -3584,7 +3628,7 @@
       // the user is nudged toward the latest (a quiet "there's a newer model" hint); they
       // can still drop back to an older one from the list.
       const BEST_MODEL = {
-        claude: "claude-opus-4-8", glm: "glm-4.6", deepseek: "deepseek-v4-pro",
+        claude: "claude-opus-5", glm: "glm-4.6", deepseek: "deepseek-v4-pro",
         qwen: "qwen3-coder-plus", minimax: "MiniMax-M3", moonshot: "kimi-k2.6",
         kimicode: "kimi-for-coding", openai: "gpt-4.1", gemini: "gemini-2.5-pro",
         xai: "grok-4", mistral: "mistral-large-latest",
@@ -3607,11 +3651,15 @@
       // Keep the model list current: silently re-pull a connected provider's live models
       // when it's picked (once per provider per open), without clobbering the field.
       const refreshModels = (p) => {
-        if (!p || p === "claude" || refreshed.has(p) || !(pcAll[p] && pcAll[p].connected)) return;
+        // claude included: its live list comes from api.anthropic.com via the
+        // machine's Claude auth, so a model released today shows up here too.
+        if (!p || refreshed.has(p)) return;
+        if (p !== "claude" && !(pcAll[p] && pcAll[p].connected)) return;
         refreshed.add(p);
-        api("/registry/provider/test", { provider: p }).then((r) => {
+        api("/registry/models/refresh", { provider: p }).then((r) => {
           if (!(r && r.models && r.models.length) || provSel.value !== p) return;
-          pcAll[p] = pcAll[p] || {}; pcAll[p].models = r.models; pcAll[p].connected = true;
+          pcAll[p] = pcAll[p] || {}; pcAll[p].models = r.models;
+          if (p !== "claude") pcAll[p].connected = true;
           const keep = modelInput.value;
           renderModels(false);
           if (keep) modelInput.value = keep;
@@ -3622,12 +3670,17 @@
       // always be made current. Feedback is symbolic (…/✓ N/⚠) — no new i18n strings.
       const setHint = (t) => { const h = modalCard.querySelector("#eModelHint"); if (h) h.textContent = t || ""; };
       const forceRefreshModels = (p) => {
-        if (!p || p === "claude") { setHint(""); return; }
+        if (!p) { setHint(""); return; }
         setHint("…"); refreshed.delete(p);
-        api("/registry/provider/test", { provider: p }).then((r) => {
+        api("/registry/models/refresh", { provider: p }).then(async (r) => {
           if (provSel.value !== p) return;
           if (r && r.models && r.models.length) {
-            pcAll[p] = pcAll[p] || {}; pcAll[p].models = r.models; pcAll[p].connected = true;
+            pcAll[p] = pcAll[p] || {}; pcAll[p].models = r.models;
+            if (p !== "claude") pcAll[p].connected = true;
+            // Re-pull the catalog so the ORDER and the pre-selected "best" model come
+            // from the backend (one source of truth), not a second copy of that logic.
+            try { const rg = await fetch("/registry").then((x) => x.json());
+                  pcAll = rg.providerConfig || pcAll; CATALOG = rg.providerCatalog || CATALOG; } catch {}
             const keep = modelInput.value; renderModels(false); if (keep) modelInput.value = keep;
             setHint("✓ " + r.models.length);
           } else { setHint(r && r.ok ? "✓" : ("⚠ " + ((r && r.msg) || ""))); }
