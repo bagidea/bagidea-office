@@ -847,7 +847,11 @@
   .chk.on { color: var(--accent); border-color: var(--accent); background: rgba(94,200,255,0.1); }
   .autobadge { font-size: 9.5px; color: #ffd28a; border: 1px solid rgba(255,210,138,0.4); border-radius: 10px; padding: 1px 7px; margin-left: 6px; }
   .switch { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--dim); margin-bottom: 10px; cursor: pointer; }
-  .switch .knob { width: 34px; height: 18px; border-radius: 12px; background: rgba(255,255,255,0.12); position: relative; transition: background 0.15s; }
+  /* flex:none is load-bearing — the label is a sibling flex item, so a LONG label
+     (the auto-approve one wraps to 2-3 lines) used to squeeze the 34px track down
+     to a bare dot: the switch stopped looking like a switch at all. Track stays
+     34x18 and the label wraps beside it; align-self keeps it on the first line. */
+  .switch .knob { width: 34px; height: 18px; flex: none; align-self: flex-start; margin-top: 1px; border-radius: 12px; background: rgba(255,255,255,0.12); position: relative; transition: background 0.15s; }
   .switch .knob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #8294ab; transition: left 0.15s, background 0.15s; }
   .switch.on .knob { background: rgba(94,200,255,0.4); }
   .switch.on .knob::after { left: 18px; background: var(--accent); }
@@ -5924,6 +5928,24 @@
       body: JSON.stringify({ path: realPath }) }).catch(() => {});
     tuckChat();  // the image now lives in its own OS window
   }
+  // 🔗 Any http(s) link — a PR URL an agent posted in chat, the changelog link in
+  // the update bar, a doc link in a card — must leave for the SYSTEM BROWSER.
+  // The office runs inside a webview with no window-open handler: target="_blank"
+  // is ignored and the click navigates the overlay itself, so clicking a PR link
+  // replaced the whole office with github.com (only a restart brought it back).
+  // Capture phase = this wins over any per-element onclick. Non-http hrefs
+  // (#anchors, javascript:) fall through untouched.
+  document.addEventListener("click", (e) => {
+    const a = e.target && e.target.closest && e.target.closest("a[href]");
+    if (!a) return;
+    const href = a.getAttribute("href") || "";
+    if (!/^https?:\/\//i.test(href)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    fetch("/open", { method: "POST",
+      headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
+      body: JSON.stringify({ path: href }) }).catch(() => {});
+  }, true);
   function mediaNode(url, kind, name, realPath) {
     let el;
     if (kind === "image") {
@@ -5938,8 +5960,13 @@
       el = document.createElement("audio");
       el.src = url; el.controls = true; el.preload = "metadata";
     } else {
+      // A doc (pdf…) — NOT an <a href> anymore: target="_blank" does nothing in a
+      // webview, so the click used to navigate the office away to the file. Open
+      // it in the OS default app (real window), same as the ⤢ button.
       el = document.createElement("a");
-      el.href = url; el.target = "_blank"; el.textContent = "📄 " + (name || url);
+      el.href = "javascript:void 0"; el.textContent = "📄 " + (name || url);
+      el.title = "เปิดด้วยโปรแกรมของเครื่อง (หน้าต่างใหม่)";
+      el.onclick = (e) => { e.preventDefault(); openExternal(realPath || url); };
     }
     el.className = "msgmedia";
     // No real filesystem path → nothing to reveal (return bare element).

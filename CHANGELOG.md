@@ -4,6 +4,25 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [Unreleased]
+
+**Fixed**
+- **A link in chat no longer swallows the office.** Clicking a URL an agent posted
+  (a pull request, a doc) navigated the office *itself* to that page — the whole UI
+  was replaced by github.com and only a restart brought it back. The office runs
+  inside a webview, where `target="_blank"` is simply ignored. Every `http(s)` link
+  — chat, update bar, cards, the MCP hub — now opens in your **real browser** and
+  leaves the office where it was. A non-previewable file (pdf…) in chat opens in the
+  OS default app instead of navigating away.
+- **The 🔓 auto-approve switch looked like a dot, not a switch.** Its label is long
+  enough to wrap, and as a sibling flex item it squeezed the 34 px track down to a
+  bare circle — unreadable as on/off. The track now keeps its size and the label
+  wraps beside it. (The setting itself always worked.)
+- **npm bootstrapper republished (0.9.47).** `npx bagidea-office` had been serving
+  0.9.39 since the publish step skips versions already on the registry, so the
+  TLS-hardened installer fetch (#37) and the winget-free Windows path never reached
+  new installs.
+
 ## [0.9.47] — ↻ Model lists that stay current · agents that don't stall waiting for you
 
 **Added**

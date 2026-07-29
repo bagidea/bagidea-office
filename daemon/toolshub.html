@@ -52,6 +52,19 @@
 <div id="toast"></div>
 <script src="/winlang.js"></script>
 <script>
+  // 🔗 This window is a webview: target="_blank" is ignored and the click would
+  // navigate the hub itself to the link. Route external links through the daemon,
+  // which opens them in the real system browser (same as pluginshub's openExt).
+  document.addEventListener("click", (e) => {
+    const a = e.target && e.target.closest && e.target.closest("a[href]");
+    if (!a) return;
+    const href = a.getAttribute("href") || "";
+    if (!/^https?:\/\//i.test(href)) return;
+    e.preventDefault();
+    fetch("/open", { method: "POST",
+      headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
+      body: JSON.stringify({ path: href }) }).catch(() => {});
+  }, true);
   let L = "th";  // office language: th / en hardcoded, others auto-translated
   let WL = null; // WinLang instance for non-English languages (Thai → lang via /i18n)
   // Static UI strings, both languages.
