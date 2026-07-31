@@ -4525,7 +4525,14 @@ end tell`;
           }
           runChildren.delete(t);
           // Always clear the strip — covers stale/replayed entries whose child is already gone.
-          broadcast({ type: "task.completed", agent: (rec && rec.agent) || agent || "", task: t });
+          // NEVER name an empty agent: the wallpaper gives a body to whatever id an event
+          // carries, and "" is not a teammate — stopping a stale row used to leave a
+          // nameless phantom standing on the floor that nothing could clean up. Unknown
+          // owner ⇒ omit the field and let the renderer resolve it from the task id.
+          const who = (rec && rec.agent) || agent || "";
+          const ev = { type: "task.completed", task: t };
+          if (who) ev.agent = who;
+          broadcast(ev);
         };
         if (task) kill(runChildren.get(task), task);
         if (agent) { for (const [t, rec] of [...runChildren]) if (rec.agent === agent) kill(rec, t); }

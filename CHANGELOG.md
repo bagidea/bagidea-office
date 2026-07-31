@@ -15,6 +15,13 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
   run reported a proper result. Every ending now emits one, so a card can no longer
   outlive its work while the team sits idle. A run the office killed for a dead
   brain ends **red**, not green.
+- **A nameless body could appear on the office floor.** Clearing a task row whose
+  process was already gone broadcast the ending with an *empty* agent id — and the
+  wallpaper gives a body to whatever id an event names, so an unnamed "Researcher"
+  materialised and stayed: the roster reconciler skips ids it can't match and
+  nothing else could remove it. Endings now name a real teammate or none at all,
+  the renderer resolves the owner from the **task id** instead (so ⏹ on a stale row
+  clears the right person), and an empty id is ignored outright.
 - **A link in chat no longer swallows the office.** Clicking a URL an agent posted
   (a pull request, a doc) navigated the office *itself* to that page — the whole UI
   was replaced by github.com and only a restart brought it back. The office runs

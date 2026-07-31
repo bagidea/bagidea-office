@@ -253,7 +253,18 @@ func handle(evt: Dictionary) -> void:
 		for sub in ghosts.keys():
 			_despawn_ghost(sub, true)
 		return
-	if not evt.has("agent") and not evt.has("agents"):
+	# A task event can arrive with NO owner named — ⏹ pressed on a row whose process
+	# is long gone, for one. The task id still says who: whoever is holding it.
+	# Resolve it here, because an empty id reaching _ensure() spawns a nameless
+	# body that nothing can ever clean up (roster reconcile skips it and
+	# _remove_agent refuses it), and the real owner stays pinned "working".
+	if type.begins_with("task.") and str(evt.get("agent", "")) == "":
+		var owner := _owner_of_task(str(evt.get("task", "")))
+		if owner == "":
+			return
+		evt["agent"] = owner
+	# An EMPTY agent counts as agent-less: "" is not a teammate, it's a bug upstream.
+	if not evt.has("agents") and str(evt.get("agent", "")) == "":
 		return  # agent-less events must never spawn a default "agent" ghost
 	# Replay Theater was removed — stale theater frames from old journals
 	# must never animate anything.
@@ -791,6 +802,16 @@ func _spawn_base(id: String) -> Vector3:
 	_spawn_n += 1
 	var h: Vector2 = world.floor_half() if world.has_method("floor_half") else Vector2(14.0, 10.0)
 	return Vector3(randf_range(-h.x + 2.0, h.x - 2.0), 0.86, randf_range(-h.y + 2.0, h.y - 2.0))
+
+## Who is currently holding this task id ("" when nobody is).
+func _owner_of_task(tk: String) -> String:
+	if tk == "":
+		return ""
+	for aid in agents:
+		var ag: Dictionary = agents[aid]
+		if ag.tasks.has(tk):
+			return aid
+	return ""
 
 func _ensure(id: String) -> Dictionary:
 	if agents.has(id):
