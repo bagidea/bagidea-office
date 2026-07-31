@@ -113,6 +113,7 @@ function help() {
   row("lang [code]", "Show / set the office language (14 languages)");
   row("auto [on|off]", "🤖 Keep going without asking — decide and finish the job");
   row("eco [on|off]", "🌱 Cut idle token burn (rhythms stretch, QA pass off)");
+  row("trust [allow|deny]", "🛡 Projects whose own hooks are waiting on your word");
   row("keys", "List configured API keys (values hidden)");
   row("key set <NAME> <value>", "Add a key · key rm <NAME> · key test [NAME]");
   row("channels", "Telegram / Discord / LINE status");
@@ -257,6 +258,35 @@ async function main() {
     return r && r.auto
       ? ok(`Keep-going mode ON — the team decides and works on without asking (up to ${(r.max || 8)} rounds per job; it still stops for missing access and irreversible actions)`)
       : ok("Keep-going mode OFF — they check with you before big calls");
+  }
+
+  if (cmd === "trust") {
+    // 🛡 Projects whose own .claude hooks are waiting on your word (issue #39).
+    // Work inside them is parked until you answer, so the terminal needs a way
+    // to answer too — not only the office window.
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const list = (await req("GET", "/project/trust")) || [];
+    const arg = (rest[0] || "").toLowerCase();
+    if (!arg) {
+      if (!list.length) return info("No project is waiting for a trust decision");
+      for (const t of list) {
+        console.log(`\n  ${c.bold}${t.project}${c.reset}  ${c.gray}${t.dir}${c.reset}`);
+        console.log(`  ${t.changed ? "hooks CHANGED after your approval" : "ships its own hooks — they run by themselves when work opens here"}`);
+        for (const h of t.hooks || []) console.log(`    ${c.gray}${h.event} →${c.reset} ${h.command}`);
+        for (const s of (t.scripts || []).filter((x) => x.outside))
+          console.log(`    ${c.warn || c.gray}⚠ ${s.rel} resolves outside the project${c.reset}`);
+        console.log(`  ${c.gray}bagidea trust allow "${t.project}"  |  bagidea trust deny "${t.project}"${c.reset}`);
+      }
+      return;
+    }
+    if (!["allow", "deny"].includes(arg)) return bad('usage: bagidea trust [allow|deny] "<project>"');
+    const name = (rest.slice(1).join(" ") || "").toLowerCase();
+    const hit = name ? list.find((t) => String(t.project).toLowerCase() === name) : list[0];
+    if (!hit) return bad(list.length ? "no pending project by that name" : "nothing is waiting for a trust decision");
+    await req("POST", "/project/trust", { id: hit.trust, decision: arg });
+    return ok(arg === "allow"
+      ? `Trusted “${hit.project}” — its hooks may run, and parked work resumes now (any edit to them asks again)`
+      : `Denied “${hit.project}” — its hooks stay blocked and the parked work is dropped`);
   }
 
   if (cmd === "eco") {

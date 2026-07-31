@@ -67,6 +67,11 @@ Working unattended
                                 Up to 8 self-driven rounds per job; it still stops for
                                 missing access and for anything irreversible.
 
+Security
+  bagidea trust                 🛡 Projects whose own .claude hooks are waiting on
+                                your word (work inside them is parked until then)
+  bagidea trust allow "<project>"   Let that project's hooks run · trust deny "<p>"
+
 Cost control
   bagidea eco [on|off]          🌱 Eco mode — cut idle token burn: background rhythms
                                 stretch (heartbeat ≥3h, social ≥6h, pitches ≥6h) and the

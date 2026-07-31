@@ -31,6 +31,34 @@ The system will: create + register the project → assign the work scoped to tha
 **Via the UI:** type a name + pick a place (or ⌨ set the path yourself / 📁 pick an existing folder
 with the built-in folder picker) → **Create / Register**
 
+## 🛡 Registering a folder someone else wrote
+
+A folder can carry its own `.claude/settings.json`. That file is **executable
+configuration**: it can declare a command hook (e.g. `SessionStart`) that runs the
+moment a session opens in that folder — before the model says a word, so the
+Security Center never sees it.
+
+Because headless sessions can't show Claude Code's own "do you trust this folder?"
+dialog (they would stall on it forever), the office pre-trusts every project
+directory. Registering a folder is bookkeeping, though — it must not silently mean
+*"yes, run whatever code this repo ships"*. So:
+
+- A project with **no hooks of its own** — nearly all of them — is trusted silently,
+  exactly as before. Nothing changes.
+- A project that **does** ship hooks raises a card in the 🛡 Security Center listing
+  the literal commands it would run, and **work inside it waits** until you answer.
+  Approve and the parked task resumes by itself — you don't re-type it.
+- Approval is bound to that **exact** setup. Edit the settings file, or the script a
+  hook calls, and you're asked again. A hook whose script resolves *outside* the
+  project is flagged on the card.
+- No office window open? The same decision is in the terminal: `bagidea trust`
+  lists what's waiting, `bagidea trust allow "<project>"` releases it. A block is
+  also pushed to your [channels](channels.md).
+
+> This covers repo-supplied **hooks** specifically. `permissions` rules in a project
+> settings file are not gated — those still run through the office's own approval
+> broker — and project `.mcp.json` servers are approved separately by Claude Code.
+
 ## Buttons in a project row
 
 Each row makes it clear who's in the project: 🖥 **you're working in it** (green) · 🫥 yours running in the background ·

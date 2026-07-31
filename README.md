@@ -615,6 +615,7 @@ Full reference: [`docs/guide/cli.md`](docs/guide/cli.md).
 | `POST /event` | push any OEP event (custom integrations) |
 | `GET /map/bg` · `POST /pos` | live map plumbing |
 | `POST /perm/request` (long-poll) · `POST /perm/respond` `{id, decision, always?}` | permission broker |
+| `GET /project/trust` · `POST /project/trust` `{id, decision}` | projects whose own `.claude` hooks await approval (work there is parked until answered) |
 | `GET /projects` · `POST /projects` `{name, place\|path \| remove \| removeDisk}` | projects (removals are human-UI-only) |
 | `POST /projects/open` `{id, mode: play\|shell\|folder}` · `/projects/hide` · `/projects/resume` · `/projects/stop` · `/projects/stopwork` | project windows (▶ = smart open; locked while an agent works — `stopwork` takes over) |
 | `GET /fs?dir=` · `POST /fs/mkdir` | in-house folder picker |

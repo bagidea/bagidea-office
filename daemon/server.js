@@ -33,6 +33,7 @@ const providers = require("./providers");
 const proxy = require("./proxy");
 const { RunWatchdog } = require("./watchdog");
 const { stripStatus, verdict: autoVerdict, readStatus } = require("./autopilot");
+const projtrust = require("./projecttrust");
 const { wireWorkspaceSettings } = require("./wire-hooks-runtime");
 const { killTree } = require("./kill-tree");   // cross-platform child reap (issue #15 review)
 
@@ -134,6 +135,7 @@ function loadReg() {
   if (reg.channelNotify === undefined) reg.channelNotify = true; // work milestones → Telegram/Discord/…
   if (reg.autoApprove === undefined) reg.autoApprove = false; // auto-allow every tool prompt (unattended runs)
   if (reg.autoPilot === undefined) reg.autoPilot = false;     // 🤖 keep working without asking the owner
+  if (!reg.projectTrust) reg.projectTrust = {};               // project dir → approved hook fingerprint (#39)
   saveReg();
 }
 function saveReg() { fs.writeFileSync(REGISTRY, JSON.stringify(reg, null, 2)); }
@@ -1324,18 +1326,95 @@ function ensureOnboarded() {
 // Headless claude in an untrusted folder stalls on the trust dialog it can
 // never show. Pre-trust project dirs in ~/.claude.json (same flag the
 // interactive "Yes, I trust this folder" sets). Creates the file if absent.
-function ensureTrusted(dir) {
+//
+// Issue #39 — but NOT unconditionally: a folder that ships its own command hooks
+// would execute them at session start, outside the Security Center. Those need the
+// owner's word first, once per exact setup (see projecttrust.js). Returns TRUE when
+// the folder is trusted and a session may open in it, FALSE while it waits on the
+// owner. A folder with no hooks is trusted silently, exactly as before.
+const trustKey = (dir) =>
+  String(dir).replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+const pendingTrust = new Map();   // trustKey → { id, dir, hash, hooks, scripts, queue[] }
+
+function ensureTrusted(dir, ctx) {
+  const fp = projtrust.fingerprint(dir);
+  if (fp.hash && (reg.projectTrust || {})[trustKey(dir)] !== fp.hash) {
+    askTrust(dir, fp, ctx);
+    return false;
+  }
   try {
     const file = claudeJsonPath();
     const j = readClaudeJson();
     j.projects = j.projects || {};
     const key = String(dir).replace(/\\/g, "/").replace(/\/+$/, "");
     const cur = j.projects[key] || {};
-    if (cur.hasTrustDialogAccepted === true) return;
+    if (cur.hasTrustDialogAccepted === true) return true;
     j.projects[key] = { ...cur, hasTrustDialogAccepted: true };
     fs.writeFileSync(file, JSON.stringify(j, null, 2));
     console.log("[proj] pre-trusted", key);
   } catch (e) { console.error("[proj] trust", e.message); }
+  return true;
+}
+
+// Put the exact commands in front of the owner and hold the work. One card per
+// folder+fingerprint — a second run into the same project joins the same card
+// instead of stacking another. The card stays until it's answered (unlike a tool
+// prompt, nothing is mid-flight waiting on a 50s timer).
+function askTrust(dir, fp, ctx) {
+  const key = trustKey(dir);
+  const pend = pendingTrust.get(key);
+  if (pend && pend.hash === fp.hash) return pend;
+  // Name it the way the owner knows it. At REGISTRATION time the project isn't in
+  // the list yet, so the caller's name is the only one there is.
+  const proj = projects.find((p) => trustKey(p.dir) === key) ||
+    (ctx && ctx.project && projects.find((p) => p.id === ctx.project)) || null;
+  const known = !!(reg.projectTrust || {})[key];   // approved before → this is a CHANGE
+  const rec = { id: "tr" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    dir, hash: fp.hash, hooks: fp.hooks, scripts: fp.scripts,
+    project: (proj && proj.name) || (ctx && ctx.name) || path.basename(dir), changed: known,
+    // The folder changed while a card was already up: the old card is void, but
+    // the work parked on it must move to the new one, not be stranded.
+    queue: pend ? pend.queue : [] };
+  if (pend) broadcast({ type: "trust.withdrawn", trust: pend.id, project: pend.project });
+  pendingTrust.set(key, rec);
+  broadcast({ type: "trust.requested", trust: rec.id, dir, project: rec.project,
+    changed: known, agent: (ctx && ctx.agent) || undefined,
+    hooks: fp.hooks, scripts: fp.scripts.map((s) => ({ rel: s.rel, outside: s.outside })) });
+  notifyChannels((known ? "🛡 โปรเจค “" + rec.project + "” เปลี่ยน hook ของตัวเอง"
+    : "🛡 โปรเจค “" + rec.project + "” มี hook ของตัวเองที่จะรันอัตโนมัติ") +
+    " — งานหยุดรอคุณอนุมัติในออฟฟิศก่อน");
+  console.log("[proj] trust HELD", key, fp.hooks.length, "hook(s)");
+  return rec;
+}
+
+// Owner's answer. allow → remember THIS fingerprint (a later edit re-asks) and
+// release everything that was waiting on the folder; deny → drop the waiting work
+// and say so, rather than leaving it queued forever.
+function resolveTrust(id, allow) {
+  let key = null;
+  for (const [k, v] of pendingTrust) if (v.id === id) { key = k; break; }
+  if (key === null) return false;
+  const rec = pendingTrust.get(key);
+  pendingTrust.delete(key);
+  if (allow) {
+    reg.projectTrust = reg.projectTrust || {};
+    reg.projectTrust[key] = rec.hash;
+    saveReg();
+    ensureTrusted(rec.dir);
+    broadcast({ type: "trust.approved", trust: id, project: rec.project, dir: rec.dir });
+    for (const fn of rec.queue) { try { fn(); } catch (e) { console.error("[proj] trust resume", e.message); } }
+  } else {
+    broadcast({ type: "trust.denied", trust: id, project: rec.project, dir: rec.dir });
+    for (const fn of rec.queue) { try { fn(null); } catch {} }
+  }
+  return true;
+}
+
+// Park a run until the folder is trusted. `fn(ok)` is called with no argument on
+// approval (re-run it) and with null on denial (tell whoever was waiting).
+function waitForTrust(dir, fn) {
+  const rec = pendingTrust.get(trustKey(dir));
+  if (rec) rec.queue.push(fn);
 }
 
 // Mentioning a registered project by name in chat binds the thread to it:
@@ -1398,7 +1477,11 @@ function createProject(name, place, pathArg) {
     throw new Error("path นี้คือโฟลเดอร์ของ place — โปรเจคต้องเป็นโฟลเดอร์ย่อยข้างใน");
   const existed = fs.existsSync(dir);
   fs.mkdirSync(dir, { recursive: true });
-  ensureTrusted(dir);
+  // Registering an EXISTING folder is the moment consent is really being asked for
+  // (a folder we just created can't ship hooks). If it carries any, the card goes up
+  // now, while the owner is looking at the screen — registration itself still
+  // succeeds; it's the first session inside it that waits.
+  ensureTrusted(dir, { name });
   // Only folders WE created may ever be disk-deleted from the UI.
   const proj = { id: "p" + Date.now(), name, dir, ts: Date.now(), created: !existed };
   projects.push(proj);
@@ -1703,7 +1786,24 @@ function runClaude(agent, prompt, opts = {}) {
     entry.proj = opts.project;
   const projId = entry.proj && projectDir(entry.proj) ? entry.proj : null;
   const cwd = projId ? projectDir(projId) : WORKSPACE;
-  if (projId) ensureTrusted(cwd);
+  // Issue #39: a project that ships its own command hooks doesn't get a session
+  // until the owner has seen them. Park the run (nothing has been broadcast yet)
+  // and replay it verbatim the moment they approve — no re-typing the task.
+  if (projId && !ensureTrusted(cwd, { agent, project: projId })) {
+    const name = (projects.find((p) => p.id === projId) || {}).name || projId;
+    broadcast({ type: "chat.message", agent, session: entry.key,
+      text: `🛡 โปรเจค “${name}” มี hook ของตัวเองที่จะรันอัตโนมัติเมื่อเปิดงาน — ` +
+        `รออนุมัติในศูนย์ความปลอดภัยก่อน แล้วผมจะทำงานนี้ต่อให้เองครับ` });
+    waitForTrust(cwd, (denied) => {
+      if (denied === null) {
+        broadcast({ type: "chat.message", agent, session: entry.key,
+          text: `🛡 ไม่อนุมัติ hook ของโปรเจค “${name}” — งานนี้ยกเลิก (โปรเจคยังไม่ถูกเปิดใช้)` });
+        return;
+      }
+      runClaude(agent, prompt, opts);
+    });
+    return task;
+  }
   // claude sessions are PER-DIRECTORY: a sid born in another cwd cannot be
   // resumed here. Ground truth beats bookkeeping — check the actual session
   // file under this cwd; missing means a fresh claude session here (our own
@@ -4588,7 +4688,12 @@ end tell`;
             res.writeHead(409, { "content-type": "text/plain; charset=utf-8" });
             return res.end("agent กำลังทำงานในโปรเจคนี้อยู่ — กด ⏹ หยุดก่อนเพื่อเข้าไปดู/ทำเอง หรือรอจนงานเสร็จ");
           }
-          ensureTrusted(dir);  // no trust dialog ambush in the new window
+          // No trust-dialog ambush in the new window — and no repo-supplied hook
+          // firing in it either, until the owner has approved it (#39).
+          if (!ensureTrusted(dir, { project: id })) {
+            res.writeHead(409, { "content-type": "text/plain; charset=utf-8" });
+            return res.end("โปรเจคนี้มี hook ของตัวเองที่จะรันอัตโนมัติ — อนุมัติในศูนย์ความปลอดภัยก่อนถึงจะเปิดได้");
+          }
           // Smart entry: resume the NEWEST session explicitly — straight into
           // where the work happened. Fresh claude only when there's no session.
           const sid = newestSid(dir);
@@ -6065,6 +6170,27 @@ end tell`;
       }, 50000);
       pendingPerms.set(id, { res, timer, agent, task, tool });
     });
+
+  } else if (req.method === "POST" && req.url === "/project/trust") {
+    // Issue #39 — the owner's answer to "this project ships its own hooks".
+    // Approval is bound to the exact fingerprint, so editing settings.json or the
+    // script it calls asks again instead of riding the old yes.
+    readBody(req, (body) => {
+      try {
+        const { id, decision } = JSON.parse(body);
+        const ok = resolveTrust(String(id), decision === "allow");
+        res.writeHead(ok ? 200 : 404, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok }));
+      } catch { res.writeHead(400); res.end(); }
+    });
+
+  } else if (req.method === "GET" && req.url === "/project/trust") {
+    // Pending cards, so a reopened overlay (or the CLI) can show what's waiting.
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify([...pendingTrust.values()].map((r) => ({
+      trust: r.id, dir: r.dir, project: r.project, changed: r.changed,
+      hooks: r.hooks, scripts: r.scripts.map((s) => ({ rel: s.rel, outside: s.outside })),
+    }))));
 
   } else if (req.method === "POST" && req.url === "/perm/respond") {
     readBody(req, (body) => {

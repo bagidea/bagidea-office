@@ -1155,6 +1155,28 @@
       en: "🤖 Keep-going mode OFF — they'll check with you before big calls",
       zh: "🤖 已关闭自动推进 — 重大决定前会先问你",
       ja: "🤖 自走モード OFF — 大きな判断の前に確認します" },
+    // 🛡 project trust (a project's own .claude hooks)
+    "โปรเจคนี้มี hook ของตัวเอง จะรันคำสั่งข้างล่างนี้เองทุกครั้งที่เปิดงาน (ไม่ผ่านการ์ดขออนุญาต)": {
+      en: "This project ships its own hooks — it runs the commands below by itself every time work opens here (no permission card)",
+      zh: "该项目自带 hook — 每次在这里开始工作时都会自行运行下列命令（不经过授权卡片）",
+      ja: "このプロジェクトは独自のフックを持っています — ここで作業を開くたび、下のコマンドを自動実行します（許可カードを通りません）" },
+    "hook ของโปรเจคนี้ถูกแก้ไขหลังจากที่คุณอนุมัติไปแล้ว — ตรวจอีกครั้ง": {
+      en: "This project's hooks changed after you approved them — check again",
+      zh: "该项目的 hook 在你批准之后发生了变化 — 请再次确认",
+      ja: "承認後にこのプロジェクトのフックが変更されました — もう一度確認してください" },
+    "สคริปต์ที่เรียกชี้ออกไปนอกโปรเจค": {
+      en: "A referenced script resolves outside the project",
+      zh: "被调用的脚本指向项目之外",
+      ja: "参照スクリプトがプロジェクト外を指しています" },
+    "เชื่อถือโปรเจคนี้": { en: "Trust this project", zh: "信任此项目", ja: "このプロジェクトを信頼" },
+    "ไม่อนุมัติ": { en: "Don't allow", zh: "不允许", ja: "許可しない" },
+    "โปรเจค": { en: "Project", zh: "项目", ja: "プロジェクト" },
+    "อนุมัติ hook แล้ว": { en: "hooks approved", zh: "已批准 hook", ja: "フックを承認しました" },
+    "ไม่อนุมัติ hook": { en: "hooks not allowed", zh: "未批准 hook", ja: "フックを許可しませんでした" },
+    "🛡 การ์ดนี้หมดอายุไปแล้ว (คำขอถูกปิดไปก่อนหน้า)": {
+      en: "🛡 This card has expired (the request was already closed)",
+      zh: "🛡 此卡片已失效（请求先前已关闭）",
+      ja: "🛡 このカードは期限切れです（リクエストは既に閉じられました）" },
     // settings tabs
     "AGENTS": { en: "AGENTS", zh: "代理", ja: "エージェント" },
     "ROLES": { en: "ROLES", zh: "角色", ja: "役職" },
@@ -2345,6 +2367,11 @@
       if (!resolveFeedPerm(ev.perm, ev.via === "timeout" ? "✗ หมดเวลา — ปฏิเสธอัตโนมัติ" : "✗ ไม่อนุญาต", false))
         addFeed(ev.agent, "🛡 " + ev.tool + " — denied ✗", sess);
     }
+    else if (ev.type === "trust.requested")
+      addFeed(ev.agent || "main", "🛡 โปรเจค " + (ev.project || "") + " มี hook ของตัวเอง — รออนุมัติ", sess);
+    else if (ev.type === "trust.approved" || ev.type === "trust.denied")
+      addFeed("main", "🛡 โปรเจค " + (ev.project || "") +
+        (ev.type === "trust.approved" ? " — อนุมัติ hook แล้ว ✓" : " — ไม่อนุมัติ hook ✗"), sess);
     else if (ev.type === "task.completed") addFeed(ev.agent, "✓ งานเสร็จ", sess);
     else if (ev.type === "task.failed") addFeed(ev.agent, "✗ งานล้มเหลว", sess);
     else if (ev.type === "task.delegated") addFeed("main", "📋 มอบหมายงานให้ " + nameOf(ev.target), sess);
@@ -2454,6 +2481,50 @@
       addChip("🛡 การ์ดนี้หมดอายุไปแล้ว (คำขอถูกปิดไปก่อนหน้า)");
     }
   }
+  // ---- project trust (issue #39) -------------------------------------------
+  // A project folder can ship its own .claude/settings.json with a command hook —
+  // that runs when a session opens there, BEFORE any tool prompt exists. So it gets
+  // its own card in the Security Center, showing the literal commands, and the work
+  // waits here until you answer. Approval is bound to this exact setup: edit the
+  // settings or the script it calls and you're asked again.
+  function addTrustCard(ev) {
+    if (document.getElementById("trust-" + ev.trust)) return;
+    const d = document.createElement("div");
+    d.className = "perm";
+    d.id = "trust-" + ev.trust;
+    const rows = (ev.hooks || []).map((h) =>
+      esc(h.event || "?") + " → " + esc(h.command || "")).join("\n");
+    const extra = (ev.scripts || []).filter((s) => s.outside)
+      .map((s) => esc(s.rel)).join(", ");
+    d.innerHTML =
+      `<b>🛡 ${esc(ev.project || ev.dir || "")}</b><br>` +
+      `<span style="font-size:11px;opacity:.85">${ev.changed
+        ? tr("hook ของโปรเจคนี้ถูกแก้ไขหลังจากที่คุณอนุมัติไปแล้ว — ตรวจอีกครั้ง")
+        : tr("โปรเจคนี้มี hook ของตัวเอง จะรันคำสั่งข้างล่างนี้เองทุกครั้งที่เปิดงาน (ไม่ผ่านการ์ดขออนุญาต)")}</span>` +
+      `<pre>${rows}</pre>` +
+      (extra ? `<span style="font-size:11px;color:#fca5a5">⚠ ${tr("สคริปต์ที่เรียกชี้ออกไปนอกโปรเจค")}: ${extra}</span>` : "") +
+      `<div class="row"><button class="allow">✓ ${tr("เชื่อถือโปรเจคนี้")}</button>` +
+      `<button class="deny">✗ ${tr("ไม่อนุมัติ")}</button></div>`;
+    const btns = d.querySelectorAll("button");
+    btns[0].onclick = () => respondTrust(ev.trust, "allow");
+    btns[1].onclick = () => respondTrust(ev.trust, "deny");
+    permsEl.appendChild(d);
+    setSide(true);
+    renderBadge();
+  }
+  async function respondTrust(id, decision) {
+    const r = await fetch("/project/trust", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, decision }),
+    });
+    if (!r.ok) { removeTrustCard(id); addChip(tr("🛡 การ์ดนี้หมดอายุไปแล้ว (คำขอถูกปิดไปก่อนหน้า)")); }
+  }
+  function removeTrustCard(id) {
+    const el = document.getElementById("trust-" + id);
+    if (el) el.remove();
+    renderBadge();
+  }
+
   function removePermCard(id) {
     // Same request renders in two places (sidebar + the inline chat mirror) —
     // clear both, by their distinct id prefixes, when it's answered/withdrawn.
@@ -5768,6 +5839,19 @@
       ensureAgent(ev.agent, "working");
       if (!ev.replay) addLog(`🛡 ${ev.tool} — <b>${ev.type === "perm.approved" ? "allowed" : "denied"}</b> (${nameOf(ev.agent)})`);
     }
+    else if (ev.type === "trust.requested") {
+      // Replays are skipped like any other card: /project/trust is the source of
+      // truth for what's still waiting, and a fresh overlay pulls it on connect.
+      if (!ev.replay) { addTrustCard(ev); uiSnd("alert"); }
+    }
+    // Superseded card (the folder changed while it was up) — the replacement
+    // arrives right behind it, so drop this one without a verdict line.
+    else if (ev.type === "trust.withdrawn") removeTrustCard(ev.trust);
+    else if (ev.type === "trust.approved" || ev.type === "trust.denied") {
+      removeTrustCard(ev.trust);
+      if (!ev.replay) addLog(`🛡 ${tr("โปรเจค")} <b>${esc(ev.project || "")}</b> — <b>${
+        ev.type === "trust.approved" ? tr("อนุมัติ hook แล้ว") : tr("ไม่อนุมัติ hook")}</b>`);
+    }
     else if (ev.type === "ceo.summon") {
       // Direct feedback in the CEO pane (you just gave the order) — log otherwise.
       if (!ev.replay) {
@@ -5855,7 +5939,13 @@
 
   function connect() {
     const ws = new WebSocket(`ws://${location.host}/ws`);
-    ws.onopen = () => document.getElementById("conn").classList.add("on");
+    ws.onopen = () => {
+      document.getElementById("conn").classList.add("on");
+      // Trust cards outlive a reload (work is parked on them), and they're skipped
+      // on replay like any other card — so ask the daemon what's still waiting.
+      fetch("/project/trust").then((r) => r.json())
+        .then((list) => (list || []).forEach(addTrustCard)).catch(() => {});
+    };
     ws.onclose = () => {
       document.getElementById("conn").classList.remove("on");
       setTimeout(connect, 2000);

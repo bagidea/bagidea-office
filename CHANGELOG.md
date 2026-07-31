@@ -19,6 +19,22 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
   wait for an *opinion* — what an agent may DO is still the separate 🔓 auto-approve
   switch.
 
+**Security**
+- **Registering a folder no longer means "run whatever code it ships"**
+  ([#39](https://github.com/bagidea/bagidea-office/issues/39), reported by
+  [@glmgbj233](https://github.com/glmgbj233)). A project can carry its own
+  `.claude/settings.json`, and that file is executable configuration: a command hook
+  such as `SessionStart` runs the instant a session opens in the folder — before the
+  model acts, so the office's permission broker never sees it. The office pre-trusts
+  project directories (headless sessions stall forever on the trust dialog they
+  can't show), which turned *registering* a folder into a standing yes. Now the
+  office reads what would actually run: a project with **no hooks of its own** is
+  trusted silently as before, while one that ships hooks raises a 🛡 card listing the
+  literal commands and **parks the work** until you answer — approve and the task
+  resumes by itself. Approval is bound to that exact setup, so editing the settings
+  file *or the script a hook calls* asks again, and a hook resolving outside the
+  project is flagged. Answerable from the terminal too: `bagidea trust`.
+
 **Fixed**
 - **Ghost task cards on the board.** A task whose run ended *without a verdict* —
   the brain turned out to be unusable (bad key, dead endpoint) and the office cut
