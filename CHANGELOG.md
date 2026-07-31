@@ -7,6 +7,14 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 ## [Unreleased]
 
 **Fixed**
+- **Ghost task cards on the board.** A task whose run ended *without a verdict* —
+  the brain turned out to be unusable (bad key, dead endpoint) and the office cut
+  it off, the CLI crashed, or a limit killed it mid-turn — left its card pinned
+  **running** on the wallpaper board and in the NOW-WORKING strip, forever: the row
+  only clears on a completed/failed event, and that event was only sent when the
+  run reported a proper result. Every ending now emits one, so a card can no longer
+  outlive its work while the team sits idle. A run the office killed for a dead
+  brain ends **red**, not green.
 - **A link in chat no longer swallows the office.** Clicking a URL an agent posted
   (a pull request, a doc) navigated the office *itself* to that page — the whole UI
   was replaced by github.com and only a restart brought it back. The office runs

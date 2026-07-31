@@ -1854,6 +1854,7 @@ function runClaude(agent, prompt, opts = {}) {
       console.error(`[claude] watchdog: ${agent}/${task} killed — ${reason}`);
       killTree(child);   // issue #15 review: shell:true on win32 → must taskkill /T, not plain kill
       // Already-cleared (doneFired) runs are skipped by fireDone's guard.
+      ended = true;
       broadcast({ type: "task.failed", agent, task, session: entry.key,
         reason: `watchdog: ${reason}` });
       fireDone(`(watchdog: ${reason})`, false);
@@ -1925,6 +1926,13 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
   // opts.onDone(finalText, ok) fires exactly once when this run truly ends —
   // if the agent splits, ownership passes to the synthesis run instead.
   let doneFired = false;
+  // Did a TERMINAL task event (completed/failed) already go out for this task?
+  // The board/NOW-WORKING strip only clears on one, and the normal path emits it
+  // from the CLI's `result` line — so a child that dies WITHOUT a result (killed
+  // on a dead brain, crashed, OOM, cut off by a limit) used to leave its card
+  // pinned "running" forever while the agent sat idle. fireDone() is the one
+  // funnel every ending passes through, so the backstop belongs there.
+  let ended = false;
   const releaseProj = () => {
     if (!projId) return;
     projRuns[projId] = Math.max(0, (projRuns[projId] || 1) - 1);
@@ -1936,6 +1944,14 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
   const fireDone = (text, ok) => {
     if (doneFired) return;
     doneFired = true;
+    // Backstop: this run is over, so the row must go — even when nobody reported
+    // an outcome. (maybeRecover/tryFailover set doneFired themselves after their
+    // own terminal event, so they never double-fire here.)
+    if (!ended) {
+      ended = true;
+      broadcast({ type: ok ? "task.completed" : "task.failed", agent, task,
+        session: entry.key, reason: "ended without a result" });
+    }
     watchdog.clear();     // issue #15: run resolved normally — disarm the watchdog
     runChildren.delete(task);
     releaseProj();
@@ -1963,6 +1979,7 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     recovering = true; doneFired = true;
     runChildren.delete(task);
     releaseProj();
+    ended = true;
     broadcast({ type: "task.completed", agent, task, session: entry.key }); // clear the old row
     autoRecoverOverflow(agent, prompt, opts, entry);
     return true;
@@ -1988,6 +2005,7 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     runChildren.delete(task);
     releaseProj();
     try { killTree(child); } catch (e) { /* best-effort */ }
+    ended = true;
     broadcast({ type: "task.completed", agent, task, session: entry.key }); // clear the stalled row
     const an = (reg.agents[agent] || {}).name || agent;
     const toTag = fb.model ? fb.provider + "/" + fb.model : fb.provider;
@@ -2138,6 +2156,7 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
           entry.lastUsage = { ...usage, model: mtag, ts: Date.now() }; saveSess();
           brainBump(mprov, inTok, u.output_tokens || 0);  // estimate non-Claude spend
         }
+        ended = true;
         broadcast({ type: m.is_error ? "task.failed" : "task.completed",
           agent, task, session: entry.key, model: mtag, usage });
         statBump(m.is_error ? "failed" : "done", null, Number(m.total_cost_usd) || 0);
@@ -2159,12 +2178,16 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     console.error("[claude]", s.trim());
   });
   child.on("error", (e) => {
+    ended = true;
     broadcast({ type: "task.failed", agent, task });
     broadcast({ type: "chat.message", agent, task, text: "adapter error: " + e.message });
     fireDone("", false);
   });
   child.on("close", () => {
-    if (!maybeRecover("")) fireDone(lastText, !!lastText);
+    // brainDead = we killed it ourselves because the brain can't answer; whatever
+    // text it managed is not a success, so the row ends RED (and clears) instead
+    // of pretending the work got done.
+    if (!maybeRecover("")) fireDone(lastText, !brainDead && !!lastText);
   });
   return task;
 }
