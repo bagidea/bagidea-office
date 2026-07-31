@@ -61,6 +61,12 @@ Move to a new machine
   bagidea export [file]         Pack agents · skills · memory · projects · plugins → one .tgz
   bagidea import <file>         Restore an exported office here (asks before overwriting)
 
+Working unattended
+  bagidea auto [on|off]         🤖 Keep-going mode — the team decides for itself and opens
+                                its own next turn instead of stopping mid-job to ask you.
+                                Up to 8 self-driven rounds per job; it still stops for
+                                missing access and for anything irreversible.
+
 Cost control
   bagidea eco [on|off]          🌱 Eco mode — cut idle token burn: background rhythms
                                 stretch (heartbeat ≥3h, social ≥6h, pitches ≥6h) and the

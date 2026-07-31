@@ -111,6 +111,7 @@ function help() {
 
   head("Configure");
   row("lang [code]", "Show / set the office language (14 languages)");
+  row("auto [on|off]", "🤖 Keep going without asking — decide and finish the job");
   row("eco [on|off]", "🌱 Cut idle token burn (rhythms stretch, QA pass off)");
   row("keys", "List configured API keys (values hidden)");
   row("key set <NAME> <value>", "Add a key · key rm <NAME> · key test [NAME]");
@@ -240,6 +241,22 @@ async function main() {
     const r = await req("POST", "/editor/open", {});
     if (r && r.error) return bad(r.error);   // e.g. Godot engine missing on this machine
     return ok("Opening the 3D Office Editor (separate window) — save when you're done");
+  }
+
+  if (cmd === "auto") {
+    // 🤖 Keep-going mode — the team decides for itself and opens its own next
+    // turn instead of stopping mid-job to ask you. Off by default.
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const arg = (rest[0] || "").toLowerCase();
+    if (!arg) {
+      const s = await req("GET", "/registry");
+      return info(`Keep-going mode is ${s && s.autoPilot ? c.ok + "ON" : c.gray + "OFF"}${c.reset} ${c.gray}— bagidea auto on|off${c.reset}`);
+    }
+    if (!["on", "off"].includes(arg)) return bad("usage: bagidea auto on|off");
+    const r = await req("POST", "/registry/autopilot", { on: arg === "on" });
+    return r && r.auto
+      ? ok(`Keep-going mode ON — the team decides and works on without asking (up to ${(r.max || 8)} rounds per job; it still stops for missing access and irreversible actions)`)
+      : ok("Keep-going mode OFF — they check with you before big calls");
   }
 
   if (cmd === "eco") {

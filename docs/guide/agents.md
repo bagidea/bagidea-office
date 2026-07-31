@@ -46,6 +46,36 @@ actually exists — managers get fewer tools, hands-on roles get more). You can 
 - No answer within 50 seconds = auto-deny (the agent re-plans on its own)
 - You can act on it from feed mode too — the card has all the buttons built in
 
+## 🤖 Keep going without you (AUTO mode)
+
+The default office is polite: an agent that hits a fork in the road stops, asks your
+opinion, and the job sits there until you come back and answer. Turn on **AUTO** and it
+doesn't — the team decides for itself and keeps working until the job is actually finished.
+
+**⚙ → TOOLS → "🤖 Keep going (AUTO)"**, or `bagidea auto on`. Off by default.
+
+**How it works:** an agent is a one-shot headless session, so nothing can nudge it
+mid-run — the only way to keep work moving is to start the next turn. With AUTO on, every
+owner-facing turn ends with a one-line status the office reads:
+
+- **CONTINUE** — there's more to do, so the office **immediately opens the next turn** on the
+  same thread. You see a `🤖 AUTO — ทำต่อเอง (round n/8)` line in chat, so it's never silent.
+- **DONE** — finished and verified. Nothing happens; the report is yours to read.
+- **BLOCKED** — genuinely stuck, and this still stops the work: a credential or permission it
+  can't get for itself, or an action that can't be taken back (push, deploy, deleting things,
+  sending something outward, spending money). A block is also pushed to your
+  [channels](channels.md), so you find out wherever you are.
+
+**Bounded on purpose:** at most **8 self-driven rounds per job** (`OFFICE_AUTOPILOT_MAX`).
+On the 9th the office stops and says so, rather than looping forever on a task it has
+misunderstood. If a turn hands work to a teammate, AUTO stays out of the way — that work is
+already in flight and the report-back drives what comes next.
+
+**It does not widen what agents may do.** AUTO removes the wait for an *opinion*; tool
+permissions are a separate switch (**🔓 auto-approve**, same tab). Left on its own with
+auto-approve off, an agent can still stall on a permission card — turn both on for genuinely
+unattended runs, and read the feed afterwards.
+
 ## Skills — the ability library
 
 ⚙ → SKILLS: every office ships with **15 builtin skill packs** — assign them to anyone in the edit screen:

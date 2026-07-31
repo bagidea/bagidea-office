@@ -6,6 +6,19 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+**Added**
+- **🤖 AUTO — the team keeps going without you.** The office used to stop mid-job to
+  ask your opinion and then sit there until you came back. With AUTO on, agents
+  decide within their remit and **open their own next turn** until the work is
+  genuinely finished. It still stops for the things that are actually yours to
+  answer: a credential it can't get, or an irreversible/outward action (push,
+  deploy, delete, spend) — and a block is pushed to your channels so you hear about
+  it wherever you are. Bounded to **8 self-driven rounds per job** so a
+  misunderstood task can't loop, and every round is announced in chat. Off by
+  default: **⚙ → TOOLS → "🤖 ทำต่อเอง (AUTO)"** or `bagidea auto on`. It removes the
+  wait for an *opinion* — what an agent may DO is still the separate 🔓 auto-approve
+  switch.
+
 **Fixed**
 - **Ghost task cards on the board.** A task whose run ended *without a verdict* —
   the brain turned out to be unusable (bad key, dead endpoint) and the office cut

@@ -1138,6 +1138,23 @@
     "คลิกบนผังเพื่อวาง · ลากเพื่อย้าย · ดับเบิลคลิกเพื่อลบ": { en: "Click to place · drag to move · double-click to remove", zh: "点击放置 · 拖动移动 · 双击删除", ja: "クリックで配置 · ドラッグで移動 · ダブルクリックで削除" },
     "ล้างทั้งหมด": { en: "Clear all", zh: "全部清除", ja: "すべて消去" },
     "บันทึกผัง": { en: "Save layout", zh: "保存布局", ja: "レイアウト保存" },
+    // 🤖 AUTO (keep-going) mode
+    "🤖 ทำต่อเอง (AUTO): น้องๆ ตัดสินใจแทนคุณแล้วทำต่อจนจบ ไม่หยุดถามความเห็นกลางทาง — จะหยุดก็ต่อเมื่อติดจริง (ไม่มีสิทธิ์/key) หรือถึงขั้นที่ย้อนกลับไม่ได้ (push, deploy, ลบของ, จ่ายเงิน)": {
+      en: "🤖 Keep going (AUTO): the team decides for you and works through to the finish instead of stopping mid-job to ask — it only stops when genuinely blocked (missing access/key) or at something irreversible (push, deploy, deleting, spending)",
+      zh: "🤖 自动推进（AUTO）：团队替你做决定并一口气做到完成，不会中途停下来问你 — 只有真正受阻（缺少权限/密钥）或遇到不可逆的操作（推送、部署、删除、花钱）时才会停",
+      ja: "🤖 自走モード（AUTO）: 途中で意見を聞くために止まらず、チームが自分で判断して最後までやり切ります — 本当に詰まったとき（権限/キーがない）や取り返しのつかない操作（push・deploy・削除・支払い）でのみ停止します" },
+    "ทำต่อเองได้สูงสุด %n รอบต่องาน แล้วหยุดรอคุณ · เปิดคู่กับ 🔓 ข้างล่างเพื่อไม่ให้ค้างรอกด Allow": {
+      en: "Up to %n self-driven rounds per job, then it waits for you · pair with 🔓 below so it never sits waiting on Allow",
+      zh: "每项工作最多自动推进 %n 轮，之后会等你 · 与下方 🔓 搭配使用，才不会卡在等待 Allow",
+      ja: "1件につき最大 %n ラウンドまで自走し、その後はあなたを待ちます · 下の 🔓 と併用すると Allow 待ちで止まりません" },
+    "🤖 เปิดโหมดทำต่อเอง — น้องๆ จะไม่หยุดถามแล้ว": {
+      en: "🤖 Keep-going mode ON — the team won't stop to ask",
+      zh: "🤖 已开启自动推进 — 团队不会再停下来问你",
+      ja: "🤖 自走モード ON — もう質問で止まりません" },
+    "🤖 ปิดโหมดทำต่อเอง — กลับมาถามก่อนตัดสินใจใหญ่ๆ": {
+      en: "🤖 Keep-going mode OFF — they'll check with you before big calls",
+      zh: "🤖 已关闭自动推进 — 重大决定前会先问你",
+      ja: "🤖 自走モード OFF — 大きな判断の前に確認します" },
     // settings tabs
     "AGENTS": { en: "AGENTS", zh: "代理", ja: "エージェント" },
     "ROLES": { en: "ROLES", zh: "角色", ja: "役職" },
@@ -1316,6 +1333,7 @@
   const NPCS = [1, 2, 3, 4, 5, 6, 9, 10, 11, 12];
   // Live registry from the daemon (roster.sync) — identity source of truth.
   let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true, VERIFY = false, AUTOAPPROVE = false;
+  let AUTOPILOT = false, AUTOPILOTMAX = 8;   // 🤖 keep-going mode + its round budget
   let BUILTIN_DESC = {}, REGMCP = {}, SOUND = true, HEARTBEAT = 0;
   let FEATURES = { openai: false, gemini: false, stt: false, tts: false, live: false, image: false };
   let TTSON = true, SOCIALMIN = 60, MAXSTAFF = 18, PROPOSALMIN = 120;
@@ -3031,7 +3049,10 @@
         <input id="sFilter" class="filterbox" placeholder="🔍 ค้นหา skill…">
         <div id="slist" class="biglist"></div><button class="bigbtn" id="newSkill">＋ New skill</button>`;
     } else if (tab === "tools") {
-      bodyHtml = `<div class="switch ${AUTOAPPROVE ? "on" : ""}" id="autoApproveSw">
+      bodyHtml = `<div class="switch ${AUTOPILOT ? "on" : ""}" id="autoPilotSw">
+          <div class="knob"></div> ${tr("🤖 ทำต่อเอง (AUTO): น้องๆ ตัดสินใจแทนคุณแล้วทำต่อจนจบ ไม่หยุดถามความเห็นกลางทาง — จะหยุดก็ต่อเมื่อติดจริง (ไม่มีสิทธิ์/key) หรือถึงขั้นที่ย้อนกลับไม่ได้ (push, deploy, ลบของ, จ่ายเงิน)")}</div>
+        <div class="hint" style="margin:-4px 0 12px 46px;opacity:.7;font-size:11px">${tr("ทำต่อเองได้สูงสุด %n รอบต่องาน แล้วหยุดรอคุณ · เปิดคู่กับ 🔓 ข้างล่างเพื่อไม่ให้ค้างรอกด Allow").replace("%n", AUTOPILOTMAX)}</div>
+        <div class="switch ${AUTOAPPROVE ? "on" : ""}" id="autoApproveSw">
           <div class="knob"></div> ${tr("🔓 อนุมัติอัตโนมัติ: ให้ทุกคำขอใช้เครื่องมือผ่านเองโดยไม่ต้องกด Allow — เหมาะตอนสั่งงานทิ้งไว้แล้วไม่ได้เฝ้า (ยังเห็นใน feed ว่าอนุมัติอะไรบ้าง · ปิดไว้ = ปลอดภัยกว่า)")}</div>
         <input id="tFilter" class="filterbox" placeholder="🔍 ค้นหาเครื่องมือ / MCP server…">
         <div class="field"><label>⚡ SYSTEM TOOLS — ความสามารถกลางของออฟฟิศ (agents เรียกใช้เองได้)</label>
@@ -3208,6 +3229,14 @@
       modalCard.querySelector("#newSkill").onclick = () => openSkillEditor(null);
       wireFilter(modalCard.querySelector("#sFilter"), list);
     } else if (tab === "tools") {
+      const apSw = modalCard.querySelector("#autoPilotSw");
+      if (apSw) apSw.onclick = async () => {
+        await api("/registry/autopilot", { enabled: !AUTOPILOT });
+        AUTOPILOT = !AUTOPILOT;
+        apSw.classList.toggle("on", AUTOPILOT);
+        addChip(AUTOPILOT ? tr("🤖 เปิดโหมดทำต่อเอง — น้องๆ จะไม่หยุดถามแล้ว")
+                          : tr("🤖 ปิดโหมดทำต่อเอง — กลับมาถามก่อนตัดสินใจใหญ่ๆ"));
+      };
       const aaSw = modalCard.querySelector("#autoApproveSw");
       if (aaSw) aaSw.onclick = async () => {
         await api("/registry/autoapprove", { enabled: !AUTOAPPROVE });
@@ -5519,6 +5548,8 @@
       AUTOSKILLS = ev.autoSkills !== false;
       VERIFY = ev.verifyDelegated === true;
       AUTOAPPROVE = ev.autoApprove === true;
+      AUTOPILOT = ev.autoPilot === true;
+      if (ev.autoPilotMax) AUTOPILOTMAX = ev.autoPilotMax;
       SOUND = ev.sound !== false;
       if (typeof ev.monitor === "number") monMode = ev.monitor;
       if (typeof ev.monitors === "number") monCount = Math.max(1, ev.monitors);

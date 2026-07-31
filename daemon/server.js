@@ -32,6 +32,7 @@ const skillsSync = require("./skills");
 const providers = require("./providers");
 const proxy = require("./proxy");
 const { RunWatchdog } = require("./watchdog");
+const { stripStatus, verdict: autoVerdict, readStatus } = require("./autopilot");
 const { wireWorkspaceSettings } = require("./wire-hooks-runtime");
 const { killTree } = require("./kill-tree");   // cross-platform child reap (issue #15 review)
 
@@ -132,6 +133,7 @@ function loadReg() {
   if (reg.proposalMin === undefined) reg.proposalMin = 120;  // min gap between CEO pitches
   if (reg.channelNotify === undefined) reg.channelNotify = true; // work milestones → Telegram/Discord/…
   if (reg.autoApprove === undefined) reg.autoApprove = false; // auto-allow every tool prompt (unattended runs)
+  if (reg.autoPilot === undefined) reg.autoPilot = false;     // 🤖 keep working without asking the owner
   saveReg();
 }
 function saveReg() { fs.writeFileSync(REGISTRY, JSON.stringify(reg, null, 2)); }
@@ -248,6 +250,7 @@ function rosterEvt() {
     verifyDelegated: reg.verifyDelegated === true,
     ecoMode: reg.ecoMode === true,
     autoApprove: reg.autoApprove === true,
+    autoPilot: reg.autoPilot === true, autoPilotMax: AUTOPILOT_MAX,
     sound: reg.sound !== false, heartbeatMin: Number(reg.heartbeatMin || 0),
     features: featuresMap(), tts: reg.tts !== false,
     socialMin: Number(reg.socialMin !== undefined ? reg.socialMin : 60),
@@ -2352,16 +2355,21 @@ function ceoFlow(prompt, session, project, opts = {}) {
     `each member's result will be REPORTED BACK to you when they finish. ` +
     `Prose alone dispatches NOTHING — only DELEGATE lines do). ` +
     `Anything not delegated you handle yourself. Reply to the owner with a short ` +
-    `plan in the language they used.` + directorNote();
+    `plan in the language they used.` + directorNote() + autoNote();
+  // 🤖 AUTO: a fresh order starts a fresh chain (the round budget resets), and if
+  // the Director ends this turn still owing work, it opens the next turn itself.
+  const keyRef = { key: session || "" }, dele = { hit: false };
+  const df = makeDelegateFilter(0, session, () => { dele.hit = true; });
   return runClaude("main", wrapped, {
     session,
     project,
     logPrompt: opts.logPrompt || ("👑 (CEO) " + prompt),
-    filterText: makeDelegateFilter(0, session),
-    onDone: (out, ok) => {
-      if (opts.relay && ok && out) try { channels.relay("👑 " + out); } catch {}
-      if (opts.onDone) opts.onDone(out, ok);   // channels/CLI hook the reply ride-back here
-    },
+    filterText: (t) => stripStatus(df(t)),
+    onEntry: (k) => { keyRef.key = k; autoRounds.delete(k); },
+    onDone: autoContinue("main", project, keyRef, (out, ok) => {
+      if (opts.relay && ok && out) try { channels.relay("👑 " + stripStatus(out)); } catch {}
+      if (opts.onDone) opts.onDone(stripStatus(out), ok);   // channels/CLI hook the reply ride-back here
+    }, true, dele),
   });
 }
 
@@ -2403,6 +2411,91 @@ const DELEGATE_NOTE = `
 ถ้าติดตามข้อยกเว้นข้างบน ให้รายงานสั้นๆ ว่าติดตรงไหนและต้องการอะไร แล้วรอ.
 In short: own the task end-to-end, decide within your remit, only ask back when truly blocked.
 </work-autonomy>`;
+
+// ---------------------------------------------------------------- 🤖 AUTO mode
+// "ทำต่อเอง" (reg.autoPilot, opt-in, off by default). The owner's complaint: the
+// team stops mid-job to ask an opinion and the work sits there until they come
+// back. A teammate is a one-shot `claude -p` — nothing can nudge it mid-run — so
+// the only lever is to START THE NEXT TURN. Every owner-facing run therefore ends
+// with one machine-readable STATUS line: CONTINUE means "there is more to do",
+// and the office immediately opens the next turn on the SAME thread instead of
+// waiting for a human. Bounded to AUTOPILOT_MAX rounds per chain so a confused
+// agent can't burn tokens forever, and BLOCKED still stops dead: missing
+// credentials and irreversible/outward actions stay the owner's call. This is
+// about not waiting for an OPINION — it never widens what an agent may do (tool
+// permissions are the separate 🔓 auto-approve switch).
+const AUTOPILOT_MAX = Number(process.env.OFFICE_AUTOPILOT_MAX) || 8;
+const autoRounds = new Map();   // thread key -> rounds already spent in this chain
+
+function autoNote() {
+  if (!reg.autoPilot) return "";
+  return `
+
+<autopilot>
+โหมด "ทำต่อเอง" (AUTO) เปิดอยู่: เจ้าของไม่ได้นั่งเฝ้าหน้าจอ จะไม่มีใครมาตอบคำถามระหว่างทาง
+— ถามไปก็ได้แค่ทำให้งานค้างเปล่าๆ. ตัดสินใจแทนเจ้าของด้วยข้อมูลที่มีให้ดีที่สุด เลือกทางที่
+สมเหตุสมผลที่สุด บอกสมมติฐานที่ใช้สั้นๆ แล้วเดินหน้าทำจนจบจริง (ทำเอง ไม่ใช่บอกว่าจะทำ).
+ปิดท้ายทุกข้อความด้วยบรรทัดสถานะ 1 บรรทัด (บรรทัดสุดท้ายเสมอ):
+STATUS: DONE — งานเสร็จจริง ตรวจแล้ว ไม่มีอะไรค้าง
+STATUS: CONTINUE — <ก้าวถัดไปที่คุณจะลงมือทำเอง>   (ระบบจะเปิดเทิร์นใหม่ให้ทำต่อทันที)
+STATUS: BLOCKED — <สิ่งที่ต้องให้เจ้าของทำ/ตัดสิน>   (ใช้เฉพาะ 2 กรณี: ไม่มี credential/สิทธิ์
+ที่หาเองไม่ได้ · ต้องทำสิ่งที่ย้อนกลับไม่ได้หรือส่งออกนอก เช่น push, deploy, ลบของ,
+ส่งข้อความออกภายนอก, ใช้จ่ายเงิน)
+ห้ามใช้ BLOCKED แทนการถามความเห็น — ถ้าแค่อยากรู้ว่าเจ้าของชอบแบบไหน ให้เลือกเองแล้ว CONTINUE.
+In short: decide it yourself, keep going, and end every message with exactly one STATUS line.
+</autopilot>`;
+}
+
+// Wrap a run's onDone so AUTO can open the next turn itself. keyRef is filled in
+// by runClaude's onEntry — the thread the run actually landed on is what we must
+// resume (and what the round counter is keyed by).
+// `dele.hit` = this turn handed work to a teammate; the office is NOT idle and the
+// report-back will drive what comes next, so AUTO must keep its hands off.
+function autoContinue(agent, project, keyRef, next, isDirector, dele) {
+  return (text, ok) => {
+    if (next) { try { next(text, ok); } catch (e) { console.error("[auto] next:", e); } }
+    if (!reg.autoPilot || !ok) return;
+    if (dele && dele.hit) return;
+    const key = keyRef.key || "";
+    const st = readStatus(text);
+    const kind = autoVerdict(text);
+    if (kind !== "CONTINUE") {
+      autoRounds.delete(key);
+      // A real block is the one thing worth interrupting the owner for — send it
+      // to wherever they actually are (Telegram/Discord/…), not just the chat.
+      if (kind === "BLOCKED" && st && st.note) notifyChannels("⛔ ต้องการเจ้าของ: " + st.note);
+      return;
+    }
+    const n = (autoRounds.get(key) || 0) + 1;
+    const an = (reg.agents[agent] || {}).name || agent;
+    if (n > AUTOPILOT_MAX) {
+      autoRounds.delete(key);
+      broadcast({ type: "chat.message", agent, session: key,
+        text: `🤖 AUTO: ${an} ทำต่อเองครบ ${AUTOPILOT_MAX} รอบแล้วแต่งานยังไม่จบ — ` +
+          `หยุดไว้ตรงนี้ก่อนกันวนไม่จบ สั่ง "ทำต่อ" ได้เลยครับ` });
+      return;
+    }
+    autoRounds.set(key, n);
+    broadcast({ type: "chat.message", agent, session: key,
+      text: `🤖 AUTO — ไม่รอเจ้าของ: ทำต่อเอง (รอบ ${n}/${AUTOPILOT_MAX})` });
+    const cont =
+      `ทำงานที่ยังค้างอยู่ต่อได้เลยตอนนี้ — เจ้าของไม่ได้อยู่ ไม่ต้องรอคำตอบ.\n` +
+      (st && st.note ? `ก้าวถัดไปที่คุณบอกไว้เอง: ${st.note}\n` : "") +
+      `ถ้ามีทางเลือกให้ตัดสินใจเอง ทำจนเสร็จจริงและ verify แล้วค่อยรายงาน.` + autoNote();
+    // A breath between turns: the office reads as a team working, not a loop.
+    setTimeout(() => {
+      const d2 = { hit: false };
+      const df = isDirector ? makeDelegateFilter(0, key, () => { d2.hit = true; }) : null;
+      runClaude(agent, cont, {
+        session: key || undefined, project,
+        logPrompt: `🤖 AUTO: ทำต่อเอง (รอบ ${n}/${AUTOPILOT_MAX})`,
+        filterText: df ? (t) => stripStatus(df(t)) : (t) => stripStatus(t),
+        onEntry: (k) => { keyRef.key = k; },
+        onDone: autoContinue(agent, project, keyRef, undefined, isDirector, d2),
+      });
+    }, 1500);
+  };
+}
 
 // DELEGATE:-line parser shared by the CEO order and every report-back turn.
 // onHit fires per dispatched assignment ("did he hand off more work?").
@@ -2545,24 +2638,27 @@ function reportToMain(fromId, text, ok, depth, session) {
       : `Write the final summary for the owner (CEO) now — clear, concrete, in ` +
         `the language of the original order. Do not delegate further.`);
   queueDirectorTurn((release) => {
-    let delegatedMore = false;
-    runClaude("main", wrapped, {
+    const dele = { hit: false };
+    const keyRef = { key: session || "" };
+    const df = depth < 2 ? makeDelegateFilter(depth + 1, session, () => { dele.hit = true; }) : null;
+    runClaude("main", wrapped + autoNote(), {
       session,
       noSub: true,
       logPrompt: `📨 รายงานผลจาก ${a.name}`,
-      filterText: depth < 2
-        ? makeDelegateFilter(depth + 1, session, () => { delegatedMore = true; })
-        : undefined,
-      onDone: (_finalText, fOk) => {
+      filterText: df ? (t) => stripStatus(df(t)) : (t) => stripStatus(t),
+      onEntry: (k) => { keyRef.key = k; },
+      // 🤖 AUTO hooks the summary turn: this is where the office used to go quiet
+      // ("…so which would you like?") until the owner came back to answer.
+      onDone: autoContinue("main", undefined, keyRef, (_finalText, fOk) => {
         release();
         // No further hand-offs → that WAS the summary: walk it to the boss.
-        if (!delegatedMore && fOk) {
+        if (!dele.hit && fOk) {
           broadcast({ type: "ceo.report", agent: "main" });
           // Follow-from-the-phone: the finished-work summary (with any preview
           // images ridden along as photos) also lands on Telegram/Discord/….
-          notifyChannels(_finalText && "📨 " + _finalText);
+          notifyChannels(_finalText && "📨 " + stripStatus(_finalText));
         }
-      },
+      }, true, dele),
     });
   });
 }
@@ -3898,19 +3994,29 @@ const server = http.createServer((req, res) => {
         // CEO orders route through the Director; talking to the Director
         // directly gives him the same dispatch power. New threads adopt the
         // requested project workspace.
+        // 🤖 AUTO rides on every owner-facing turn: talking straight to the Director
+        // or to one teammate stalls the same way a CEO order does.
+        const keyRef = { key: session || "" }, dele = { hit: false };
+        const reply = wait ? (t, ok) => waited && waited(stripStatus(t), ok) : undefined;
         const task = agent === "ceo"
           ? ceoFlow(prompt, session, project,
               { logPrompt: voice ? "🎤👑 (สั่งด้วยเสียง) " + origPrompt : origPrompt,
                 relay: true,  // mirror the CEO conversation to connected channels
-                onDone: wait ? (t, ok) => waited && waited(t, ok) : undefined })
+                onDone: reply })
           : agent === "main"
-            ? runClaude("main", prompt + directorNote(),
-                { session, project, logPrompt: origPrompt,
-                  filterText: makeDelegateFilter(0, session),
-                  onDone: wait ? (t, ok) => waited && waited(t, ok) : undefined })
-            : runClaude(agent, prompt, { session, project, logPrompt: origPrompt,
+            ? (() => {
+                const df = makeDelegateFilter(0, session, () => { dele.hit = true; });
+                return runClaude("main", prompt + directorNote() + autoNote(),
+                  { session, project, logPrompt: origPrompt,
+                    filterText: (t) => stripStatus(df(t)),
+                    onEntry: (k) => { keyRef.key = k; autoRounds.delete(k); },
+                    onDone: autoContinue("main", project, keyRef, reply, true, dele) });
+              })()
+            : runClaude(agent, prompt + autoNote(), { session, project, logPrompt: origPrompt,
                 resumable: true, resumePrompt: origPrompt,  // a member's direct task auto-resumes
-                onDone: wait ? (t, ok) => waited && waited(t, ok) : undefined });
+                filterText: (t) => stripStatus(t),
+                onEntry: (k) => { keyRef.key = k; autoRounds.delete(k); },
+                onDone: autoContinue(agent, project, keyRef, reply, false) });
         if (!wait) {
           res.writeHead(200, { "content-type": "application/json" });
           res.end(JSON.stringify({ task }));
@@ -5571,6 +5677,24 @@ end tell`;
         pushRoster();
         res.writeHead(200);
         res.end("ok");
+      } catch {
+        res.writeHead(400);
+        res.end("bad json");
+      }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/autopilot") {
+    // 🤖 AUTO ("ทำต่อเอง"): agents decide for themselves and open their own next
+    // turn instead of stopping to ask the owner (opt-in, default off).
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body);
+        reg.autoPilot = !!(p.enabled !== undefined ? p.enabled : p.on);
+        if (!reg.autoPilot) autoRounds.clear();   // switching off ends every chain now
+        saveReg();
+        pushRoster();
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ auto: reg.autoPilot, max: AUTOPILOT_MAX }));
       } catch {
         res.writeHead(400);
         res.end("bad json");
