@@ -59,7 +59,7 @@ mid-run — the only way to keep work moving is to start the next turn. With AUT
 owner-facing turn ends with a one-line status the office reads:
 
 - **CONTINUE** — there's more to do, so the office **immediately opens the next turn** on the
-  same thread. You see a `🤖 AUTO — ทำต่อเอง (round n/8)` line in chat, so it's never silent.
+  same thread. Each round is announced in chat as a `🤖 AUTO` line, so it's never silent.
 - **DONE** — finished and verified. Nothing happens; the report is yours to read.
 - **BLOCKED** — genuinely stuck, and this still stops the work: a credential or permission it
   can't get for itself, or an action that can't be taken back (push, deploy, deleting things,
@@ -70,6 +70,10 @@ owner-facing turn ends with a one-line status the office reads:
 On the 9th the office stops and says so, rather than looping forever on a task it has
 misunderstood. If a turn hands work to a teammate, AUTO stays out of the way — that work is
 already in flight and the report-back drives what comes next.
+
+**Scheduled work rides it too.** A job booked in [Office Ops](office-ops.md) is run like an
+order you typed yourself, so with AUTO on a standing order that ends with work still pending
+opens its own next turn instead of waiting for you to come back.
 
 **It does not widen what agents may do.** AUTO removes the wait for an *opinion*; tool
 permissions are a separate switch (**🔓 auto-approve**, same tab). Left on its own with

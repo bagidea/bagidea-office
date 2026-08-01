@@ -45,6 +45,7 @@
     <a href="#chat" data-i18n="dn_chat">Chat & the CEO</a>
     <a href="#projects" data-i18n="dn_projects">Projects</a>
     <a href="#security" data-i18n="dn_security">Permissions</a>
+    <a href="#auto" data-i18n="dn_auto">Keep going (AUTO)</a>
     <a href="#editor" data-i18n="dn_editor">3D Editor</a>
     <a href="#voice" data-i18n="dn_voice">Voice & channels</a>
     <a href="#updates" data-i18n="dn_updates">Updates & start-up</a>
@@ -167,6 +168,10 @@ bagidea start   # launch the office</code></pre>
 
     <h3 id="security" data-i18n="d_security_h">Permissions</h3>
     <p data-i18n="d_security_p">Tools you grant in an agent's profile run silently — and the agent never even leaves its desk. For anything else, the agent walks to the Security Center and waits while a card pops up with the exact command. Choose Allow, ✓✓ Forever (remembers the grant), or Deny. No answer in 50 seconds auto-denies and the agent re-plans.</p>
+    <p data-i18n="d_trust_p">A project can also carry its own .claude hooks — commands that run the moment a session opens in that folder, before the model acts. So registering a folder is not consent to run the code it ships: a project with its own hooks raises a card listing the literal commands, and the work is parked until you answer. Approval is bound to that exact setup, so editing the settings file or the script a hook calls asks again. From the terminal: bagidea trust.</p>
+
+    <h3 id="auto" data-i18n="d_auto_h">Keep going without you (AUTO)</h3>
+    <p data-i18n="d_auto_p">By default, an agent that reaches a fork stops to ask your opinion and the job waits until you answer. Turn AUTO on (⚙ → TOOLS, or bagidea auto on) and it decides for itself and opens its own next turn until the work is genuinely finished — at most 8 self-driven rounds per job, each announced in chat. It still stops for a credential it cannot get, or an action that cannot be undone (push, deploy, delete, spend), and that block is pushed to your channels. Scheduled jobs run as real orders too. AUTO removes the wait for an opinion; what an agent may do is still the separate 🔓 auto-approve switch.</p>
 
     <h3 id="editor" data-i18n="d_editor_h">The 3D Editor</h3>
     <p data-i18n="d_editor_p">Open the editor (the 🎨 button or bagidea editor) to rearrange the office in true 3D: click two rooms to swap them on the 3×3 grid, move the Ghost Deck, place furniture and decor, and import your own .glb/.gltf/.fbx models and images. Save and the wallpaper updates instantly — furniture, agent seats, navigation and pets all follow.</p>
@@ -243,6 +248,8 @@ bagidea start   # launch the office</code></pre>
       <tr><td><code>bagidea channels · keys</code></td><td>Channel + API-key status</td></tr>
       <tr><td><code>bagidea feed</code></td><td>Live office event stream in your terminal</td></tr>
       <tr><td><code>bagidea editor</code></td><td>Open the 3D Office Editor</td></tr>
+      <tr><td><code>bagidea auto [on|off]</code></td><td>🤖 Keep-going mode — the team decides and finishes without waiting on you</td></tr>
+      <tr><td><code>bagidea trust [allow|deny] "&lt;project&gt;"</code></td><td>🛡 Projects whose own .claude hooks are waiting on your word</td></tr>
       <tr><td><code>bagidea eco [on|off]</code></td><td>🌱 Eco mode — cut idle token burn (rhythms stretch, QA pass off)</td></tr>
       <tr><td><code>bagidea export [file]</code></td><td>Pack agents · skills · memory · plugins into one .tgz</td></tr>
       <tr><td><code>bagidea import &lt;file&gt;</code></td><td>Restore an exported office on this machine</td></tr>

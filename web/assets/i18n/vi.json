@@ -38,7 +38,7 @@
   "f_plugin_t": "Plugin, kỹ năng và công cụ",
   "f_plugin_d": "Mở rộng văn phòng với plugin (cài đặt từ bất kỳ GitHub repo nào), gán agent từ thư viện kỹ năng tích hợp sẵn, và thêm khả năng mới qua các máy chủ MCP — cả người và agent đều có thể xây dựng plugin.",
   "f_security_t": "Bảo mật theo không gian",
-  "f_security_d": "Khi một agent cần một công cụ bạn chưa cấp quyền, nó sẽ đi vật lý đến Trung tâm Bảo mật và chờ. Bạn chọn Cho phép / ✓✓ Mãi mãi / Từ chối. Các công cụ đã được cấp quyền chạy im lặng và không bao giờ rời bàn làm việc.",
+  "f_security_d": "Khi một agent cần một công cụ bạn chưa cấp quyền, nó sẽ đi vật lý đến Trung tâm Bảo mật và chờ. Bạn chọn Cho phép / ✓✓ Mãi mãi / Từ chối. Các công cụ đã được cấp quyền chạy im lặng và không bao giờ rời bàn làm việc. Dự án mang theo hook .claude của riêng nó lại là chuyện khác: thẻ hiện đúng những câu lệnh sẽ chạy, và công việc chờ đến khi bạn trả lời.",
   "f_projects_t": "Dự án thực",
   "f_projects_d": "Đăng ký các thư mục thực là dự án; Director tạo và phân phối công việc vào chúng. Phiên Claude của mỗi người được giao chạy trong thư mục đó và có thể tiếp tục bởi bạn — một cửa sổ mỗi dự án.",
   "f_i18n_t": "14 ngôn ngữ",
@@ -331,5 +331,11 @@
   "sc_submit_cta": "Đọc hướng dẫn gửi bài →",
   "sc_edit_cta": "Chỉnh sửa showcase.json →",
   "d_migrate_h": "Chuyển sang máy mới",
-  "d_migrate_p": "Chuyển sang máy mới? <code>bagidea export</code> đóng gói toàn bộ văn phòng — agent, kỹ năng, trí nhớ, dự án, plugin — vào một tệp duy nhất. Cài BagIdea Office trên máy mới rồi chạy <code>bagidea import</code> để đưa đúng đội ngũ đó trở lại."
+  "d_migrate_p": "Chuyển sang máy mới? <code>bagidea export</code> đóng gói toàn bộ văn phòng — agent, kỹ năng, trí nhớ, dự án, plugin — vào một tệp duy nhất. Cài BagIdea Office trên máy mới rồi chạy <code>bagidea import</code> để đưa đúng đội ngũ đó trở lại.",
+  "f_auto_t": "Công việc không chờ bạn",
+  "f_auto_d": "Bật AUTO và cả nhóm thôi treo việc lại chỉ vì một câu hỏi: mỗi nhân viên tự quyết trong phạm vi của mình và tự mở lượt tiếp theo cho đến khi công việc thực sự xong — tối đa 8 vòng, vòng nào cũng được báo trong khung chat. Nó vẫn dừng khi thiếu thông tin đăng nhập mà nó không tự lấy được, hoặc khi việc đó không thể hoàn tác. Lệnh hẹn giờ cũng chạy y như vậy, dù bạn có ngồi trước máy hay không.",
+  "dn_auto": "Tự chạy tiếp (AUTO)",
+  "d_auto_h": "Chạy tiếp mà không cần bạn (AUTO)",
+  "d_auto_p": "Mặc định, nhân viên gặp ngã ba sẽ dừng lại hỏi ý bạn, và công việc nằm đó chờ bạn trả lời. Bật AUTO (⚙ → TOOLS, hoặc bagidea auto on) thì nó tự quyết và tự mở lượt tiếp theo cho đến khi việc thực sự xong — tối đa 8 vòng tự chạy cho mỗi việc, mỗi vòng đều được báo trong chat. Nó vẫn dừng khi thiếu quyền truy cập mà nó không tự lấy được, hoặc khi việc không thể hoàn tác (push, triển khai, xoá, tiêu tiền), và tình trạng kẹt đó được đẩy sang các kênh của bạn. Việc hẹn giờ cũng được chạy như một mệnh lệnh thật. AUTO chỉ bỏ đi khoảng chờ 'xin ý kiến'; còn nhân viên được phép làm gì thì vẫn do công tắc 🔓 tự động duyệt riêng quyết định.",
+  "d_trust_p": "Một dự án cũng có thể mang theo hook .claude của riêng nó — những câu lệnh chạy ngay khi mở phiên làm việc trong thư mục đó, trước cả khi mô hình kịp làm gì. Vì vậy đăng ký một thư mục không có nghĩa là đồng ý chạy đoạn mã đi kèm: dự án có hook riêng sẽ hiện một thẻ liệt kê đúng các câu lệnh, và công việc được giữ lại cho đến khi bạn trả lời. Phê duyệt gắn với đúng cấu hình đó, nên sửa tệp cài đặt hay sửa script mà hook gọi đều khiến nó hỏi lại. Từ terminal: bagidea trust."
 }

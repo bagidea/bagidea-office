@@ -145,7 +145,7 @@ Providers go down. GLM/Z.AI in particular throws `529 · overloaded` under load,
 while it's down any agent on that brain just sits there erroring. Set an **office-wide
 fallback brain** and the office will re-run that task on the fallback instead:
 
-- Go to **Settings → CONNECT → 🛟 สมองสำรอง** and pick any **connected** provider (plus
+- Go to **Settings → CONNECT → 🛟 fallback brain** and pick any **connected** provider (plus
   an optional model). That's it — it applies to every agent.
 - It's **off by default**. With no fallback set, nothing changes: an overloaded brain
   just retries hard, exactly as before.

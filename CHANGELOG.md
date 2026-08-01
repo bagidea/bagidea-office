@@ -6,6 +6,8 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+## [0.9.48] — 🤖 The office stops waiting for you
+
 **Added**
 - **🤖 AUTO — the team keeps going without you.** The office used to stop mid-job to
   ask your opinion and then sit there until you came back. With AUTO on, agents
@@ -15,7 +17,7 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
   deploy, delete, spend) — and a block is pushed to your channels so you hear about
   it wherever you are. Bounded to **8 self-driven rounds per job** so a
   misunderstood task can't loop, and every round is announced in chat. Off by
-  default: **⚙ → TOOLS → "🤖 ทำต่อเอง (AUTO)"** or `bagidea auto on`. It removes the
+  default: **⚙ → TOOLS → "🤖 Keep going (AUTO)"** or `bagidea auto on`. It removes the
   wait for an *opinion* — what an agent may DO is still the separate 🔓 auto-approve
   switch.
 
@@ -76,6 +78,16 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
   0.9.39 since the publish step skips versions already on the registry, so the
   TLS-hardened installer fetch (#37) and the winget-free Windows path never reached
   new installs.
+
+**Docs**
+- README, the guide set, the website (all **14 languages**) and the pitch deck cover
+  AUTO, the project-hook trust card and standing orders. The English surfaces had
+  drifted back into Thai in places — the user-guide index, the PLACE examples, the
+  NOW-WORKING strip quote, a settings label and a dead Thai anchor into
+  troubleshooting — all now English, and the guide index lists every guide instead of
+  two thirds of them.
+
+> No shell change in this release — `bagidea update` picks it all up.
 
 ## [0.9.47] — ↻ Model lists that stay current · agents that don't stall waiting for you
 

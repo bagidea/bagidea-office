@@ -51,10 +51,12 @@ the office truly comes alive.
 ### 🆕 Recently shipped
 BagIdea Office is updated **constantly** — every office gets a 🔄 banner and one-click `bagidea update`. The latest:
 
+- **v0.9.48 — 🤖 the office stops waiting for you:** ① **AUTO (keep-going) mode** — the team used to stop mid-job to ask your opinion and then sit there until you came back. With AUTO on, agents decide within their remit and **open their own next turn** until the work is genuinely finished; it still stops for a credential it can't get or an irreversible/outward action, and a block is pushed to your channels. Bounded to 8 self-driven rounds per job. Off by default: **⚙ → TOOLS → "🤖 Keep going (AUTO)"** or `bagidea auto on`. ② **Scheduled jobs are real orders again** — a standing order would fire, the Director would answer with a plan, and *nothing was dispatched*: the job runner was the one path that sent the prompt without the delegation protocol and read the reply without the `DELEGATE:` parser, so the lines that hand work to the team were printed as prose and thrown away. Fixed, and the same missing parser is fixed on the resume-after-limit path. ③ **🛡 Registering a folder no longer means "run whatever code it ships"** ([#39](https://github.com/bagidea/bagidea-office/issues/39)) — a project that carries its own `.claude` command hooks now raises a Security Center card listing the literal commands and **parks the work** until you answer; approval is bound to that exact setup, so editing the settings file *or* the script a hook calls asks again. `bagidea trust` answers it from the terminal. Projects with no hooks of their own are unaffected.
+- **v0.9.47 — ↻ model lists that stay current · a floor that doesn't stall:** every provider's model list is now fetched from its own `/models` (20 s after boot, every 12 h, and on demand via `↻ Refresh model list`) — **including Claude**, which had no live fetch at all, so a model released today is selectable today; no existing agent's brain is ever rewritten for you. Plus **🔓 auto-approve** for tool permissions (opt-in), live rows for 👻 sub-agents and meetings, delegated work carrying an end-to-end mandate, a sustained **429** failing over like a 5xx with **3 job lanes** so one agent's limit doesn't freeze the floor, and one XSS-safe markdown renderer everywhere. Fixes: the silent macOS installer death (bash 3.2 `source` semantics), the team wandering into the CEO's room, and a crash on worlds with no security light.
 - **v0.9.46 — ⛶ Large window opens fullscreen and actually resizes:** the large chat window now opens **fullscreen** (drag any edge down to shrink it — never below the normal size). Dragging used to do nothing because the webview covers the whole frameless window and hides the OS resize handles; large mode now has invisible drag strips on every edge and corner that trigger a real OS resize. The mini/restore button hides while large is open and returns when you leave it.
 - **v0.9.45 — the "runs anywhere, follows you anywhere" release:** ① **Zero-Anthropic-account fix** — a user who never logged into Claude couldn't run *any* agent, even on GLM/DeepSeek/Qwen: the Claude Code CLI (our runtime for every brain) hangs on its interactive first-run wizard in headless spawns; the office now seeds the onboarding flag on boot, so third-party-only users just work — Claude login is **optional**. ② **📦 Move to a new machine** — `bagidea export` packs your whole office (agents · skills · memory · projects · plugins) into one file; `bagidea import` restores it. ③ **Gemini tool-use fix** — the proxy now round-trips `thought_signature`, so Gemini thinking models stop 400-ing on tools. ④ **⛶ Large window mode** — big, resizable (never below normal size), great for reading long threads. ⑤ **Two hide levels** — hide everything, or hide just the chat + button while the wallpaper lives on. ⑥ **Channels follow the work** — delegation/report/pitch milestones push to Telegram & friends, and preview images upload as real Telegram photos. ⑦ **🌱 Eco mode** — `bagidea eco on` cuts idle token burn without slowing your direct orders. Plus: the 3D-Editor-won't-open bug fixed (three real causes), Claude 5 family in the model picker, and 37 missing English UI strings seeded for fresh installs.
 - **v0.9.44 — 📂 "open folder" opens the *real* folder again (Windows):** the 📂 button under a media file in chat was opening **Documents** instead of where the file actually lives. It hit any path with a **space** in it — which is most real media (`uploads/`, a Thai filename, anything ChatGPT generated), while space-free paths worked, so it hid in plain sight. `explorer.exe` wants `/select,"C:\dir\file.ext"` with the switch bare and the path quoted; we were passing the switch and path as one token, so Node quoted the lot and Explorer never saw `/select` at all. Verified end-to-end on paths with spaces, commas and Thai names.
-- **v0.9.43 — 🛟 a fallback brain so agents survive a provider outage:** when a teammate's model provider goes *sustainedly* overloaded (GLM/Z.AI's `529` under load is the usual culprit), the office can now re-run that same task on a **fallback brain you picked** instead of letting it die on the retry loop. Turn it on once in **Settings → CONNECT → 🛟 สมองสำรอง** (any *connected* provider, optional model) — it's **off by default**, so if you don't set one nothing changes. It's the careful version of the auto-failover reverted in v0.9.40: it only fires after the overload is *sustained* (not a one-off blip), only routes to a provider that's actually connected, never loops back onto the down brain, and leaves bad-auth (`401/403`) and rate-limit (`429`) handling exactly as it was. The failed-over task keeps its work and still reports back to whoever delegated it.
+- **v0.9.43 — 🛟 a fallback brain so agents survive a provider outage:** when a teammate's model provider goes *sustainedly* overloaded (GLM/Z.AI's `529` under load is the usual culprit), the office can now re-run that same task on a **fallback brain you picked** instead of letting it die on the retry loop. Turn it on once in **Settings → CONNECT → 🛟 fallback brain** (any *connected* provider, optional model) — it's **off by default**, so if you don't set one nothing changes. It's the careful version of the auto-failover reverted in v0.9.40: it only fires after the overload is *sustained* (not a one-off blip), only routes to a provider that's actually connected, never loops back onto the down brain, and leaves bad-auth (`401/403`) and rate-limit (`429`) handling exactly as it was. The failed-over task keeps its work and still reports back to whoever delegated it.
 - **v0.9.42 — 📚 a full docs & website overhaul:** every doc surface — README, the guide set, the website in all 14 languages, and the pitch deck — got an accuracy + coverage pass (provider count corrected to 19, the real 15 builtin skill packs, the File & Media Toolkit finally documented, the CLI reference completed), plus the website's version badge now self-updates from the repo and a macOS/Linux ready-flag fix (`OS.get_temp_dir()`).
 - **v0.9.41 — 🖼️ the wallpaper stops vanishing + agents schedule timed work for real:** two long-standing annoyances, fixed. **The wallpaper no longer disappears (Windows).** It used to vanish "for no reason" and never come back until a restart — the #1 recurring complaint. Root cause, proven with a live parent-probe and a real Explorer restart: Windows destroys and recreates the hidden `WorkerW` behind your icons on ordinary events (changing/slideshow-rotating the wallpaper, a resolution/DPI/monitor change, an Explorer or DWM restart, lock screen / RDP, exiting a fullscreen game), taking our embedded world down with it and leaving Godot a windowless zombie. The shell now runs a **world supervisor**: lose the desktop parent → re-embed into a fresh WorkerW; window destroyed → relaunch and re-pin — automatically, within ~2 s, no restart. It gates on *parent loss* (never on visibility), so **Win+D and display-sleep are untouched** (the regression that reverted two earlier attempts can't recur). And **agents now schedule "do it later" work through the office — and it actually runs.** "In an hour", "tomorrow 9am", "every 30 minutes" used to quietly never happen (the scheduling skill taught the wrong request shape, so the daemon rejected it, and agents fell back to session-bound timers that die when the session closes). The skill now teaches the real `POST /jobs` schema, ships in the builtin library for everyone, and every teammate carries it — so timed and recurring work is booked in the office's own scheduler and fires for real. Plus: the **executive / CEO room is reserved** for the CEO and the Director — no other teammate wanders in.
 - **v0.9.40 — 🛠️ install anywhere + always-current model lists + media that renders:** the one-shot installer now works on Windows boxes **without winget** (Git and Node download directly; the prebuilt shell needs no build at all) — and the docs make that installer the primary path, with `npx bagidea` just an optional wrapper around it. The 🧠 brain picker's **model lists are always current** now — one backend catalog is the single source of truth plus a **↻ refresh** button, so no more stale `glm-4.6` long after `glm-5.2` shipped. Chat **previews media at any absolute path, including paths with spaces** (screenshots and Thai filenames render again). Plus hardened **plugin loading** (a JS-broken plugin is rejected up front instead of silently half-loading), an **Ollama local-model guide**, and a simpler brain-overload policy — a temporarily overloaded provider is retried hard rather than auto-switched to Claude.
@@ -197,7 +199,7 @@ Sponsorship is a **recurring monthly subscription handled entirely by GitHub Spo
 - [HTTP API](#http-api)
 - [Event protocol (OEP)](#event-protocol-oep)
 - [Performance](#performance)
-- [User guides (ภาษาไทย)](#user-guides)
+- [User guides](#user-guides)
 - [Design documents](#design-documents)
 - [Roadmap](#roadmap)
 
@@ -255,13 +257,14 @@ Sponsorship is a **recurring monthly subscription handled entirely by GitHub Spo
 - **CEO chain of command**: ordering the CEO summons the Director — he walks over, takes the order, replies with a plan, and dispatches work to teammates via `DELEGATE:` lines (each spawns a real session, with the hand-over walk acted out). Delegation is a **round trip**: every delegate's result is reported back to the Director, who can answer questions / follow up with more `DELEGATE:` lines (bounded depth, serialized turns), and finally walks the CEO-readable summary over to the boss (`ceo.report`)
 - **Agent discussions**: pick 2–4 agents and a topic — they hold a real meeting, round-robin turns over a shared transcript, minutes on the in-world whiteboard
 - **Self-splitting sub-agents**: every session is told it may end a reply with `SUB: <job>` lines (2–4) when the request parallelizes — the daemon strips the protocol, spawns parallel clone sessions with the parent's persona + tools, records each in a labeled 👻 session, and resumes the parent for a final synthesis once all ghosts report back (a stuck ghost is reaped after 6 min, so synthesis always happens)
-- **Standing work orders**: `POST /jobs` — run now, at a datetime (optionally daily), or every N minutes; per-agent queue + a global concurrency cap keep the machine comfortable; each job keeps its own resumable thread
+- **Standing work orders**: `POST /jobs` — run now, at a datetime (optionally daily), or every N minutes; per-agent queue + a global concurrency cap keep the machine comfortable; each job keeps its own resumable thread. A fired job is treated as a **real order**, not a reminder: the assignee is told to do the work in that turn, and a job on the Director carries the full delegation protocol so he dispatches to the team and their results report back to him
+- **🤖 AUTO — keep going without you** (opt-in, ⚙ → TOOLS or `bagidea auto on`): an agent that hits a fork decides within its remit and **opens its own next turn** instead of parking the job on a question. Up to 8 self-driven rounds, each announced in chat; it still stops dead for a credential it can't get or an irreversible/outward action, and that block is pushed to your channels. It removes the wait for an *opinion* — what an agent may **do** is still the separate 🔓 auto-approve switch
 - **Shared note board**: notes live in the UI *and* in `workspace/notes.md` — agents read it and append bullets themselves (file-watched both ways)
 - **Calendar with a personal touch**: appointments remind you via the Director — he physically walks over and tells you (`reminder` event), N minutes ahead
 - **Director heartbeat**: every 15/30/60 minutes (configurable) he reviews the calendar, standing jobs and the note board — and pings you ONLY when something deserves it ("OK" stays silent)
 - **Claude Code hooks integration**: any Claude Code session in this project reports its tool calls — your real work animates the Director automatically
 - **Permission broker**: tools you *granted* in an agent's profile run silently; anything else is held until you approve — with a **✓✓ forever** option that remembers the grant
-- **📁 Projects**: register real folders as projects (with PLACE shorthands like `"ห้องเรียน" → D:\Learning`); the Director creates new ones himself via a `PROJECT:` protocol line and routes work with `DELEGATE: <agent> @ <project> :: <job>` — the assignee's claude session lives **inside** that directory and is resumable by you. One window per project: ▶ opens (or surfaces) *the* window. **One occupant at a time** — while an agent works the project you can't open it (the row shows a **⏹ stop agent** button with a two-click confirm to take over), and while you have it open an agent won't be dispatched into it. Removing/deleting a project also closes its window; disk-deletes sweep leftover dev servers first
+- **📁 Projects**: register real folders as projects (with PLACE shorthands like `"classroom" → D:\Learning`); the Director creates new ones himself via a `PROJECT:` protocol line and routes work with `DELEGATE: <agent> @ <project> :: <job>` — the assignee's claude session lives **inside** that directory and is resumable by you. One window per project: ▶ opens (or surfaces) *the* window. **One occupant at a time** — while an agent works the project you can't open it (the row shows a **⏹ stop agent** button with a two-click confirm to take over), and while you have it open an agent won't be dispatched into it. Removing/deleting a project also closes its window; disk-deletes sweep leftover dev servers first
 - **📨 Channels (6)**: Telegram (long-poll), Discord (native gateway), LINE, Slack (Events API), WhatsApp (Meta Cloud API) and Messenger (Meta Graph) feed straight into the Director — order your office from your phone, the reply comes back on the same channel
 - **🔑 API key vault**: store `OPENAI_API_KEY` & friends once; they're injected into every agent run's environment, and agents are told which names exist
 - **♻️ Self-healing daemon**: a watchdog respawns the daemon if it ever dies, and `bagidea restart` is more resilient — the office stays up on its own
@@ -281,6 +284,17 @@ short grace to confirm a trip is actually needed, so granted tools never make it
 twitch toward Security. This is real: the PreToolUse hook long-polls the daemon
 until you decide.
 
+**🛡 A project's own hooks are a separate yes.** A folder can carry its own
+`.claude/settings.json`, and that file is executable configuration: a `SessionStart`
+command hook runs the instant a session opens there — *before* the model acts, so the
+permission broker above never sees it. Registering a folder therefore is **not** consent
+to run the code it ships. A project with no hooks of its own is trusted silently as
+before; one that ships hooks raises a card in the Security Center listing the literal
+commands and **parks the work** until you answer — approve and the task resumes by
+itself. Approval is bound to that exact setup (the hook commands *and* the contents of
+the scripts they call), so editing either asks again, and a hook resolving outside the
+project is flagged. Answer it from the terminal with `bagidea trust`.
+
 ### 💬 Overlay (Layer 2)
 Served by the daemon at `http://127.0.0.1:8787/` — best experienced through the included **native Rust shell**:
 - **Agent rail**: every staff member with live state dots — 👑 the CEO leads in gold (that seat is you), ⭐ the Director in blue; double-click any seat for an **ID card**
@@ -289,7 +303,7 @@ Served by the daemon at `http://127.0.0.1:8787/` — best experienced through th
 - **🧵 Threads**: per-conversation chat panes — switching threads or agents loads that conversation's history; a thread bar shows where you are; meetings (🗣 with participant faces) and sub-agent jobs (👻 with the owner's face + ✓/✗/⏳ status) are readable forever, streaming live while they run
 - **🗣 Discussions**: launch agent-to-agent meetings
 - **🗂 OFFICE OPS**: projects (create / register / open / stop-agent-to-take-over / hide / delete, with an in-house Blender-style folder picker), standing tasks, calendar, the shared note board, and the org chart by tier
-- **🔵 NOW WORKING strip**: one calm line under the header — "กำลังทำ N งาน · latest…" — expandable into the full live task list; visible in feed mode too
+- **🔵 NOW WORKING strip**: one calm line under the header — "working on N tasks · latest…" — expandable into the full live task list; visible in feed mode too
 - **🔗 CONNECT tab**: API key vault (masked) + Telegram / Discord / LINE / Slack / WhatsApp / Messenger channel setup with live status dots
 - **📡 Feed mode**: right-click the chat head — the panel becomes a translucent right-edge activity stream (scrollback, hover-to-focus, 🧹 clear, actionable permission cards); the wallpaper stays clean for streaming/recording
 - **🎤 Push-to-talk**: hold **Right Ctrl** anywhere in Windows, speak (Windows Voice Typing — Thai works), release; a pulsing live pill shows what was heard; feed mode auto-sends to the Director (the Right Ctrl global hotkey is Windows-only for now — on macOS/Linux use the in-overlay mic button)
@@ -405,7 +419,7 @@ curl -fsSL https://raw.githubusercontent.com/bagidea/bagidea-office/main/install
 
 > First time only: open a **new** terminal, run `claude` once to log in to Claude,
 > then `bagidea start`. Safe to re-run — a re-run does a `git pull` and your data is kept.
-> Install didn't finish? See **[troubleshooting → install](docs/guide/troubleshooting.md#แก้ปัญหาการติดตั้ง)**
+> Install didn't finish? See **[troubleshooting → install](docs/guide/troubleshooting.md#installation-problems)**
 > (covers winget, the C++ Build Tools / linker error, PATH, SmartScreen).
 
 ### Alternative — via npm (optional)
@@ -533,8 +547,9 @@ Security and the overlay pops the exact command with Allow / ✓✓ Forever / De
 Granted tools run silently.
 
 ### Work in real projects
-🗂 → PROJECTS: define a PLACE once (`"ห้องเรียน" → D:\Learning`), then just tell
-the Director: *"สร้างโปรเจค Calculator ในห้องเรียน แล้วให้ Flamingo สร้างเว็บเครื่องคิดเลข"* —
+🗂 → PROJECTS: define a PLACE once (`"classroom" → D:\Learning`), then just tell
+the Director: *"create a project called Calculator in classroom, and have Flamingo
+build a calculator web app in it"* —
 the project folder is created, registered, and the assignee works **inside** it
 with a real resumable session. The row lights up with who's working; ▶ opens
 *the* project window. **One occupant at a time:** while an agent works it you
@@ -588,6 +603,10 @@ bagidea image "<prompt>"          generate an image into the office
 bagidea channels | keys           channel + API-key status
 bagidea key set <NAME> <value>    store an API key in the vault (env-injected)
 bagidea feed                      live office event stream in your terminal
+bagidea auto [on|off]             🤖 keep-going mode — decide and finish, don't wait
+bagidea trust [allow|deny] "<p>"  🛡 projects whose own hooks await your word
+bagidea eco [on|off]              🌱 eco mode — cut idle token burn
+bagidea export [file] | import <file>   move your whole office to another machine
 bagidea startup [on|off]          launch the office with Windows (show/set)
 bagidea update                    update to the latest version + relaunch
 bagidea version                   current build + whether an update is out
@@ -610,6 +629,7 @@ Full reference: [`docs/guide/cli.md`](docs/guide/cli.md).
 | `GET/POST /notes` | shared note board (mirrors `workspace/notes.md`) |
 | `GET/POST /calendar` | appointments + Director reminders |
 | `POST /registry/heartbeat` `{min}` · `/registry/sound` | Director heartbeat · sound toggle |
+| `POST /registry/autopilot` `{enabled}` | 🤖 AUTO keep-going mode (office-wide, off by default) |
 | `POST /discuss` `{agents[], topic, rounds}` | agent-to-agent meeting |
 | `POST /ui/daylight` `{hour: 17.5 \| "auto"}` | atmosphere override |
 | `POST /event` | push any OEP event (custom integrations) |
@@ -678,24 +698,31 @@ remain (FSR scale, grass density, cinema pass) if you want it leaner.
 
 ## User guides
 
-คู่มือผู้ใช้ฉบับเต็ม (ภาษาไทย) — step-by-step พร้อมภาพ:
+The full step-by-step guides, with screenshots:
 
-| คู่มือ | เนื้อหา |
+| Guide | What's in it |
 |---|---|
-| [เริ่มต้นใช้งาน](docs/guide/getting-started.md) | ติดตั้ง · เปิดครั้งแรก · แชทแรกกับ Director |
-| [Agents & Skills](docs/guide/agents.md) | จ้างพนักงาน · persona · skills/tools · Security Center |
-| [Projects](docs/guide/projects.md) | places · สร้าง/เปิด/ดูงานสด/ลบโปรเจค |
-| [AI features](docs/guide/ai-features.md) | main keys · เสียง/TTS/realtime · รูปภาพ · ความจำ · social |
-| [Models & Providers](docs/guide/models.md) | สมองถอดเปลี่ยนได้ · เลือกโมเดลต่อ agent · GLM/DeepSeek/Qwen/MiniMax · ประหยัด |
-| [Cost & vision](docs/guide/cost-and-vision.md) | ใช้ให้ประหยัด token · route brain ถูก/ฟรี · รันด้วย GLM/DeepSeek ล้วน · ทำให้น้องมองรูปได้ |
-| [เสียง & Feed mode](docs/guide/voice-feed.md) | Right Ctrl push-to-talk · feed mode · NOW WORKING |
-| [Office Editor](docs/guide/editor.md) | จัดเฟอร์นิเจอร์/กำแพง · import โมเดล/รูป |
-| [Plugins](docs/guide/plugins.md) | ระบบส่วนขยาย · music player · เขียน plugin เอง |
-| [Office Ops](docs/guide/office-ops.md) | งานตั้งเวลา · ปฏิทิน · กระดานโน้ต · ผังองค์กร |
-| [Channels](docs/guide/channels.md) | ต่อ Telegram / Discord / LINE ทีละขั้น |
-| [CLI](docs/guide/cli.md) | ทุกคำสั่ง `bagidea` พร้อมตัวอย่าง |
-| [อัปเดตโปรแกรม](docs/guide/updates.md) | ระบบอัปเดต + ตัวติดตั้ง |
-| [แก้ปัญหา](docs/guide/troubleshooting.md) | ปัญหาที่พบบ่อยและวิธีแก้ |
+| [Getting started](docs/guide/getting-started.md) | install · first launch · your first chat with the Director |
+| [Agents & skills](docs/guide/agents.md) | hiring · persona · skills/tools · Security Center · 🤖 AUTO keep-going mode |
+| [Projects](docs/guide/projects.md) | places · create/open/watch/delete · 🛡 registering a folder someone else wrote |
+| [Office Ops](docs/guide/office-ops.md) | scheduled & recurring jobs · calendar · note board · org chart |
+| [Models & providers](docs/guide/models.md) | swappable brains · per-agent model · 19 providers · live model lists · fallback brain |
+| [Cost & vision](docs/guide/cost-and-vision.md) | spend less per token · route work to a cheap/free brain · give agents eyes |
+| [Local models (Ollama)](docs/guide/ollama-local.md) | run agents on your own machine, no API key |
+| [AI features](docs/guide/ai-features.md) | main keys · TTS/realtime voice · images · memory · social life |
+| [Voice & feed mode](docs/guide/voice-feed.md) | Right Ctrl push-to-talk · feed mode · NOW WORKING strip |
+| [Web automation](docs/guide/web-automation.md) | let an agent drive a real browser |
+| [Meetings](docs/guide/meetings.md) | agent-to-agent discussions and what comes out of them |
+| [Workflow Builder](docs/guide/workflows.md) | plan work as plain-language nodes, let the Director analyze it |
+| [Plugins](docs/guide/plugins.md) | the extension system · music player · writing your own |
+| [Plugin Hub](docs/guide/plugin-hub.md) | browse, install and publish community plugins |
+| [Showcase](docs/guide/showcase.md) | get your office, project or plugin featured |
+| [Office Editor](docs/guide/editor.md) | furniture/walls · swap rooms · import your own models & images |
+| [Channels](docs/guide/channels.md) | connect Telegram / Discord / LINE / Slack / WhatsApp / Messenger |
+| [CLI](docs/guide/cli.md) | every `bagidea` command with examples |
+| [Updates](docs/guide/updates.md) | the update system + the installer |
+| [Sponsoring](docs/guide/sponsors.md) | tiers, how logos appear, how the wall updates |
+| [Troubleshooting](docs/guide/troubleshooting.md) | common problems and how to fix them |
 
 ## Design documents
 

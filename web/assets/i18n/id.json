@@ -38,7 +38,7 @@
   "f_plugin_t": "Plugin, skill & alat",
   "f_plugin_d": "Perluas kantor dengan plugin (instal dari repo GitHub mana pun), tetapkan agen dari perpustakaan skill bawaan, dan tambahkan kemampuan baru melalui server MCP — manusia maupun agen dapat membangun plugin.",
   "f_security_t": "Keamanan spasial",
-  "f_security_d": "Ketika agen membutuhkan alat yang belum kamu izinkan, ia secara fisik berjalan ke Pusat Keamanan dan menunggu. Kamu Izinkan / ✓✓ Selamanya / Tolak. Alat yang sudah diizinkan berjalan diam-diam dan tidak pernah meninggalkan meja.",
+  "f_security_d": "Ketika agen membutuhkan alat yang belum kamu izinkan, ia secara fisik berjalan ke Pusat Keamanan dan menunggu. Kamu Izinkan / ✓✓ Selamanya / Tolak. Alat yang sudah diizinkan berjalan diam-diam dan tidak pernah meninggalkan meja. Proyek yang membawa hook .claude miliknya sendiri adalah pertanyaan terpisah: kartunya menampilkan perintah apa adanya, dan pekerjaan menunggu sampai Anda menjawab.",
   "f_projects_t": "Proyek nyata",
   "f_projects_d": "Daftarkan folder nyata sebagai proyek; Director membuat dan mengarahkan pekerjaan ke dalamnya. Sesi Claude setiap penerima tugas berjalan di dalam direktori dan dapat dilanjutkan olehmu — satu jendela per proyek.",
   "f_i18n_t": "14 bahasa",
@@ -331,5 +331,11 @@
   "sc_submit_cta": "Baca panduan pengiriman →",
   "sc_edit_cta": "Edit showcase.json →",
   "d_migrate_h": "Pindah ke mesin baru",
-  "d_migrate_p": "Pindah ke mesin baru? <code>bagidea export</code> mengemas seluruh kantor Anda — agen, skill, memori, proyek, plugin — menjadi satu file. Instal BagIdea Office di mesin baru lalu jalankan <code>bagidea import</code> untuk menghadirkan kembali tim yang sama."
+  "d_migrate_p": "Pindah ke mesin baru? <code>bagidea export</code> mengemas seluruh kantor Anda — agen, skill, memori, proyek, plugin — menjadi satu file. Instal BagIdea Office di mesin baru lalu jalankan <code>bagidea import</code> untuk menghadirkan kembali tim yang sama.",
+  "f_auto_t": "Pekerjaan yang tidak menunggu Anda",
+  "f_auto_d": "Nyalakan AUTO dan tim berhenti menggantung pekerjaan karena sebuah pertanyaan: setiap agen memutuskan dalam wewenangnya sendiri dan membuka giliran berikutnya sendiri sampai pekerjaan benar-benar selesai — hingga 8 putaran, masing-masing diumumkan di chat. Ia tetap berhenti untuk kredensial yang tidak bisa ia peroleh atau tindakan yang tidak bisa dibatalkan. Perintah terjadwal berjalan dengan cara yang sama, entah Anda ada di depan komputer atau tidak.",
+  "dn_auto": "Lanjut sendiri (AUTO)",
+  "d_auto_h": "Terus jalan tanpa Anda (AUTO)",
+  "d_auto_p": "Secara bawaan, agen yang sampai di persimpangan berhenti untuk menanyakan pendapat Anda, dan pekerjaan menunggu jawaban. Nyalakan AUTO (⚙ → TOOLS, atau bagidea auto on) dan ia memutuskan sendiri lalu membuka giliran berikutnya sampai pekerjaan benar-benar selesai — paling banyak 8 putaran mandiri per tugas, masing-masing diumumkan di chat. Ia tetap berhenti untuk kredensial yang tidak bisa ia dapatkan, atau tindakan yang tidak bisa dibatalkan (push, deploy, hapus, keluar biaya), dan penghentian itu dikirim ke kanal Anda. Pekerjaan terjadwal juga dijalankan sebagai perintah sungguhan. AUTO menghapus penantian akan sebuah pendapat; apa yang boleh dilakukan agen tetap ditentukan sakelar 🔓 auto-approve yang terpisah.",
+  "d_trust_p": "Sebuah proyek juga bisa membawa hook .claude miliknya sendiri — perintah yang berjalan begitu sesi dibuka di folder itu, sebelum model bertindak. Jadi mendaftarkan sebuah folder bukan berarti menyetujui menjalankan kode yang dibawanya: proyek dengan hook sendiri memunculkan kartu berisi perintah apa adanya, dan pekerjaan ditahan sampai Anda menjawab. Persetujuan terikat pada susunan itu persis, jadi mengubah berkas pengaturan atau skrip yang dipanggil hook akan bertanya lagi. Dari terminal: bagidea trust."
 }

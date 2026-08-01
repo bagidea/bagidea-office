@@ -38,7 +38,7 @@
   "f_plugin_t": "Plugins, compétences et outils",
   "f_plugin_d": "Étendez le bureau avec des plugins (installer depuis n'importe quel dépôt GitHub), assignez aux agents des compétences depuis une bibliothèque de compétences intégrées, et ajoutez de nouvelles capacités via des serveurs MCP — humains et agents peuvent créer des plugins.",
   "f_security_t": "Sécurité spatialisée",
-  "f_security_d": "Quand un agent a besoin d'un outil que vous n'avez pas accordé, il se rend physiquement au Centre de Sécurité et attend. Vous choisissez Autoriser / ✓✓ Toujours / Refuser. Les outils accordés s'exécutent silencieusement et ne quittent jamais le bureau.",
+  "f_security_d": "Quand un agent a besoin d'un outil que vous n'avez pas accordé, il se rend physiquement au Centre de Sécurité et attend. Vous choisissez Autoriser / ✓✓ Toujours / Refuser. Les outils accordés s'exécutent silencieusement et ne quittent jamais le bureau. Un projet qui apporte ses propres hooks .claude est une autre question : la carte affiche les commandes telles quelles, et le travail attend votre réponse.",
   "f_projects_t": "Vrais projets",
   "f_projects_d": "Enregistrez de vrais dossiers comme projets ; le Director crée et achemine le travail dedans. La session Claude de chaque assigné vit dans le répertoire et est reprennable par vous — une fenêtre par projet.",
   "f_i18n_t": "14 langues",
@@ -331,5 +331,11 @@
   "sc_submit_cta": "Lire le guide de soumission →",
   "sc_edit_cta": "Modifier showcase.json →",
   "d_migrate_h": "Migrer vers une nouvelle machine",
-  "d_migrate_p": "Vous changez de machine ? <code>bagidea export</code> emballe tout votre bureau — agents, compétences, mémoire, projets, plugins — dans un seul fichier. Installez BagIdea Office sur la nouvelle machine puis lancez <code>bagidea import</code> pour retrouver la même équipe."
+  "d_migrate_p": "Vous changez de machine ? <code>bagidea export</code> emballe tout votre bureau — agents, compétences, mémoire, projets, plugins — dans un seul fichier. Installez BagIdea Office sur la nouvelle machine puis lancez <code>bagidea import</code> pour retrouver la même équipe.",
+  "f_auto_t": "Un travail qui ne vous attend pas",
+  "f_auto_d": "Activez AUTO et l'équipe cesse de mettre le travail en attente sur une question : chaque agent décide dans son périmètre et ouvre lui-même son tour suivant jusqu'à ce que la tâche soit vraiment terminée — jusqu'à 8 tours, tous annoncés dans le chat. Il s'arrête toujours devant un identifiant qu'il ne peut pas obtenir ou une action irréversible. Les ordres programmés fonctionnent pareil, que vous soyez devant l'écran ou non.",
+  "dn_auto": "Continuer seul (AUTO)",
+  "d_auto_h": "Continuer sans vous (AUTO)",
+  "d_auto_p": "Par défaut, un agent qui arrive à un embranchement s'arrête pour demander votre avis, et le travail attend votre réponse. Activez AUTO (⚙ → TOOLS, ou bagidea auto on) : il décide lui-même et ouvre son tour suivant jusqu'à ce que ce soit réellement terminé — au plus 8 tours autonomes par tâche, chacun annoncé dans le chat. Il s'arrête toujours devant un identifiant qu'il ne peut pas obtenir ou une action irréversible (push, déploiement, suppression, dépense), et ce blocage est envoyé sur vos canaux. Les tâches programmées sont exécutées comme de vrais ordres. AUTO supprime l'attente d'un avis ; ce qu'un agent a le droit de faire reste l'interrupteur 🔓 d'approbation automatique.",
+  "d_trust_p": "Un projet peut aussi apporter ses propres hooks .claude — des commandes qui s'exécutent dès l'ouverture d'une session dans ce dossier, avant même que le modèle n'agisse. Enregistrer un dossier n'est donc pas consentir à exécuter le code qu'il contient : un projet avec ses propres hooks fait apparaître une carte listant les commandes telles quelles, et le travail reste en attente jusqu'à votre réponse. L'approbation est liée à cette configuration exacte : modifier le fichier de réglages ou le script appelé par un hook redemande. Depuis le terminal : bagidea trust."
 }
