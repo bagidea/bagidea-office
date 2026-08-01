@@ -36,6 +36,16 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
   project is flagged. Answerable from the terminal too: `bagidea trust`.
 
 **Fixed**
+- **A scheduled job now actually sets work in motion.** A standing order would fire
+  on time, the Director would answer with a plan — and nothing happened, so the
+  owner had to come back and give the same order by hand. The job runner was the one
+  path in the office that sent the raw prompt with none of the scaffolding every
+  other path carries: no dispatch protocol on the way in, and **no `DELEGATE:` parser
+  on the way out**, so the lines that hand work to the team were printed as prose and
+  thrown away. A fired job is now run exactly like an order you just typed — the
+  Director dispatches and the results report back to him — and it carries the
+  "act in this turn, don't just acknowledge" mandate plus 🤖 AUTO when that's on. The
+  same missing parser is fixed on the resume-after-limit path.
 - **Ghost task cards on the board.** A task whose run ended *without a verdict* —
   the brain turned out to be unusable (bad key, dead endpoint) and the office cut
   it off, the CLI crashed, or a limit killed it mid-turn — left its card pinned

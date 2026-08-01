@@ -19,6 +19,12 @@ Pick an agent + type the task (or press 🎤 to speak it) + choose a time:
 - Each job has its own thread — every run is reviewable in history 🧵
 - Pause temporarily / delete from the list
 
+**A scheduled job is a real order.** When it fires, the assignee is told to do the work in that
+turn — not to reply with a plan and wait for you. Put the job on the **Director** and it runs like
+an order you typed yourself: he hands the pieces out to the team and their results report back to
+him. With 🤖 **AUTO** on ([keep-going mode](agents.md)), a job that ends with work still pending
+opens its own next turn instead of sitting idle until you return.
+
 > 💬 **You don't have to open this tab.** Just tell the Director in plain language —
 > *"brief me every morning at 8"*, *"check the prices again in an hour"*, *"remind the team every 30 minutes"* —
 > and the office **books the job in this scheduler for you** (it runs whether or not your chat session is still

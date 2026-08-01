@@ -34,6 +34,7 @@ const proxy = require("./proxy");
 const { RunWatchdog } = require("./watchdog");
 const { stripStatus, verdict: autoVerdict, readStatus } = require("./autopilot");
 const projtrust = require("./projecttrust");
+const joborder = require("./joborder");
 const { wireWorkspaceSettings } = require("./wire-hooks-runtime");
 const { killTree } = require("./kill-tree");   // cross-platform child reap (issue #15 review)
 
@@ -1608,11 +1609,32 @@ function dispatchJob(job) {
   // one-time scheduled time) has nothing left to do once it finishes — so it's
   // removed instead of lingering as a dead, uneditable row.
   const oneShot = job.mode === "now" || (job.mode === "at" && !job.daily);
-  runClaude(job.agent, job.prompt, {
+  // A fired job is an ORDER, run exactly like one the owner just typed: the
+  // Director gets the DELEGATE protocol AND a parser on the way out (without it
+  // his DELEGATE lines were printed as prose and nothing was ever dispatched —
+  // the office answered the schedule and went quiet), and 🤖 AUTO rides the turn
+  // so work that isn't finished opens its own next turn. See daemon/joborder.js.
+  const director = joborder.isDirectorJob(job.agent);
+  const keyRef = { key: job.sessionKey || "" }, dele = { hit: false };
+  const text = joborder.jobPrompt(job.prompt, {
+    director, directorNote: director ? directorNote() : "", autoNote: autoNote() });
+  runClaude(job.agent, text, {
     session: job.sessionKey || "new",
     logPrompt: "📋 [งานที่สั่งไว้] " + job.prompt,
-    onEntry: (key) => { job.sessionKey = key; saveJobs(); },
-    onDone: () => {
+    // Built at filter time, not now: a first firing has no thread yet, and the
+    // report-back must resume the thread this job actually ran on (onEntry has
+    // filled keyRef by then) so the Director answers with his own order in view.
+    filterText: (t) => stripStatus(
+      director ? makeDelegateFilter(0, keyRef.key || undefined,
+        () => { dele.hit = true; })(t) : t),
+    onEntry: (key) => {
+      job.sessionKey = key; keyRef.key = key;
+      autoRounds.delete(key);   // each firing is a fresh chain, not a continuation
+      saveJobs();
+    },
+    // The lane frees when this turn ends — a hand-off or an AUTO chain can outlive
+    // it, and holding the slot open would wedge every other scheduled job behind it.
+    onDone: autoContinue(job.agent, undefined, keyRef, () => {
       agentBusy.delete(job.agent);
       job.running = false;
       if (oneShot) jobs = jobs.filter((j) => j.id !== job.id);
@@ -1620,7 +1642,7 @@ function dispatchJob(job) {
       broadcast({ type: "jobs.changed" }, false);
       const next = jobQueue.shift();
       if (next) dispatchJob(next);
-    },
+    }, director, dele),
   });
 }
 
@@ -1693,7 +1715,13 @@ function resumePausedTick(now) {
       "ทำงานต่อจากที่ค้างไว้ก่อนหน้า (ก่อนหน้านี้สะดุดเพราะติดลิมิตชั่วคราว/โปรแกรมรีสตาร์ท). " +
       "ดูบริบทในเธรดนี้แล้วทำงานที่ยังไม่เสร็จให้จบ:\n\n" + String(w.prompt || ""),
       { session: w.key, project: w.project, resumable: true, _tries: w.tries,
-        resumePrompt: w.prompt, logPrompt: "▶ ทำงานต่อ (resume)" });
+        resumePrompt: w.prompt, logPrompt: "▶ ทำงานต่อ (resume)",
+        // Same defect as the job runner had: a resumed Director turn that hands
+        // work back out needs its DELEGATE lines parsed, or the work it just
+        // dispatched is printed as prose and silently lost.
+        filterText: joborder.isDirectorJob(w.agent)
+          ? (t) => stripStatus(makeDelegateFilter(0, w.key)(t))
+          : (t) => stripStatus(t) });
   }
 }
 
