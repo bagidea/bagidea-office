@@ -6,6 +6,13 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+**Fixed**
+- **A stray horizontal scrollbar under 📡 OFFICE FEED.** The feed renders the same
+  markdown the chat does, but it never inherited the chat's wrapping rules — so a
+  single long line inside a code block (a path, a command) stretched the whole
+  stream sideways and left a scrollbar the feed should never have had. Feed
+  markdown now wraps like chat markdown, and the feed only scrolls vertically.
+
 ## [0.9.48] — 🤖 The office stops waiting for you
 
 **Added**

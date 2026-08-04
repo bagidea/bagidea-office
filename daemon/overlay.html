@@ -404,7 +404,9 @@
   body.feedmode #feed {
     display: flex; flex-direction: column-reverse; gap: 5px;
     position: fixed; top: 34px; bottom: 6px; left: 6px; right: 6px;
-    overflow-y: auto; padding: 2px;
+    /* overflow-x is explicit: leaving it at `visible` makes the browser
+       promote it to `auto`, and the feed only ever scrolls vertically. */
+    overflow-y: auto; overflow-x: hidden; padding: 2px;
     mask-image: linear-gradient(to bottom, transparent, black 12%);
   }
   .fitem .fpbtns { display: flex; gap: 5px; margin-top: 5px; }
@@ -658,10 +660,18 @@
   }
   .fitem .face { width: 26px; height: 26px; border-radius: 7px; flex: none;
     background: #1c2740; }
-  .fitem .ftxt { min-width: 0; }
+  .fitem .ftxt { min-width: 0; flex: 1 1 auto; }
   .fitem .ftxt b { display: block; font-size: 11px; color: #cfe3ff; }
   .fitem .ftxt .sess { color: var(--dim); font-weight: 400; font-size: 9.5px; }
   .fitem .ftxt .body { color: rgba(225,232,245,0.92); word-break: break-word; }
+  /* The feed renders the same markdown the chat does, so it needs the same
+     wrapping: a bare <pre> defaults to white-space:pre, and one long path or
+     code line then pushes the whole stream sideways — which is where the
+     stray horizontal scrollbar under the feed came from. */
+  .fitem .ftxt .body pre { white-space: pre-wrap; word-break: break-word; margin: .2em 0; }
+  .fitem .ftxt .body code { font: inherit; }
+  .fitem .ftxt .body img { max-width: 100%; }
+  .fitem .ftxt .body table { display: block; max-width: 100%; overflow-x: auto; }
   .fitem.alert { border-color: rgba(255,176,84,0.8); background: rgba(255,150,60,0.13); }
   .fitem.ghostly { border-color: rgba(140,160,255,0.4); }
   /* 🧠 BRAINS monitor */
