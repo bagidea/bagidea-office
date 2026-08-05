@@ -23,7 +23,8 @@ const DAY_KEYS := [
 	[24.0, -40.0, 0.22, Color(0.5, 0.62, 1.0),  Color(0.05, 0.07, 0.16), 0.8],
 ]
 
-var _day_timer := 0.0
+var _clock_timer := 0.0
+var _last_minute := -1  # minute-of-day last painted on the roofline clock
 var _hour_override := -1.0
 var _cli_pinned := false  # --hour=N beats replayed ui.daylight events
 
@@ -188,10 +189,22 @@ func _opaque_after_first_frame() -> void:
 		flag.store_line(Time.get_datetime_string_from_system())
 
 func _process(delta: float) -> void:
-	_day_timer -= delta
-	if _day_timer <= 0.0:
-		_day_timer = 60.0  # re-evaluate once a minute
-		_apply_daylight()
+	# The roofline clock has to agree with the taskbar, so it SAMPLES the system
+	# clock every second and repaints the moment the minute rolls over. The old
+	# loop counted 60 seconds of frame deltas instead and only then looked at the
+	# time: stale by up to a minute even at a healthy frame rate, and stale for
+	# however long the renderer was starved when it wasn't (an occluded
+	# wallpaper, a machine coming back from sleep — where the frame timer stops
+	# but the wall clock doesn't). That is how a desktop clock ends up minutes
+	# behind the one in the corner of the same screen.
+	_clock_timer -= delta
+	if _clock_timer <= 0.0:
+		_clock_timer = 1.0
+		var t := Time.get_time_dict_from_system()
+		var minute_of_day: int = int(t.hour) * 60 + int(t.minute)
+		if minute_of_day != _last_minute:
+			_last_minute = minute_of_day
+			_apply_daylight()
 
 	if _wallpaper_mode:
 		# Occlusion throttle: shim writes /tmp/bagidea_occ when the window is

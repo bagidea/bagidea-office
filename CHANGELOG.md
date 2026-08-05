@@ -6,12 +6,25 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+## [0.9.49] — 🕘 A clock that agrees with your taskbar
+
 **Fixed**
+- **The roofline clock drifted minutes behind the real time.** It was driven by an
+  accumulated frame-delta timer that only *looked* at the system clock once every
+  60 seconds — so the office was stale by up to a minute at the best of times, and
+  by however long the renderer had been starved at the worst (an occluded
+  wallpaper, a machine back from sleep: the frame timer stops, the wall clock does
+  not). The clock now samples the system time **every second** and repaints the
+  moment the minute rolls over, so it can't disagree with the clock in the corner
+  of the same screen. The daylight/atmosphere pass still runs once a minute, and a
+  pinned atmosphere (🌅/☀️/🌇/🌙) is untouched.
 - **A stray horizontal scrollbar under 📡 OFFICE FEED.** The feed renders the same
   markdown the chat does, but it never inherited the chat's wrapping rules — so a
   single long line inside a code block (a path, a command) stretched the whole
   stream sideways and left a scrollbar the feed should never have had. Feed
   markdown now wraps like chat markdown, and the feed only scrolls vertically.
+
+> No shell change in this release — `bagidea update` picks it all up.
 
 ## [0.9.48] — 🤖 The office stops waiting for you
 
