@@ -115,11 +115,19 @@ test('Native folder picker endpoint responds (or 404 on Linux w/o zenity)', asyn
   // daemon returns 404, which the client treats as "fall back to in-house".
   // Skip on darwin/win32 to avoid hanging the suite on a modal dialog.
   if (process.platform === 'darwin' || process.platform === 'win32') {
+    // t.skip() only *marks* the test skipped — it does not stop the body, so
+    // without this return the request fired anyway and the assertion below ran
+    // on every Windows/macOS run.
     t.skip('Native picker blocks on user input — skip on darwin/win32');
+    return;
   }
   try {
     const res = await new Promise((resolve, reject) => {
-      const req = http.request(`${BASE_URL}/fs/native-pick`, { method: 'POST' }, (r) => {
+      // The endpoint is human-UI only: without this header the daemon answers
+      // 403 by design (agents don't get to open modal dialogs), which is what
+      // the overlay sends too.
+      const req = http.request(`${BASE_URL}/fs/native-pick`,
+        { method: 'POST', headers: { 'x-bagidea-ui': '1' } }, (r) => {
         let d = '';
         r.on('data', (c) => d += c);
         r.on('end', () => resolve({ statusCode: r.statusCode, data: d }));

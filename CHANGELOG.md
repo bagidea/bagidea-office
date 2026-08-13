@@ -6,6 +6,49 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+## [0.9.50] — 🌱 Not just agents. An ecosystem.
+
+**Added**
+- **The story of what the office has become, written down.** A new guide —
+  [A self-evolving, self-extending agentic AI ecosystem](docs/guide/ecosystem.md) —
+  covering the four things that make it more than a team of agents: **multi-agent
+  collaboration** (many agents, different roles, skills, tools and even different
+  brains, coordinating and reporting up the chain), **knowledge that compounds**
+  (shared `OFFICE.md` notes, per-agent memory written automatically after real
+  work, workflows saved as reusable skills, an archive any agent can search — so a
+  new project doesn't start from zero), **self-extension** (an agent that finds its
+  current capabilities aren't enough can propose the tool or plugin that would be,
+  and with your approval that capability becomes a real part of the running office
+  — the shift from *AI that uses tools* to *AI that proposes new tools for
+  itself*), and the **human gates** that keep you the CEO. Plus the loop it all
+  runs on: `Goal → Think → Act → Learn → Extend → Collaborate → Repeat`.
+- **A matching section on the website and the docs site**, linked from the README
+  — pre-translated in **all 14 languages** in the same change.
+
+**Fixed**
+- **Two UI strings the site referenced but never had.** `inst_s1_win` /
+  `inst_s1_mac` (the shell labels above the install commands) were used in the
+  markup with no string behind them, so every language quietly fell back to
+  English. Added in all 14.
+- **The English pack was contradicting the page it renders into.** It still called
+  the npm path "quickest" and said the installer compiles with Rust — stale since
+  the prebuilt shell landed, and since the English pack overwrites the markup it
+  was what English readers actually saw. `en`/`de`/`th` synced to the wording the
+  other 11 languages already had.
+- **The website scrolled sideways on a phone.** A grid track sized itself to the
+  min-content of the long one-line installer URL, and the provider list rendered
+  as one unbreakable word — together they dragged the whole page past the viewport.
+  The same bug shape made the docs page overflow on narrow screens. Verified at
+  390 px and 1280 px: no horizontal overflow left.
+- **`daemon/tests/api.test.js` reported a failure it had invented.** `t.skip()`
+  marks a test skipped but does **not** stop the body, so the Windows/macOS
+  early-out ran the request anyway — against an endpoint that is human-UI only and
+  correctly answers `403` without the `x-bagidea-ui` header. The test now returns
+  on skip and sends the header the overlay sends.
+
+> Docs, website and a test only — no change to how the office behaves.
+> `bagidea update` picks it up.
+
 ## [0.9.49] — 🕘 A clock that agrees with your taskbar
 
 **Fixed**
