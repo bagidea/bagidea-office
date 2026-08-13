@@ -1,6 +1,6 @@
 {
   "name": "bagidea-office",
-  "version": "0.9.47",
+  "version": "0.9.50",
   "description": "Your desktop wallpaper goes to work — a living HD-2D office where every AI agent is a real Claude Code session. This installs the full app for your platform (Windows / macOS / Linux).",
   "bin": {
     "bagidea-office": "cli.js"
