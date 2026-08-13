@@ -45,6 +45,44 @@ own plugins** (you approve each one) that extend the office for real.
 unlocks agent voices, voice commands, realtime calls and image generation, and
 the office truly comes alive.
 
+### 🌱 More than agents — a self-evolving, self-extending ecosystem
+
+BagIdea Office began as a place to have **AI agents as real coworkers**. It has
+been growing into something wider: **an ecosystem where agents learn, adapt, work
+together, and grow their own capabilities.**
+
+- **🤖 Multi-agent collaboration.** One office holds many agents with different
+  roles, skills, tools — and even different **brains**. They coordinate, hand work
+  off, split into ghost clones for parallel work, hold meetings and report back.
+  You don't have *an AI*; you have **a team of AI that works together**.
+- **🧠 Knowledge that compounds.** Agents accumulate knowledge from the work
+  itself — shared `OFFICE.md` notes, per-agent memory written automatically after
+  real work, workflows saved as reusable skills, and an archive any agent can
+  search. One project creates knowledge the next project can use, so the office
+  **doesn't start from zero** every time.
+- **🛠️ It extends itself.** When an agent finds that *the capabilities it has
+  aren't enough for this job*, it doesn't have to stop — it can propose a tool or
+  a plugin, and (with your approval) that capability becomes a real part of the
+  running office. In our own office the team built themselves a tool to talk to
+  each other with, which also cleared up errors that kept recurring — and the
+  Director now reports to the CEO from that plugin's data. Nobody specified it up
+  front; the work asked for it. The idea shifts from **AI that uses tools** to
+  **AI that can propose new tools and capabilities for itself**.
+- **👑 You are still the CEO.** Every widening passes a human gate: the Security
+  Center, project-hook trust, and ✅/✕ on every proposal — *with your reasons*,
+  which is also how the team learns what you want next time.
+
+```
+Goal → Think → Act → Learn → Extend → Collaborate → Repeat
+```
+
+We're not building one AI. We're building **a place where AI can work, learn,
+build and grow together with you** — and honestly, nobody knows yet what a system
+like this looks like after another year or two of growing. That's the most
+interesting part of building it.
+
+→ Read the full story: [**A self-evolving, self-extending agentic AI ecosystem**](docs/guide/ecosystem.md)
+
 🌐 **Website:** the landing page + browsable docs live in [`web/`](web/) (deployable to any static host).
 📝 **What changed:** see the [`CHANGELOG.md`](CHANGELOG.md) for per-release notes.
 
@@ -704,6 +742,7 @@ The full step-by-step guides, with screenshots:
 | Guide | What's in it |
 |---|---|
 | [Getting started](docs/guide/getting-started.md) | install · first launch · your first chat with the Director |
+| [The ecosystem](docs/guide/ecosystem.md) | why it's more than agents — collaboration · compounding knowledge · self-extension |
 | [Agents & skills](docs/guide/agents.md) | hiring · persona · skills/tools · Security Center · 🤖 AUTO keep-going mode |
 | [Projects](docs/guide/projects.md) | places · create/open/watch/delete · 🛡 registering a folder someone else wrote |
 | [Office Ops](docs/guide/office-ops.md) | scheduled & recurring jobs · calendar · note board · org chart |
