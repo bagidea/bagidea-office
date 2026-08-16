@@ -1955,7 +1955,15 @@ function runClaude(agent, prompt, opts = {}) {
   let settingsFile = sharedSettings;
   try {
     const base = JSON.parse(fs.readFileSync(sharedSettings, "utf8"));
-    const keep = new Set(picked.filter((t) => !t.startsWith("mcp:")));
+    // A grant can be SCOPED: "Bash(npm test:*)" grants only that command shape.
+    // Verified: a blanket deny of the base tool removes it outright and the scoped
+    // allow never fires — so the base name must stay OUT of the deny list, and the
+    // scoped rules go into permissions.allow to run without a prompt. Anything else
+    // that agent tries with the tool still walks to the Security Center.
+    const bare = (t) => t.replace(/\(.*$/, "");
+    const local = picked.filter((t) => !t.startsWith("mcp:"));
+    const keep = new Set(local.map(bare));
+    const scoped = local.filter((t) => /\(.*\)$/.test(t));
     // "Agent"/"Workflow" spawn sub-agents that would carry their OWN tool sets,
     // so they are denied too unless granted — otherwise they are a hole around
     // this whole mechanism.
@@ -1966,7 +1974,8 @@ function runClaude(agent, prompt, opts = {}) {
     // "read-only" agent could still WRITE to those services. If the owner granted
     // this agent no MCP server, deny the whole surface.
     if (!mcpNames.length) deny.push("mcp__*");
-    base.permissions = { ...(base.permissions || {}), deny };
+    base.permissions = { ...(base.permissions || {}), deny,
+      allow: [...((base.permissions || {}).allow || []), ...scoped] };
     const f = path.join(__dirname,
       `settings_${String(agent).replace(/[^\w-]/g, "_")}.json`);
     fs.writeFileSync(f, JSON.stringify(base, null, 2));
@@ -6259,18 +6268,20 @@ end tell`;
         const { id, decision, always } = JSON.parse(body);
         // "Allow ตลอดไป": remember the grant — broker auto-approves future
         // requests AND the tool joins the agent's allowlist for new runs.
+        // 🔒 "Allow forever" no longer persists (Aignition patch, 2026-08-16).
+        // It used to do two things: remember the grant in reg.autoAllow AND push
+        // the tool into the agent's own tools array. That means a single click on
+        // a permission card silently REWROTE the agent's role — the read-only
+        // Reviewer gained permanent shell four separate times that way, each time
+        // during a run where approving was the only way to let the work continue.
+        // A permission answer is about THIS request; widening a role is a config
+        // decision and must be made on purpose, by editing the agent.
+        // The request itself is still approved below — only the persistence is
+        // dropped, so "forever" degrades to "this once".
         if (always && decision === "allow") {
           const pend = pendingPerms.get(id);
-          if (pend) {
-            const base = String(pend.agent).split("#")[0];
-            reg.autoAllow = reg.autoAllow || {};
-            reg.autoAllow[base] = [...new Set([...(reg.autoAllow[base] || []), pend.tool])];
-            const a = reg.agents[base];
-            if (a && Array.isArray(a.tools) && !a.tools.includes(pend.tool))
-              a.tools.push(pend.tool);
-            saveReg();
-            pushRoster();
-          }
+          if (pend) console.log(`[lock] "allow forever" not persisted for ` +
+            `${pend.agent}/${pend.tool} — edit the agent's tools to grant it`);
         }
         const ok = finishPerm(id, decision === "allow" ? "allow" : "deny", "user");
         res.writeHead(ok ? 200 : 404);
