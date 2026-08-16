@@ -32,6 +32,7 @@ const skillsSync = require("./skills");
 const providers = require("./providers");
 const proxy = require("./proxy");
 const { RunWatchdog } = require("./watchdog");
+const { bashScopeVerdict } = require("./bashscope");
 const { stripStatus, verdict: autoVerdict, readStatus } = require("./autopilot");
 const projtrust = require("./projecttrust");
 const joborder = require("./joborder");
@@ -1778,6 +1779,50 @@ SUB: <งานย่อยที่ชัดเจนครบถ้วนใ�
 ระบบจะส่งร่างโคลนไปทำขนานกัน แล้วรวมผลกลับมาให้คุณสรุปเป็นคำตอบสุดท้าย.
 </system-capability>`;
 
+// 🔒 Per-agent HARD lock, shared by real runs and ghosts (Aignition patch, 2026-08-16).
+// --allowedTools only skips the permission PROMPT; it does not remove a tool.
+// Verified: with --allowedTools "Read,Glob,Grep" and no deny list, the model still
+// has Bash. permissions.deny is what actually removes it — a denied tool never
+// reaches the model at all. So everything the owner did NOT grant is denied outright
+// and the roster's tool list becomes a real boundary instead of a written promise.
+// Side effect, intended: a denied tool never reaches the Security Center, so "Allow
+// forever" can no longer widen an agent's powers by a permission click.
+// Returns the path of the settings file to hand to `claude --settings`.
+function perAgentSettings(agent, picked, mcpNames) {
+  const sharedSettings = path.join(WORKSPACE, ".claude", "settings.json");
+  try {
+    const base = JSON.parse(fs.readFileSync(sharedSettings, "utf8"));
+    // A grant can be SCOPED: "Bash(npm test:*)" grants only that command shape.
+    // Verified: a blanket deny of the base tool removes it outright and the scoped
+    // allow never fires — so the base name must stay OUT of the deny list, and the
+    // scoped rules go into permissions.allow to run without a prompt. Anything else
+    // that agent tries with the tool is settled by bashScopeVerdict at /perm/request.
+    const bare = (t) => t.replace(/\(.*$/, "");
+    const local = picked.filter((t) => !t.startsWith("mcp:"));
+    const keep = new Set(local.map(bare));
+    const scoped = local.filter((t) => /\(.*\)$/.test(t));
+    // "Agent"/"Workflow" spawn sub-agents that would carry their OWN tool sets,
+    // so they are denied too unless granted — otherwise they are a hole around
+    // this whole mechanism.
+    const deny = [...Object.keys(BUILTIN_TOOLS), "Agent", "Workflow"]
+      .filter((t, i, a) => a.indexOf(t) === i && !keep.has(t));
+    // Account-level MCP connectors (claude.ai: Drive, Notion, Supabase, Shopify…)
+    // ride in with the authenticated session, NOT through --mcp-config, so a
+    // "read-only" agent could still WRITE to those services. If the owner granted
+    // this agent no MCP server, deny the whole surface.
+    if (!mcpNames.length) deny.push("mcp__*");
+    base.permissions = { ...(base.permissions || {}), deny,
+      allow: [...((base.permissions || {}).allow || []), ...scoped] };
+    const f = path.join(__dirname,
+      `settings_${String(agent).replace(/[^\w-]/g, "_")}.json`);
+    fs.writeFileSync(f, JSON.stringify(base, null, 2));
+    return f;
+  } catch (e) {
+    console.error("[lock] per-agent settings:", e.message);
+    return sharedSettings;
+  }
+}
+
 function runClaude(agent, prompt, opts = {}) {
   const task = "t" + ++taskCounter;
 
@@ -1941,46 +1986,7 @@ function runClaude(agent, prompt, opts = {}) {
       `die when your session closes. That is how timed work actually runs here.\n</role-lock>\n\n`;
   }
 
-  // 🔒 Per-agent HARD lock (Aignition patch, 2026-08-16).
-  // --allowedTools only skips the permission PROMPT; it does not remove a tool.
-  // Verified: with --allowedTools "Read,Glob,Grep" and no deny list, the model
-  // still has Bash. permissions.deny is what actually removes it — a denied tool
-  // never reaches the model at all.
-  // So: everything the owner did NOT grant this agent is denied outright, and the
-  // roster's tool list becomes a real boundary instead of a written promise.
-  // Side effect, intended: a denied tool never reaches the Security Center, so
-  // "Allow forever" can no longer widen an agent's powers by a permission click.
-  // Widening now requires editing the agent's tools on purpose.
-  const sharedSettings = path.join(WORKSPACE, ".claude", "settings.json");
-  let settingsFile = sharedSettings;
-  try {
-    const base = JSON.parse(fs.readFileSync(sharedSettings, "utf8"));
-    // A grant can be SCOPED: "Bash(npm test:*)" grants only that command shape.
-    // Verified: a blanket deny of the base tool removes it outright and the scoped
-    // allow never fires — so the base name must stay OUT of the deny list, and the
-    // scoped rules go into permissions.allow to run without a prompt. Anything else
-    // that agent tries with the tool still walks to the Security Center.
-    const bare = (t) => t.replace(/\(.*$/, "");
-    const local = picked.filter((t) => !t.startsWith("mcp:"));
-    const keep = new Set(local.map(bare));
-    const scoped = local.filter((t) => /\(.*\)$/.test(t));
-    // "Agent"/"Workflow" spawn sub-agents that would carry their OWN tool sets,
-    // so they are denied too unless granted — otherwise they are a hole around
-    // this whole mechanism.
-    const deny = [...Object.keys(BUILTIN_TOOLS), "Agent", "Workflow"]
-      .filter((t, i, a) => a.indexOf(t) === i && !keep.has(t));
-    // Account-level MCP connectors (claude.ai: Drive, Notion, Supabase, Shopify…)
-    // ride in with the authenticated session, NOT through --mcp-config, so a
-    // "read-only" agent could still WRITE to those services. If the owner granted
-    // this agent no MCP server, deny the whole surface.
-    if (!mcpNames.length) deny.push("mcp__*");
-    base.permissions = { ...(base.permissions || {}), deny,
-      allow: [...((base.permissions || {}).allow || []), ...scoped] };
-    const f = path.join(__dirname,
-      `settings_${String(agent).replace(/[^\w-]/g, "_")}.json`);
-    fs.writeFileSync(f, JSON.stringify(base, null, 2));
-    settingsFile = f;
-  } catch (e) { console.error("[lock] per-agent settings:", e.message); }
+  const settingsFile = perAgentSettings(agent, picked, mcpNames);
 
   const args = ["-p", "--output-format", "stream-json", "--verbose",
     "--allowedTools", tools,
@@ -2910,7 +2916,13 @@ function runSub(parentId, subId, taskText, entry, onDone) {
   }
   const args = ["-p", "--output-format", "stream-json", "--verbose",
     "--allowedTools", tools,
-    "--settings", path.join(WORKSPACE, ".claude", "settings.json")];
+    // 🔒 Ghosts ran on the SHARED settings — no deny list, so a clone of a
+    // read-only agent came back with Write, Edit and a full shell (Aignition
+    // patch, 2026-08-16). The parent can't split itself (Agent/Workflow are
+    // denied), but the Director can order the split, which made this the same
+    // hole through another door. A ghost is its parent, so it gets the parent's
+    // lock — and /perm/request already resolves "revisor#s1" back to "revisor".
+    "--settings", perAgentSettings(parentId, picked, mcpNames)];
   if (mcpConfig) args.push("--mcp-config", mcpConfig);
   // Ghosts inherit the parent's native skills (additive — ghosts had none before).
   if (reg.nativeSkills !== false) {
@@ -6222,6 +6234,24 @@ end tell`;
         res.end(JSON.stringify({ decision: "allow" }));
         broadcast({ type: "perm.approved", agent, task, tool, perm: id, via: "rule" });
         return;
+      }
+      // 🔒 A scope-limited agent doesn't get to ask (Aignition patch, 2026-08-16).
+      // The owner wrote which command shapes this agent may run; that list decides,
+      // not a card at 3am. See bashScopeVerdict for why the two rules are there.
+      // No card is shown either way: in scope it runs, out of scope it is refused.
+      if (tool === "Bash" && !granted.includes("Bash")) {
+        const scopedBash = granted.filter((g) => /^Bash\(.+\)$/.test(g));
+        if (scopedBash.length) {
+          let cmd = "";
+          try { cmd = (JSON.parse(input || "{}") || {}).command || ""; } catch {}
+          const v = bashScopeVerdict(cmd, scopedBash);
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ decision: v.ok ? "allow" : "deny" }));
+          broadcast({ type: v.ok ? "perm.approved" : "perm.denied",
+            agent, task, tool, perm: id, via: "lock", input, reason: v.why });
+          if (!v.ok) console.log(`[lock] ${agent}: Bash rechazado — ${v.why}`);
+          return;
+        }
       }
       // Unattended mode (opt-in, reg.autoApprove): the owner can't come click Allow
       // — e.g. they queued work and stepped out — so every prompt is auto-approved
