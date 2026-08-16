@@ -112,3 +112,6 @@ keystore*
 mnemonic*.txt
 credentials.json
 secrets.json
+
+# per-agent settings: los genera el daemon en cada corrida
+daemon/settings_*.json
