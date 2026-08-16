@@ -1941,12 +1941,45 @@ function runClaude(agent, prompt, opts = {}) {
       `die when your session closes. That is how timed work actually runs here.\n</role-lock>\n\n`;
   }
 
+  // 🔒 Per-agent HARD lock (Aignition patch, 2026-08-16).
+  // --allowedTools only skips the permission PROMPT; it does not remove a tool.
+  // Verified: with --allowedTools "Read,Glob,Grep" and no deny list, the model
+  // still has Bash. permissions.deny is what actually removes it — a denied tool
+  // never reaches the model at all.
+  // So: everything the owner did NOT grant this agent is denied outright, and the
+  // roster's tool list becomes a real boundary instead of a written promise.
+  // Side effect, intended: a denied tool never reaches the Security Center, so
+  // "Allow forever" can no longer widen an agent's powers by a permission click.
+  // Widening now requires editing the agent's tools on purpose.
+  const sharedSettings = path.join(WORKSPACE, ".claude", "settings.json");
+  let settingsFile = sharedSettings;
+  try {
+    const base = JSON.parse(fs.readFileSync(sharedSettings, "utf8"));
+    const keep = new Set(picked.filter((t) => !t.startsWith("mcp:")));
+    // "Agent"/"Workflow" spawn sub-agents that would carry their OWN tool sets,
+    // so they are denied too unless granted — otherwise they are a hole around
+    // this whole mechanism.
+    const deny = [...Object.keys(BUILTIN_TOOLS), "Agent", "Workflow"]
+      .filter((t, i, a) => a.indexOf(t) === i && !keep.has(t));
+    // Account-level MCP connectors (claude.ai: Drive, Notion, Supabase, Shopify…)
+    // ride in with the authenticated session, NOT through --mcp-config, so a
+    // "read-only" agent could still WRITE to those services. If the owner granted
+    // this agent no MCP server, deny the whole surface.
+    if (!mcpNames.length) deny.push("mcp__*");
+    base.permissions = { ...(base.permissions || {}), deny };
+    const f = path.join(__dirname,
+      `settings_${String(agent).replace(/[^\w-]/g, "_")}.json`);
+    fs.writeFileSync(f, JSON.stringify(base, null, 2));
+    settingsFile = f;
+  } catch (e) { console.error("[lock] per-agent settings:", e.message); }
+
   const args = ["-p", "--output-format", "stream-json", "--verbose",
     "--allowedTools", tools,
     // The permission-broker hooks live in the workspace settings; agents
     // now run inside PROJECT directories, so the settings must travel
-    // explicitly or the Security Center goes silent.
-    "--settings", path.join(WORKSPACE, ".claude", "settings.json")];
+    // explicitly or the Security Center goes silent. Since 2026-08-16 this is a
+    // per-agent copy of those settings plus the deny list built above.
+    "--settings", settingsFile];
   if (mcpConfig) args.push("--mcp-config", mcpConfig);
   // Native skills: refresh this agent's SKILL.md files (hash-gated) and expose
   // them to the session — progressive disclosure, so bodies never hit the prompt.
