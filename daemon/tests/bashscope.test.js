@@ -78,3 +78,48 @@ test("an agent with no console grants gets nothing", () => {
   assert.ok(!bashScopeVerdict("echo hola", []).ok);
   assert.ok(!bashScopeVerdict("echo hola", ["Read", "Glob"]).ok);
 });
+
+// The Implementer is the only agent that writes, and it needs a WIDE console —
+// git, node, npm. That means `Bash(node:*)` also covers
+// `node -e "fs.writeFileSync('…/BagIdeaOffice/daemon/settings_revisor.json')"`,
+// and the only writer loosens everyone's lock. Prefix grants cannot express
+// "node yes, but not to write there", so the zone is named per agent instead.
+const IMPL = ["Bash(git:*)", "Bash(node:*)", "Bash(npm:*)", "Bash(echo:*)"];
+const ZONA = ["C:\\Users\\sbras\\AppData\\Local\\BagIdeaOffice"];
+
+const zok = (cmd) => assert.ok(bashScopeVerdict(cmd, IMPL, ZONA).ok,
+  `should be allowed: ${cmd}`);
+const zno = (cmd) => assert.ok(!bashScopeVerdict(cmd, IMPL, ZONA).ok,
+  `MUST be refused: ${cmd}`);
+
+test("the Implementer's real work still runs", () => {
+  zok("node build-tablero.js");
+  zok("git status --short");
+  zok("npm test");
+  zok("node sync-memoria.js");
+});
+
+test("no command may name the lock directory, whatever the tool", () => {
+  zno('node -e "require(\'fs\').writeFileSync(\'C:/Users/sbras/AppData/Local/BagIdeaOffice/daemon/settings_revisor.json\',\'x\')"');
+  zno("node C:\\Users\\sbras\\AppData\\Local\\BagIdeaOffice\\daemon\\server.js");
+  zno("git diff C:/Users/sbras/AppData/Local/BagIdeaOffice/daemon/registry.json");
+});
+
+test("the zone matches regardless of slash direction or case", () => {
+  // The agent writes paths both ways on Windows; the guard must not care.
+  zno("node -e \"x('c:/users/sbras/appdata/local/bagideaoffice/daemon/registry.json')\"");
+  zno("node -e \"x('C:\\\\USERS\\\\SBRAS\\\\APPDATA\\\\LOCAL\\\\BAGIDEAOFFICE\\\\x')\"");
+});
+
+test("the zone is a guard, not a cage — and the docs say so", () => {
+  // Named here so nobody mistakes it for a sandbox: an obfuscated path gets through.
+  // It holds together with the other two layers (no readDirs there, Reviewer audits).
+  const obfuscated = 'node -e "x(String.fromCharCode(67,58) + \'/…\')"';
+  assert.ok(bashScopeVerdict(obfuscated, IMPL, ZONA).ok,
+    "an obfuscated path passes — this is documented, not a defect to hide");
+});
+
+test("with no zone declared, nothing changes for anyone else", () => {
+  assert.ok(bashScopeVerdict("node build-tablero.js", IMPL).ok);
+  assert.ok(bashScopeVerdict("node C:/Users/sbras/AppData/Local/BagIdeaOffice/x.js", IMPL).ok);
+});

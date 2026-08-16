@@ -4544,6 +4544,80 @@ const server = http.createServer((req, res) => {
       }
     });
 
+  } else if (req.method === "POST" && req.url === "/registry/agent/create") {
+    // 🚪 La puerta angosta (Aignition, 2026-08-16). Decisión de Sergio: "yo soy
+    // cuello de botella", así que RRIA da de alta sin esperarlo.
+    //
+    // Conserva la misma compuerta que el resto de /registry. La llama el lanzador
+    // tools/alta-agente.js, que vive en esta carpeta y por eso ningún agente puede
+    // reescribirlo. Lo que protege de verdad no es la compuerta, sino la ESTRECHEZ
+    // de lo que esta ruta acepta.
+    //
+    // Hace UNA cosa y se niega a cualquier otra: crear un agente que NO existe.
+    // No modifica, no borra, no toca cerebros, no toca los puestos protegidos, y
+    // solo concede herramientas de una lista fija. Cambiar un agente que ya existe
+    // sigue siendo exclusivamente de Sergio, por la pantalla.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      const no = (msg) => { res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, error: msg }));
+        console.log(`[alta] rechazada — ${msg}`);
+        broadcast({ type: "agent.alta.rechazada", error: msg }); };
+      let a;
+      try { a = JSON.parse(body); } catch { return no("cuerpo ilegible"); }
+
+      const id = String(a.id || "").trim();
+      if (!/^[a-z][a-z0-9_]{1,30}$/.test(id)) return no(`id inválido: "${id}"`);
+      if (reg.agents[id]) return no(`"${id}" ya existe — esta ruta NO modifica, solo crea`);
+      if (["main", "ceo", "rria", "revisor"].includes(id)) return no(`"${id}" es un puesto protegido`);
+
+      // Las herramientas se conceden de una lista fija. Nada de Agent/Workflow, que
+      // traen su propio juego de herramientas, ni de conectores MCP.
+      const PERMITIDAS = new Set(["Read", "Glob", "Grep", "Skill", "Write", "Edit",
+        "WebSearch", "WebFetch", "TodoWrite"]);
+      const tools = Array.isArray(a.tools) ? a.tools.map(String) : [];
+      for (const t of tools) {
+        const bare = t.replace(/\(.*$/, "");
+        if (bare === "Bash") {
+          // Bash solo acotado: "Bash(git log:*)" sí, "Bash" pelado no.
+          if (!/^Bash\(.+\)$/.test(t)) return no("Bash solo se concede acotado, nunca pelado");
+          continue;
+        }
+        if (!PERMITIDAS.has(bare)) return no(`herramienta no concedible por esta ruta: ${t}`);
+      }
+
+      const MODELOS = new Set(["claude-sonnet-5", "claude-haiku-4-5-20251001", "claude-opus-5"]);
+      const model = String(a.model || "claude-sonnet-5");
+      if (!MODELOS.has(model)) return no(`modelo no permitido: ${model}`);
+
+      reg.agents[id] = {
+        name: String(a.name || id).slice(0, 60),
+        role: String(a.role || "Especialista").slice(0, 60),
+        avatar: Number(a.avatar) || 4,
+        aura: "", tier: 2, voice: "",
+        provider: "claude", model,
+        prompt: String(a.prompt || ""),
+        persona: {
+          expertise: String((a.persona || {}).expertise || ""),
+          personality: String((a.persona || {}).personality || ""),
+          language: String((a.persona || {}).language || "es"),
+          rules: String((a.persona || {}).rules || ""),
+        },
+        skills: Array.isArray(a.skills) ? a.skills.map(String) : [],
+        tools,
+        readDirs: Array.isArray(a.readDirs) ? a.readDirs.map(String) : [],
+        noTouch: Array.isArray(a.noTouch) ? a.noTouch.map(String) : [],
+        altaPor: "rria",
+      };
+      saveReg();
+      console.log(`[alta] ${id} · ${tools.join(", ")} · ${model}`);
+      // Queda en el feed y en el journal: el alta la audita el Revisor, y Sergio la
+      // ve pasar sin tener que aprobarla.
+      broadcast({ type: "agent.alta", agent: id, tools, model, role: reg.agents[id].role });
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: true, id, tools, model }));
+    });
+
   } else if (req.method === "POST" && req.url === "/registry/agent/delete") {
     // Owner-only — a teammate must not be able to remove other teammates.
     if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
@@ -6285,7 +6359,8 @@ end tell`;
         if (scopedBash.length) {
           let cmd = "";
           try { cmd = (JSON.parse(input || "{}") || {}).command || ""; } catch {}
-          const v = bashScopeVerdict(cmd, scopedBash);
+          const noTouch = ((reg.agents[base] || {}).noTouch) || [];
+          const v = bashScopeVerdict(cmd, scopedBash, noTouch);
           res.writeHead(200, { "content-type": "application/json" });
           res.end(JSON.stringify({ decision: v.ok ? "allow" : "deny" }));
           broadcast({ type: v.ok ? "perm.approved" : "perm.denied",
