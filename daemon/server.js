@@ -36,6 +36,7 @@ const { bashScopeVerdict } = require("./bashscope");
 const { stripStatus, verdict: autoVerdict, readStatus } = require("./autopilot");
 const projtrust = require("./projecttrust");
 const joborder = require("./joborder");
+const { resolveThread } = require("./reportthread");
 const { wireWorkspaceSettings } = require("./wire-hooks-runtime");
 const { killTree } = require("./kill-tree");   // cross-platform child reap (issue #15 review)
 
@@ -1658,15 +1659,20 @@ function dispatchJob(job) {
   const keyRef = { key: job.sessionKey || "" }, dele = { hit: false };
   const text = joborder.jobPrompt(job.prompt, {
     director, directorNote: director ? directorNote() : "", autoNote: autoNote() });
+  const jobFilter = director
+    ? makeDelegateFilter(0, keyRef, () => { dele.hit = true; })
+    : null;
   runClaude(job.agent, text, {
     session: job.sessionKey || "new",
     logPrompt: "📋 [งานที่สั่งไว้] " + job.prompt,
-    // Built at filter time, not now: a first firing has no thread yet, and the
-    // report-back must resume the thread this job actually ran on (onEntry has
-    // filled keyRef by then) so the Director answers with his own order in view.
-    filterText: (t) => stripStatus(
-      director ? makeDelegateFilter(0, keyRef.key || undefined,
-        () => { dele.hit = true; })(t) : t),
+    // The thread is resolved at filter time, not now: a first firing has no thread
+    // yet, and the report-back must resume the thread this job actually ran on
+    // (onEntry has filled keyRef by then) so the Director answers with his own
+    // order in view. Handing keyRef to the filter is what makes that late read
+    // happen — the same rule every other dispatch path now follows.
+    filterText: director
+      ? (t) => stripStatus(jobFilter(t))
+      : (t) => stripStatus(t),
     onEntry: (key) => {
       job.sessionKey = key; keyRef.key = key;
       autoRounds.delete(key);   // each firing is a fresh chain, not a continuation
@@ -2614,7 +2620,10 @@ function ceoFlow(prompt, session, project, opts = {}) {
   // 🤖 AUTO: a fresh order starts a fresh chain (the round budget resets), and if
   // the Director ends this turn still owing work, it opens the next turn itself.
   const keyRef = { key: session || "" }, dele = { hit: false };
-  const df = makeDelegateFilter(0, session, () => { dele.hit = true; });
+  // keyRef, not `session`: a CEO order usually opens a FRESH thread, so the key
+  // only exists once onEntry has fired. Capturing `session` here filed the team's
+  // results in whatever thread happened to be latest when they finished.
+  const df = makeDelegateFilter(0, keyRef, () => { dele.hit = true; });
   return runClaude("main", wrapped, {
     session,
     project,
@@ -2740,7 +2749,9 @@ function autoContinue(agent, project, keyRef, next, isDirector, dele) {
     // A breath between turns: the office reads as a team working, not a loop.
     setTimeout(() => {
       const d2 = { hit: false };
-      const df = isDirector ? makeDelegateFilter(0, key, () => { d2.hit = true; }) : null;
+      // keyRef, not the `key` snapshot: an AUTO round can land on a fresh thread
+      // (compaction forks one), and the report must follow the work, not the snapshot.
+      const df = isDirector ? makeDelegateFilter(0, keyRef, () => { d2.hit = true; }) : null;
       runClaude(agent, cont, {
         session: key || undefined, project,
         logPrompt: `🤖 AUTO: ทำต่อเอง (รอบ ${n}/${AUTOPILOT_MAX})`,
@@ -2754,8 +2765,18 @@ function autoContinue(agent, project, keyRef, next, isDirector, dele) {
 
 // DELEGATE:-line parser shared by the CEO order and every report-back turn.
 // onHit fires per dispatched assignment ("did he hand off more work?").
-function makeDelegateFilter(depth, session, onHit) {
+//
+// `sessionRef` is the thread the report-back must come home to. Pass the run's
+// `keyRef` — NOT a bare `session` string — on any path where the filter is built
+// before the run starts: a fresh thread has no key until runClaude's `onEntry`
+// fires, and a captured `undefined` means "continue the agent's LATEST thread",
+// which by report time is whatever the owner has opened since. That is how a
+// finished task ended up filed in a thread nobody was reading. See reportthread.js.
+function makeDelegateFilter(depth, sessionRef, onHit) {
   return (text) => {
+    // Resolve LATE: onEntry has run by the time any text is filtered, so this is
+    // the thread the turn actually landed on — not the one it was requested with.
+    const session = resolveThread(sessionRef);
     const keep = [];
     for (const ln of String(text).split("\n")) {
       // PROJECT: <name> @ <place ชื่อย่อ | full path> — the Director creates
@@ -2895,7 +2916,9 @@ function reportToMain(fromId, text, ok, depth, session) {
   queueDirectorTurn((release) => {
     const dele = { hit: false };
     const keyRef = { key: session || "" };
-    const df = depth < 2 ? makeDelegateFilter(depth + 1, session, () => { dele.hit = true; }) : null;
+    // keyRef starts pinned to `session` and onEntry keeps it honest, so a follow-up
+    // DELEGATE from this very report-back turn comes home to the same thread.
+    const df = depth < 2 ? makeDelegateFilter(depth + 1, keyRef, () => { dele.hit = true; }) : null;
     runClaude("main", wrapped + autoNote(), {
       session,
       noSub: true,
@@ -4267,7 +4290,12 @@ const server = http.createServer((req, res) => {
                 onDone: reply })
           : agent === "main"
             ? (() => {
-                const df = makeDelegateFilter(0, session, () => { dele.hit = true; });
+                // keyRef, not `session`: this is the path the owner uses all day.
+                // Talking to the Director on a fresh thread sends `session:
+                // undefined`, and that undefined used to ride down the whole
+                // delegation chain — so the team's answers came back to the wrong
+                // thread and the order looked like it was never answered.
+                const df = makeDelegateFilter(0, keyRef, () => { dele.hit = true; });
                 return runClaude("main", prompt + directorNote() + autoNote(),
                   { session, project, logPrompt: origPrompt,
                     filterText: (t) => stripStatus(df(t)),
@@ -6613,6 +6641,9 @@ end tell`;
             proj = createProject(p.name, "", path.join(playDir, p.name.replace(/[^\wก-๙ -]/g, "_")));
           } catch (e) { /* duplicate name → Director routes to the existing one */ }
           queueDirectorTurn((release) => {
+            // Same rule as every other dispatch path: the team's results must come
+            // back to THIS approval turn's thread, not to whatever is latest by then.
+            const keyRef = { key: "" };
             runClaude("main",
               `CEO อนุมัติข้อเสนอโปรเจคของทีมแล้ว 🎉\n` +
               `ชื่อ: ${p.name}\nไอเดีย: ${p.detail}\nผู้เสนอ: ${p.agents.join(", ")}\n` + noteLine +
@@ -6624,7 +6655,8 @@ end tell`;
               `ให้คนที่เสนอไอเดียได้ทำเป็นหลัก แล้วสรุปแผนสั้นๆ` +
               (note ? ` และนำข้อความของเจ้าของไปปรับทิศทางงานด้วย` : ""),
               { logPrompt: `✅ อนุมัติข้อเสนอ: ${p.name}`,
-                filterText: makeDelegateFilter(0, undefined),
+                filterText: makeDelegateFilter(0, keyRef),
+                onEntry: (k) => { keyRef.key = k; },
                 onDone: () => release() });
           });
         } else if (decision === "reject" && note) {
