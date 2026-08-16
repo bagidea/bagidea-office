@@ -1839,6 +1839,29 @@ function perAgentSettings(agent, picked, mcpNames) {
   }
 }
 
+// 📖 Extra directories an agent may READ (Aignition patch, 2026-08-16).
+//
+// An auditor that cannot reach the code it is auditing returns "no verificable" on
+// every checkbox that matters. The Reviewer said it plainly after the lock probe:
+// "confirmo el comportamiento, no la regla que lo produce" — the config that imposes
+// its own lock lived outside the project it runs in.
+//
+// This does NOT widen what it can DO. Write and Edit are denied outright, Bash is
+// scoped to its granted command shapes, and redirection is refused, so an extra
+// directory only extends the reach of Read/Grep/Glob. Verified by probe, not assumed:
+// see infra/bagidea-candado-por-agente.md.
+//
+// Owner-set, per agent, in the registry: "readDirs": ["<absolute path>", …].
+// Empty or missing → nothing is added, which is the default for everyone else.
+function addReadDirs(args, a) {
+  const dirs = (a && Array.isArray(a.readDirs) ? a.readDirs : [])
+    .map((d) => String(d || "").trim()).filter(Boolean);
+  for (const d of dirs) {
+    if (!fs.existsSync(d)) { console.error(`[readDirs] no existe, se omite: ${d}`); continue; }
+    args.push("--add-dir", d);
+  }
+}
+
 function runClaude(agent, prompt, opts = {}) {
   const task = "t" + ++taskCounter;
 
@@ -2012,6 +2035,7 @@ function runClaude(agent, prompt, opts = {}) {
     // per-agent copy of those settings plus the deny list built above.
     "--settings", settingsFile];
   if (mcpConfig) args.push("--mcp-config", mcpConfig);
+  addReadDirs(args, a);
   // Native skills: refresh this agent's SKILL.md files (hash-gated) and expose
   // them to the session — progressive disclosure, so bodies never hit the prompt.
   if (nativeSkills) {
@@ -2940,6 +2964,7 @@ function runSub(parentId, subId, taskText, entry, onDone) {
     // lock — and /perm/request already resolves "revisor#s1" back to "revisor".
     "--settings", perAgentSettings(parentId, picked, mcpNames)];
   if (mcpConfig) args.push("--mcp-config", mcpConfig);
+  addReadDirs(args, a);   // a ghost reads what its parent reads
   // Ghosts inherit the parent's native skills (additive — ghosts had none before).
   if (reg.nativeSkills !== false) {
     try {
