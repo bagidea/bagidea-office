@@ -141,6 +141,12 @@ function loadReg() {
   saveReg();
 }
 function saveReg() { fs.writeFileSync(REGISTRY, JSON.stringify(reg, null, 2)); }
+
+// Cambios de configuración propuestos por RRIA y todavía sin aprobar por Shino.
+// En memoria a propósito: si la oficina se reinicia, las propuestas se pierden y hay
+// que volver a proponerlas. Un cambio de permisos que sobrevive a un reinicio sin que
+// nadie lo mire es justamente lo que no queremos.
+const pendingCambios = new Map();
 loadReg();
 
 // 🌱 Eco mode (reg.ecoMode): ONE switch that cuts the office's idle token burn —
@@ -4617,6 +4623,103 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
       res.end(JSON.stringify({ ok: true, id, tools, model }));
     });
+
+  } else if (req.method === "POST" && req.url === "/registry/agent/propose") {
+    // 📝 Paso 1 de 2 — RRIA PROPONE un cambio sobre un agente que ya existe.
+    // Decisión de Sergio, 16/08: "lo que no puede hacer RRIA es tocar a Shino, no
+    // puede modificarse a sí misma. Y después sí, en tanto y en cuanto Shino apruebe."
+    //
+    // Proponer NO cambia nada. Queda pendiente hasta que Shino lo apruebe por la otra
+    // ruta. La separación es el control: RRIA propone y NO puede aprobar (no tiene el
+    // lanzador), Shino aprueba y NO puede proponer. Ninguno de los dos cierra el
+    // circuito solo, que es la regla madre del arnés aplicada a los permisos mismos.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      const no = (msg) => { res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, error: msg }));
+        console.log(`[cambio] propuesta rechazada — ${msg}`); };
+      let p;
+      try { p = JSON.parse(body); } catch { return no("cuerpo ilegible"); }
+
+      const id = String(p.id || "").trim();
+      if (!reg.agents[id]) return no(`"${id}" no existe — para crear está /registry/agent/create`);
+      // Los tres intocables. Shino porque es quien aprueba y no puede modificar a su
+      // propio revisor de facto; RRIA porque nadie se amplía a sí mismo; el CEO
+      // porque no es un agente, es el asiento de Sergio.
+      if (id === "main") return no("Shino (main) es intocable: es quien aprueba los cambios");
+      if (id === "rria") return no("RRIA no puede modificarse a sí misma");
+      if (id === "ceo") return no("el CEO no es un agente, es el asiento de Sergio");
+      if (!String(p.motivo || "").trim()) return no("falta el motivo del cambio");
+
+      const cambios = p.cambios && typeof p.cambios === "object" ? p.cambios : null;
+      if (!cambios) return no("falta el objeto 'cambios'");
+      const CAMPOS = new Set(["tools", "model", "prompt", "skills", "readDirs", "noTouch", "persona", "role", "name"]);
+      for (const k of Object.keys(cambios)) {
+        if (!CAMPOS.has(k)) return no(`campo no modificable por esta ruta: ${k}`);
+      }
+      if (cambios.model) {
+        const MODELOS = new Set(["claude-sonnet-5", "claude-haiku-4-5-20251001", "claude-opus-5"]);
+        if (!MODELOS.has(String(cambios.model))) return no(`modelo no permitido: ${cambios.model}`);
+      }
+      if (cambios.tools) {
+        const PERMITIDAS = new Set(["Read", "Glob", "Grep", "Skill", "Write", "Edit",
+          "WebSearch", "WebFetch", "TodoWrite"]);
+        if (!Array.isArray(cambios.tools)) return no("'tools' tiene que ser una lista");
+        for (const t of cambios.tools.map(String)) {
+          const bare = t.replace(/\(.*$/, "");
+          if (bare === "Bash") {
+            if (!/^Bash\(.+\)$/.test(t)) return no("Bash solo se concede acotado, nunca pelado");
+            continue;
+          }
+          if (!PERMITIDAS.has(bare)) return no(`herramienta no concedible por esta ruta: ${t}`);
+        }
+      }
+
+      const pid = "c" + crypto.randomBytes(4).toString("hex");
+      pendingCambios.set(pid, { id, cambios, motivo: String(p.motivo), por: "rria", ts: Date.now() });
+      console.log(`[cambio] propuesto ${pid} sobre ${id}: ${Object.keys(cambios).join(", ")}`);
+      broadcast({ type: "agent.cambio.propuesto", cambio: pid, agent: id,
+        campos: Object.keys(cambios), motivo: String(p.motivo) });
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: true, cambio: pid, agent: id, campos: Object.keys(cambios) }));
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/agent/approve") {
+    // ✅ Paso 2 de 2 — SHINO aprueba. Recién acá el cambio existe.
+    // Queda registrado con quién lo propuso, quién lo aprobó y qué campos tocó, para
+    // que Sergio lo vea pasar sin tener que estar en el medio.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      const no = (msg) => { res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, error: msg }));
+        console.log(`[cambio] aprobación rechazada — ${msg}`); };
+      let p;
+      try { p = JSON.parse(body); } catch { return no("cuerpo ilegible"); }
+      const pid = String(p.cambio || "").trim();
+      const c = pendingCambios.get(pid);
+      if (!c) return no(`no hay ningún cambio pendiente con id "${pid}"`);
+      if (!reg.agents[c.id]) { pendingCambios.delete(pid); return no(`"${c.id}" ya no existe`); }
+
+      const antes = {};
+      for (const [k, v] of Object.entries(c.cambios)) {
+        antes[k] = reg.agents[c.id][k];
+        reg.agents[c.id][k] = v;
+      }
+      reg.agents[c.id].cambioPor = { propuso: c.por, aprobo: "main", ts: Date.now() };
+      pendingCambios.delete(pid);
+      saveReg();
+      console.log(`[cambio] APLICADO ${pid} sobre ${c.id}: ${Object.keys(c.cambios).join(", ")}`);
+      broadcast({ type: "agent.cambio.aplicado", cambio: pid, agent: c.id,
+        campos: Object.keys(c.cambios), motivo: c.motivo, propuso: c.por, aprobo: "main", antes });
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: true, cambio: pid, agent: c.id, campos: Object.keys(c.cambios) }));
+    });
+
+  } else if (req.method === "GET" && req.url === "/registry/agent/pending") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify([...pendingCambios.entries()].map(([pid, c]) => ({
+      cambio: pid, agent: c.id, campos: Object.keys(c.cambios), motivo: c.motivo, por: c.por,
+    }))));
 
   } else if (req.method === "POST" && req.url === "/registry/agent/delete") {
     // Owner-only — a teammate must not be able to remove other teammates.
