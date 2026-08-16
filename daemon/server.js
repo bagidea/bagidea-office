@@ -1873,6 +1873,9 @@ function perAgentSettings(agent, picked, mcpNames) {
     // "read-only" agent could still WRITE to those services. If the owner granted
     // this agent no MCP server, deny the whole surface.
     if (!mcpNames.length) deny.push("mcp__*");
+    // Nota: ToolSearch NO se agrega acá. Se probó, y no sirve — el hook PreToolUse
+    // pregunta igual y la respuesta la decide /perm/request contra la lista de tools
+    // del registro. La concesión vive allá; ver el comentario en esa ruta.
     base.permissions = { ...(base.permissions || {}), deny,
       allow: [...((base.permissions || {}).allow || []), ...scoped] };
     const f = path.join(__dirname,
@@ -6502,11 +6505,29 @@ end tell`;
         ...(((reg.agents[base] || {}).tools) || []),
         ...(((reg.autoAllow || {})[base]) || []),
       ];
+      const tieneMcp = granted.some((g) => g.startsWith("mcp:"));
       const isGranted = granted.includes(tool) ||
         // MCP grants are stored as "mcp:<server>"; hook tool names arrive
         // as "mcp__<server>__<tool>".
         granted.some((g) => g.startsWith("mcp:") &&
-          String(tool).startsWith("mcp__" + g.slice(4) + "__"));
+          String(tool).startsWith("mcp__" + g.slice(4) + "__")) ||
+        // Conceder un servidor MCP sin ToolSearch es conceder nada: las herramientas
+        // MCP llegan diferidas y ToolSearch es lo único que carga sus esquemas. Sin
+        // esto el agente pide tarjeta para poder usar lo que YA se le dio, y con nadie
+        // mirando la pantalla se le vence y vuelve al camino viejo.
+        //
+        // Pasó con RRIA el 16/08: se le sacó la consola y se le dieron sus tres
+        // operaciones por MCP, y quedó pidiendo ToolSearch en cada corrida — dos veces
+        // vencida por timeout, y las que sí pasaron fueron con Sergio clickeando. Es
+        // el mismo defecto que candado-rendija: un permiso que depende de un clic.
+        //
+        // Va acá, en la puerta que decide de verdad, y NO en el `allow` del settings:
+        // ese archivo lo consulta Claude Code, pero el hook PreToolUse pregunta igual
+        // y la respuesta sale de esta lista. Se probó al revés primero y no sirvió.
+        //
+        // No amplía nada: ToolSearch solo LEE definiciones de herramientas. Ejecutar
+        // sigue pasando por su propia regla, y un agente sin MCP tiene `mcp__*` negado.
+        (tieneMcp && tool === "ToolSearch");
       if (isGranted) {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ decision: "allow" }));
