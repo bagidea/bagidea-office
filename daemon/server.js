@@ -1804,7 +1804,23 @@ function perAgentSettings(agent, picked, mcpNames) {
     // "Agent"/"Workflow" spawn sub-agents that would carry their OWN tool sets,
     // so they are denied too unless granted — otherwise they are a hole around
     // this whole mechanism.
-    const deny = [...Object.keys(BUILTIN_TOOLS), "Agent", "Workflow"]
+    //
+    // 🔒 BUILTIN_TOOLS is the MENU BagIdea offers the owner, not the set of tools
+    // Claude Code actually ships. Building the deny list from the menu means every
+    // tool the menu doesn't list stays reachable. Found the hard way: with Bash
+    // locked down to its granted shapes, the read-only Reviewer reached for
+    // `PowerShell` — `Set-Content -Path PRUEBA-ESCRITURA.txt` — and it was never
+    // denied, because PowerShell isn't on the menu. It only failed because nobody
+    // was awake to stamp the card, which is the failure mode this patch exists to
+    // remove. So the write channels Claude Code ships outside the menu are named
+    // here explicitly. `Artifact` is on the list for the same reason as the rest:
+    // it publishes content to the web, and an auditor that can publish is not
+    // read-only. (Tools that only READ or SCHEDULE — CronCreate, EnterWorktree,
+    // SendMessage and the others — are deliberately NOT here: making "read-only"
+    // literal is Sergio's open decision, see infra/bagidea-candado-por-agente.md.)
+    const OFF_MENU_WRITE_TOOLS = ["PowerShell", "Artifact"];
+    const deny = [...Object.keys(BUILTIN_TOOLS), "Agent", "Workflow",
+      ...OFF_MENU_WRITE_TOOLS]
       .filter((t, i, a) => a.indexOf(t) === i && !keep.has(t));
     // Account-level MCP connectors (claude.ai: Drive, Notion, Supabase, Shopify…)
     // ride in with the authenticated session, NOT through --mcp-config, so a
