@@ -1,0 +1,47 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\\\Users\\\\sbras\\\\AppData\\\\Local\\\\BagIdeaOffice\\\\daemon\\\\perm.js\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "Edit",
+      "Write",
+      "WebSearch",
+      "WebFetch",
+      "Task",
+      "TodoWrite",
+      "NotebookEdit",
+      "BashOutput",
+      "KillShell",
+      "SlashCommand",
+      "Agent",
+      "Workflow",
+      "PowerShell",
+      "Artifact",
+      "mcp__*"
+    ],
+    "allow": [
+      "Bash(bash arnes/init.sh:*)",
+      "Bash(npm test:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx eslint:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git status:*)",
+      "Bash(git show:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git branch:*)",
+      "Bash(echo:*)"
+    ]
+  }
+}
