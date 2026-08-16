@@ -37,6 +37,7 @@ const { stripStatus, verdict: autoVerdict, readStatus } = require("./autopilot")
 const projtrust = require("./projecttrust");
 const joborder = require("./joborder");
 const { resolveThread } = require("./reportthread");
+const artifact = require("./artifact");
 const { wireWorkspaceSettings } = require("./wire-hooks-runtime");
 const { killTree } = require("./kill-tree");   // cross-platform child reap (issue #15 review)
 
@@ -1898,8 +1899,12 @@ function perAgentSettings(agent, picked, mcpNames) {
 //
 // Owner-set, per agent, in the registry: "readDirs": ["<absolute path>", …].
 // Empty or missing → nothing is added, which is the default for everyone else.
-function addReadDirs(args, a) {
+// `extra` is per-RUN rather than per-agent: the artifact folder is granted only
+// on the turns that actually reference a file in it, so a standing grant never
+// widens what an agent can reach for the rest of its life.
+function addReadDirs(args, a, extra) {
   const dirs = (a && Array.isArray(a.readDirs) ? a.readDirs : [])
+    .concat(Array.isArray(extra) ? extra : [])
     .map((d) => String(d || "").trim()).filter(Boolean);
   for (const d of dirs) {
     if (!fs.existsSync(d)) { console.error(`[readDirs] no existe, se omite: ${d}`); continue; }
@@ -2080,7 +2085,7 @@ function runClaude(agent, prompt, opts = {}) {
     // per-agent copy of those settings plus the deny list built above.
     "--settings", settingsFile];
   if (mcpConfig) args.push("--mcp-config", mcpConfig);
-  addReadDirs(args, a);
+  addReadDirs(args, a, opts.addDirs);
   // Native skills: refresh this agent's SKILL.md files (hash-gated) and expose
   // them to the session — progressive disclosure, so bodies never hit the prompt.
   if (nativeSkills) {
@@ -2863,7 +2868,7 @@ function makeDelegateFilter(depth, sessionRef, onHit) {
 function verifyThenReport(fromId, task, out, ok, depth, session, proj) {
   // Eco mode skips the QA double-pass — it re-runs a whole review turn per
   // delegated task, the single biggest optional token cost in the office.
-  if (!reg.verifyDelegated || reg.ecoMode || !ok) return reportToMain(fromId, out, ok, depth, session);
+  if (!reg.verifyDelegated || reg.ecoMode || !ok) return reportToMain(fromId, out, ok, depth, session, task);
   const a = reg.agents[fromId] || { name: fromId };
   // Snapshot the assignee's WORK thread now — before the review run spawns a new one.
   const wl = sess[fromId] || [];
@@ -2883,7 +2888,7 @@ function verifyThenReport(fromId, task, out, ok, depth, session, proj) {
     onDone: (verdict, vok) => {
       const txt = String(verdict || "");
       const flagged = vok && /(^|\n)\s*ISSUES\s*:/i.test(txt) && !/^\s*APPROVED\s*$/im.test(txt);
-      if (!flagged) return reportToMain(fromId, out, ok, depth, session);  // approved / inconclusive → ship
+      if (!flagged) return reportToMain(fromId, out, ok, depth, session, task);  // approved / inconclusive → ship
       // One fix-back loop: hand the findings to the assignee on their own thread, then
       // report the revised result (no second review — bounded).
       const fixPrompt =
@@ -2893,26 +2898,46 @@ function verifyThenReport(fromId, task, out, ok, depth, session, proj) {
         project: proj, session: workSess, noSub: true,
         logPrompt: `🛠 ${a.name} แก้งานตามรีวิว`,
         onDone: (out2, ok2) =>
-          reportToMain(fromId, `${out2}\n\n(ตรวจแล้ว + แก้ตามรีวิว)`, ok2, depth, session),
+          reportToMain(fromId, `${out2}\n\n(ตรวจแล้ว + แก้ตามรีวิว)`, ok2, depth, session, task),
       });
     },
   });
 }
 
-function reportToMain(fromId, text, ok, depth, session) {
+// Where teammates' reports are filed. Inside the workspace so it travels with
+// the office and is reachable from any thread via --add-dir. See artifact.js for
+// why the report goes to disk instead of into the Director's thread.
+const ARTIFACTS = path.join(WORKSPACE, "informes");
+
+// Write one report to disk and hand back its path, or null if that failed.
+// Fails OPEN on purpose: a report that costs too much is bad, a report that
+// vanishes is worse, so a write error falls back to the old inline behaviour.
+function fileReport(fromId, name, text, ok, task) {
+  try {
+    fs.mkdirSync(ARTIFACTS, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const file = path.join(ARTIFACTS, artifact.reportFileName(fromId, stamp));
+    fs.writeFileSync(file, artifact.reportFileBody({
+      name, fromId, ok, task, when: new Date().toISOString(), text,
+    }), "utf8");
+    return file;
+  } catch (e) {
+    console.error("[artifact] no se pudo guardar el informe:", e.message);
+    return null;
+  }
+}
+
+function reportToMain(fromId, text, ok, depth, session, task) {
   const a = reg.agents[fromId] || { name: fromId };
-  const wrapped =
-    `Report back from your team member ${a.name} (${fromId})` +
-    (ok ? "" : " — THE TASK FAILED") + `:\n` +
-    `"""${String(text || "(no result)").slice(0, 6000)}"""\n\n` +
-    (depth < 2
-      ? `If they asked you a question or something is missing, answer / follow ` +
-        `up with a line: DELEGATE: ${fromId} :: <your answer or next instruction> ` +
-        `(exact format — it resumes their session with full context). ` +
-        `If the work is complete, write the final summary for the owner (CEO): ` +
-        `clear, concrete, in the language of the original order.`
-      : `Write the final summary for the owner (CEO) now — clear, concrete, in ` +
-        `the language of the original order. Do not delegate further.`);
+  // The artifact pattern: the full result lives in a file; the thread carries a
+  // head plus the path. Without this the whole report is re-sent as cached input
+  // on EVERY later turn of this thread — the single largest line in the office's
+  // bill (see artifact.js for the measured split).
+  const { head, full, truncated } = artifact.splitReport(text || "(no result)");
+  const file = fileReport(fromId, a.name, full, ok, task);
+  const wrapped = artifact.buildReportPrompt({
+    name: a.name, fromId, ok, depth, head, truncated, full, file,
+  });
   queueDirectorTurn((release) => {
     const dele = { hit: false };
     const keyRef = { key: session || "" };
@@ -2922,6 +2947,8 @@ function reportToMain(fromId, text, ok, depth, session) {
     runClaude("main", wrapped + autoNote(), {
       session,
       noSub: true,
+      // Granted only on this turn, and only when there is a file to open.
+      addDirs: file ? [ARTIFACTS] : undefined,
       logPrompt: `📨 รายงานผลจาก ${a.name}`,
       filterText: df ? (t) => stripStatus(df(t)) : (t) => stripStatus(t),
       onEntry: (k) => { keyRef.key = k; },
