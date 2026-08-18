@@ -107,6 +107,17 @@ the installer** (re-running is safe; no data is lost).
     chat head disappear; the wallpaper office keeps living on your desktop.
 - Click the item again to bring things back.
 
+**The chat window is frozen — it draws but nothing reacts**
+- Right-click the tray icon → **Reload chat window**. It rebuilds the page in place
+  and puts the window back to its normal size and position. The daemon is untouched,
+  so agents that are mid-task keep running — try this before **Restart office**.
+- Seen after switching between window modes (⛶ large / 📡 feed) on Windows: the
+  window keeps resizing but the page stays on its last drawn frame. 0.9.51 removed
+  the two things the shell did to that window that WebView2 doesn't support
+  (flipping the window's resizable style and dimming it with a layered-window
+  alpha — the feed's see-through look is plain CSS now). If it still happens,
+  please open an issue with what you did just before it froze.
+
 **The 3D Editor won't open on this machine**
 - Fixed in 0.9.45: the launcher now checks every place the Godot engine can live
   (the app's own copy, `BAGIDEA_GODOT`, the installer's tools folder) and tells you

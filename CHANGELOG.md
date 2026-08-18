@@ -6,6 +6,39 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+## [0.9.51] — 🪟 A window that comes back
+
+**Fixed**
+- **The chat window could come back from a mode switch dead.** Going ⛶ large, then
+  📡 feed, then back left the window drawing its last frame forever: the window
+  itself resized and moved correctly, but the page inside never repainted again —
+  no hover, no new messages, nothing but a restart. Two things this shell did to
+  that window are things WebView2 does not support being hosted through, and both
+  sat in exactly that path. Both are gone:
+  - the window's **resizable style is no longer flipped** on every ⛶ toggle (it is
+    born resizable and stays that way — the OS resize handles are unreachable
+    behind the webview either way, so large mode's edge strips are still the only
+    way to drag it);
+  - the feed strip's **see-through look is CSS now**, not a layered-window alpha
+    (`WS_EX_LAYERED` on Windows, `NSWindow.alphaValue` on macOS). One look, one
+    implementation, every platform.
+
+  Honest caveat: the freeze could not be reproduced on demand — around 30 scripted
+  mode switches never triggered it — so this removes the hazards rather than a
+  proven cause. Hence the rescue below.
+
+**Added**
+- **Tray → "Reload chat window".** First aid for a chat window that has stopped
+  responding: it rebuilds the page and puts the window back to its normal size,
+  position and mode — **without touching the daemon**, so agents that are mid-task
+  keep running. Use it before **Restart office**, which takes the whole stack down.
+
+**Changed**
+- Leaving ⛶ large now **clears the size floor** it had set. The floor exists so a
+  stretched large window can't be dragged below the normal size; leaving it in
+  place afterwards meant mini (390×430) and the feed strip (330 wide) were smaller
+  than a minimum that was still nominally in force.
+
 ## [0.9.50] — 🌱 Not just agents. An ecosystem.
 
 **Added**

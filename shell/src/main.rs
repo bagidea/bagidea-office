@@ -425,9 +425,9 @@ mod platform {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         EnumWindows, FindWindowExW, FindWindowW, GetAncestor, GetClassNameW, GetWindowLongW,
         GetWindowThreadProcessId, GetWindowRect, IsIconic, IsWindow,
-        IsWindowVisible, SendMessageTimeoutW, SetLayeredWindowAttributes, SetParent,
-        SetWindowLongW, ShowWindow, SystemParametersInfoW, GA_PARENT, GWL_EXSTYLE, LWA_ALPHA,
-        SMTO_NORMAL, SPI_SETDESKWALLPAPER, SW_HIDE, SW_SHOW, WS_EX_LAYERED,
+        IsWindowVisible, SendMessageTimeoutW, SetParent,
+        SetWindowLongW, ShowWindow, SystemParametersInfoW, GA_PARENT, GWL_EXSTYLE,
+        SMTO_NORMAL, SPI_SETDESKWALLPAPER, SW_HIDE, SW_SHOW,
         WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
     };
     use std::io::Write;
@@ -1211,20 +1211,6 @@ mod platform {
         }
     }
 
-    pub fn set_feed_alpha(window: &Window, feed: bool) {
-        unsafe {
-            let hwnd = window.hwnd() as HWND;
-            let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
-            if feed {
-                SetWindowLongW(hwnd, GWL_EXSTYLE, (ex | WS_EX_LAYERED) as i32);
-                SetLayeredWindowAttributes(hwnd, 0, 196, LWA_ALPHA);
-            } else {
-                SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
-                SetWindowLongW(hwnd, GWL_EXSTYLE, (ex & !WS_EX_LAYERED) as i32);
-            }
-        }
-    }
-
     pub fn webview_extras<'a>(b: wry::WebViewBuilder<'a>) -> wry::WebViewBuilder<'a> {
         use wry::WebViewBuilderExtWindows;
         // Edge's "Saved info" autofill bubbles are noise on an app UI.
@@ -1677,16 +1663,6 @@ mod platform {
         round_corners(window, d / 2.0);
     }
 
-    pub fn set_feed_alpha(window: &Window, feed: bool) {
-        unsafe {
-            let w = window.ns_window() as *mut AnyObject;
-            if !w.is_null() {
-                let a: f64 = if feed { 0.77 } else { 1.0 };
-                let _: () = msg_send![w, setAlphaValue: a];
-            }
-        }
-    }
-
     pub fn webview_extras<'a>(b: wry::WebViewBuilder<'a>) -> wry::WebViewBuilder<'a> {
         b
     }
@@ -1927,7 +1903,6 @@ mod platform {
     pub fn suppress_nc(_w: &Window) {}
     pub fn region_round(_w: &Window, _a: f64, _b: f64, _r: f64) {}
     pub fn region_circle(_w: &Window, _d: f64) {}
-    pub fn set_feed_alpha(_w: &Window, _f: bool) {}
     pub fn webview_extras<'a>(b: wry::WebViewBuilder<'a>) -> wry::WebViewBuilder<'a> { b }
     pub fn is_autostart() -> bool { false }
     pub fn set_autostart(_on: bool) {}
@@ -1948,13 +1923,14 @@ fn chrome_window(
     y: f64,
     icon: Option<Icon>,
     transparent: bool,
+    resizable: bool,
 ) -> Window {
     let mut b = WindowBuilder::new()
         .with_title(title)
         .with_inner_size(LogicalSize::new(w, h))
         .with_position(LogicalPosition::new(x, y))
         .with_decorations(false)
-        .with_resizable(false)
+        .with_resizable(resizable)
         .with_always_on_top(true);
     // Per-pixel alpha so a rounded/circular shape comes from the page's anti-aliased
     // CSS border-radius — NOT a hard-edged SetWindowRgn clip (which looks jagged).
@@ -2128,6 +2104,9 @@ fn main() {
     //   hidechat_item = chat + chat-head gone, wallpaper stays alive
     let hide_item = CheckMenuItem::new("Hide everything (agents keep working)", true, false, None);
     let hidechat_item = CheckMenuItem::new("Hide chat + button (wallpaper stays)", true, false, None);
+    // First aid before the sledgehammer: reloading the page brings a wedged chat
+    // window back WITHOUT touching the daemon, so nobody's agent loses its run.
+    let reload_item = MenuItem::new("Reload chat window", true, None);
     let restart_item = MenuItem::new("Restart office", true, None);
     let autostart_item = CheckMenuItem::new(platform::AUTOSTART_LABEL, true, platform::is_autostart(), None);
     let exit_item = MenuItem::new("Exit BagIdea Office", true, None);
@@ -2135,6 +2114,7 @@ fn main() {
         &open_item,
         &hide_item,
         &hidechat_item,
+        &reload_item,
         &restart_item,
         &autostart_item,
         &PredefinedMenuItem::separator(),
@@ -2149,6 +2129,7 @@ fn main() {
     let open_id = open_item.id().clone();
     let hide_id = hide_item.id().clone();
     let hidechat_id = hidechat_item.id().clone();
+    let reload_id = reload_item.id().clone();
     let restart_id = restart_item.id().clone();
     let autostart_id = autostart_item.id().clone();
     let exit_id = exit_item.id().clone();
@@ -2182,7 +2163,7 @@ fn main() {
     // ---- boot splash: a pulsing circular logo, centered
     let splash = chrome_window(
         &event_loop, "BagIdea", SPLASH_SIZE, SPLASH_SIZE,
-        (logical_w - SPLASH_SIZE) / 2.0, (logical_h - SPLASH_SIZE) / 2.0 - 30.0, None, true,
+        (logical_w - SPLASH_SIZE) / 2.0, (logical_h - SPLASH_SIZE) / 2.0 - 30.0, None, true, false,
     );
     platform::set_no_activate(&splash);
     let _splash_view = WebViewBuilder::new()
@@ -2193,8 +2174,17 @@ fn main() {
     let _splash_id = splash.id();
 
     // ---- overlay (born visible but parked off-screen)
+    // BORN RESIZABLE and never flipped back. The mode toggles used to restyle this
+    // window's frame (WS_THICKFRAME on for ⛶ large, off again on the way out) —
+    // restyling the frame of a live WebView2 host is not a supported thing to do,
+    // and it sat right in the path where a window came back from large/feed DEAD:
+    // drawing its last frame forever while the window resized underneath it.
+    // Never reproduced on demand, so this is removing a hazard rather than a proven
+    // cause. Nothing is lost by staying resizable: the webview covers the whole
+    // frameless window, so the OS resize handles are unreachable and large mode's
+    // JS edge strips remain the only way to drag an edge.
     let overlay = chrome_window(
-        &event_loop, "BagIdea Office", FULL.0, FULL.1, PARK.0, PARK.1, app_icon(), false,
+        &event_loop, "BagIdea Office", FULL.0, FULL.1, PARK.0, PARK.1, app_icon(), false, true,
     );
     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
     let overlay_id = overlay.id();
@@ -2232,7 +2222,7 @@ fn main() {
 
     // ---- circular chat head
     let orb = chrome_window(
-        &event_loop, "BagIdea", ORB_SIZE, ORB_SIZE, orb_x, orb_y, app_icon(), true,
+        &event_loop, "BagIdea", ORB_SIZE, ORB_SIZE, orb_x, orb_y, app_icon(), true, false,
     );
     platform::set_no_activate(&orb);
     platform::suppress_nc(&orb);   // swallow non-client paint → no white caption bar on click
@@ -2361,6 +2351,23 @@ fn main() {
                     orb.set_outer_position(LogicalPosition::new(orb_x, orb_y));
                     raise_orb(&orb);
                 }
+            } else if ev.id == reload_id {
+                // Re-navigate rather than reload(): a fresh document is built even if
+                // the current one is the thing that got stuck. A fresh page has no mode
+                // classes, so put the WINDOW back to the plain one as well — otherwise
+                // the shell would still think it is in feed/large while the page no
+                // longer is. Rescue lands you in the normal window, on screen, in front.
+                feed = false;
+                large = false;
+                mini = false;
+                overlay.set_min_inner_size(None::<LogicalSize<f64>>);
+                overlay.set_inner_size(LogicalSize::new(FULL.0, FULL.1));
+                overlay.set_outer_position(LogicalPosition::new(overlay_x, overlay_y));
+                platform::region_round(&overlay, FULL.0, FULL.1, 18.0);
+                let _ = overlay.set_ignore_cursor_events(false);
+                let _ = overlay_view.load_url("http://127.0.0.1:8787/");
+                overlay.set_focus();
+                raise_orb(&orb);
             } else if ev.id == restart_id {
                 // The daemon does a detached relaunch that outlives us being killed.
                 post_restart();
@@ -2505,14 +2512,18 @@ fn main() {
                             mini = false;
                             // Owner's call: large OPENS FULLSCREEN — whoever wants it
                             // smaller drags an edge down (never below FULL, the floor).
-                            overlay.set_resizable(true);
+                            // (The window is always resizable — see the overlay's
+                            // construction; only the size floor moves with the mode.)
                             overlay.set_min_inner_size(Some(LogicalSize::new(FULL.0, FULL.1)));
                             overlay.set_inner_size(LogicalSize::new(logical_w, logical_h));
                             overlay.set_outer_position(LogicalPosition::new(0.0, 0.0));
                             overlay.set_focus();
                             // Resized fires next and clips the region to the real size.
                         } else {
-                            overlay.set_resizable(false);
+                            // Drop the large-mode floor first: mini (390×430) and the
+                            // feed strip (330 wide) are both below it, and a stale
+                            // minimum silently clamps whatever comes next.
+                            overlay.set_min_inner_size(None::<LogicalSize<f64>>);
                             overlay.set_inner_size(LogicalSize::new(FULL.0, FULL.1));
                             overlay.set_outer_position(LogicalPosition::new(overlay_x, overlay_y));
                             platform::region_round(&overlay, FULL.0, FULL.1, 18.0);
@@ -2535,16 +2546,21 @@ fn main() {
                 }
                 UserEvent::FeedToggle => {
                     if large {
-                        // Feed replaces large — drop resizability before shrinking.
+                        // Feed replaces large — drop the FULL size floor before
+                        // shrinking to a 330px strip.
                         large = false;
-                        overlay.set_resizable(false);
+                        overlay.set_min_inner_size(None::<LogicalSize<f64>>);
                         let _ = overlay_view.evaluate_script("window.setLargeMode && setLargeMode(false)");
                     }
                     feed = !feed;
                     let _ = overlay_view.evaluate_script(&format!(
                         "window.setFeedMode && setFeedMode({})", feed));
                     let _ = overlay.set_ignore_cursor_events(false);
-                    platform::set_feed_alpha(&overlay, feed);
+                    // Feed translucency is CSS (html.feedmode) now, never an OS window
+                    // alpha. WS_EX_LAYERED on a WebView2 host is the second thing this
+                    // shell did that WebView2 doesn't support, and flipping it off on
+                    // the way out of feed is the other half of the path where the page
+                    // came back frozen. One look, one implementation, all platforms.
                     if feed {
                         overlay.set_inner_size(LogicalSize::new(FEED_W, feed_h));
                         overlay.set_outer_position(LogicalPosition::new(feed_x, feed_y));

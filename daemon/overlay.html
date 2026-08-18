@@ -383,9 +383,18 @@
      they were left in (the "modal stuck in feed mode" report). */
   body.feedmode #modal, body.feedmode #fsPick, body.feedmode #sessMenu,
   body.feedmode #dayMenu { display: none !important; }
-  /* Mouse-over = reading: the glass turns near-solid so text pops. */
-  body.feedmode { background: rgba(4, 7, 13, 0.92); transition: background 0.3s; }
-  body.feedmode:hover { background: rgba(4, 7, 13, 0.985); }
+  /* Mouse-over = reading: the glass turns near-solid so text pops.
+     The translucency lives HERE, on the page — never on the OS window. The shell
+     used to dim the whole window with WS_EX_LAYERED (and an NSWindow alpha on
+     macOS); a layered window is not something WebView2 supports being hosted in,
+     and flipping that flag off on the way out of feed mode sat in the path where
+     the page came back frozen on its last frame. The class is set on <html> too,
+     because the canvas background is the root's — dimming only <body> leaves an
+     opaque sheet behind it. */
+  /* 0.78 idle = the 196/255 window alpha this used to be, to the eye. */
+  html.feedmode { background: rgba(4, 7, 13, 0.78); transition: background 0.3s; }
+  html.feedmode:hover { background: rgba(4, 7, 13, 0.96); }
+  body.feedmode { background: transparent; }
   body.feedmode #feedHead {
     display: flex; align-items: center; gap: 7px;
     position: fixed; top: 0; left: 0; right: 0; height: 30px; padding: 0 12px;
@@ -2149,6 +2158,9 @@
     // feed cards) → the Security Center folds; pending requests keep it open.
     if (!on && !permsEl.querySelector(".perm")) setSide(false);
     document.body.classList.toggle("feedmode", on);
+    // <html> carries it as well: the canvas background comes from the root, so the
+    // feed's see-through glass has to be set there (see the CSS note).
+    document.documentElement.classList.toggle("feedmode", on);
     if (on) feedEl.scrollTop = 0;  // column-reverse: 0 = the live bottom edge
   };
   // column-reverse stream: newest = FIRST child (renders at the bottom),
