@@ -390,11 +390,16 @@
      and flipping that flag off on the way out of feed mode sat in the path where
      the page came back frozen on its last frame. The class is set on <html> too,
      because the canvas background is the root's — dimming only <body> leaves an
-     opaque sheet behind it. */
-  /* 0.78 idle = the 196/255 window alpha this used to be, to the eye. */
-  html.feedmode { background: rgba(4, 7, 13, 0.78); transition: background 0.3s; }
-  html.feedmode:hover { background: rgba(4, 7, 13, 0.96); }
-  body.feedmode { background: transparent; }
+     opaque sheet behind it.
+     Matching the old look takes BOTH halves: the window alpha (196/255 ≈ 0.77)
+     faded the cards, the avatars and the text as much as the backdrop — that
+     ghosted-over-your-desktop feel IS feed mode. So: a see-through canvas AND the
+     same fade on the page's own ink. Hover brings both back to solid, which is
+     when you actually read it. */
+  html.feedmode { background: rgba(6, 10, 16, 0.77); transition: background 0.3s; }
+  html.feedmode:hover { background: rgba(6, 10, 16, 0.95); }
+  body.feedmode { background: transparent; opacity: 0.77; transition: opacity 0.3s; }
+  body.feedmode:hover { opacity: 1; }
   body.feedmode #feedHead {
     display: flex; align-items: center; gap: 7px;
     position: fixed; top: 0; left: 0; right: 0; height: 30px; padding: 0 12px;

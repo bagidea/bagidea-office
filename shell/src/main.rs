@@ -2183,8 +2183,12 @@ fn main() {
     // cause. Nothing is lost by staying resizable: the webview covers the whole
     // frameless window, so the OS resize handles are unreachable and large mode's
     // JS edge strips remain the only way to drag an edge.
+    // TRANSPARENT, like the orb and the splash: 📡 feed mode is supposed to ghost
+    // over your desktop, and that see-through used to come from an OS window alpha
+    // we no longer set. With per-pixel alpha the page decides — opaque `body`
+    // background in chat/large mode, a translucent canvas in feed mode.
     let overlay = chrome_window(
-        &event_loop, "BagIdea Office", FULL.0, FULL.1, PARK.0, PARK.1, app_icon(), false, true,
+        &event_loop, "BagIdea Office", FULL.0, FULL.1, PARK.0, PARK.1, app_icon(), true, true,
     );
     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
     let overlay_id = overlay.id();
@@ -2192,6 +2196,7 @@ fn main() {
     let overlay_view = platform::webview_extras(
         WebViewBuilder::new()
             .with_url("http://127.0.0.1:8787/")
+            .with_transparent(true)   // the window's alpha is only real if the surface has one
             .with_devtools(true)
             .with_ipc_handler(move |req| {
                 let _ = match req.body().as_str() {

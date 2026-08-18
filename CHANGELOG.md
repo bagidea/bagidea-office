@@ -6,6 +6,19 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+## [0.9.52] — 📡 The feed goes see-through again
+
+**Fixed**
+- **Feed mode lost its glass in 0.9.51.** Dropping the layered-window alpha took
+  the see-through with it: the office window has always been an *opaque* window, so
+  once the OS stopped dimming it, no amount of CSS transparency could show your
+  desktop through the strip — the feed became a solid grey panel sitting on your
+  wallpaper. The window itself is now **per-pixel transparent** (the same way the
+  chat head and the boot splash already were), so the page decides: an opaque
+  `body` background in chat and ⛶ large mode, a translucent canvas plus the old
+  0.77 fade on cards, avatars and text in 📡 feed. Hovering the strip still brings
+  it back to near-solid for reading. The layered-window trick stays gone.
+
 ## [0.9.51] — 🪟 A window that comes back
 
 **Fixed**
