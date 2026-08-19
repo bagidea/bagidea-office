@@ -383,32 +383,19 @@
      they were left in (the "modal stuck in feed mode" report). */
   body.feedmode #modal, body.feedmode #fsPick, body.feedmode #sessMenu,
   body.feedmode #dayMenu { display: none !important; }
-  /* Mouse-over = reading: the glass turns solid so text pops.
-     The translucency lives HERE, on the page — never on the OS window. The shell
-     used to dim the whole window with WS_EX_LAYERED (and an NSWindow alpha on
-     macOS); a layered window is not something WebView2 supports being hosted in,
-     and flipping that flag off on the way out of feed mode sat in the path where
-     the page came back frozen on its last frame.
-     The look has to be reproduced EXACTLY, and the only faithful way is the way
-     the OS did it: paint the page fully opaque, then fade the finished result
-     once. `opacity` on <body> is that single fade — same maths as LWA_ALPHA 196
-     (196/255 ≈ 0.77). Splitting it in two (a see-through canvas AND a faded body)
-     is NOT the same picture: the cards end up double-covered and go near-solid
-     while the 6px gutter around them still shows the desktop at full strength, so
-     the window's edge lights up as a pale frame. One fade, one layer. */
-  html.feedmode {
-    background-color: transparent;
-    /* Deliberately not `none`: with a fully transparent root background the canvas
-       steals <body>'s background, and a propagated background paints OUTSIDE
-       body's layer — where `opacity` below can never reach it. A transparent
-       gradient still counts as an image, which keeps body's paint on body. */
-    background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
-  }
-  body.feedmode { opacity: 0.77; transition: opacity 0.3s; }
-  body.feedmode:hover { opacity: 1; }
+  /* The feed's ghost-over-your-desktop translucency is the SHELL's job, not this
+     stylesheet's — one uniform alpha on the window (see set_feed_alpha). v0.9.51
+     and v0.9.52 tried to do it here, on a per-pixel-transparent window, and the
+     page cannot: only some of its layers reach the desktop, so the gutter, the
+     header and the corners sat on an opaque backing and lit up as a pale frame.
+     Keep every surface below OPAQUE. */
   body.feedmode #feedHead {
     display: flex; align-items: center; gap: 7px;
     position: fixed; top: 0; left: 0; right: 0; height: 30px; padding: 0 12px;
+    /* The head paints over body's top corners, so it has to carry the same round
+       or the strip ends up with two soft corners at the bottom and two square ones
+       at the top. 17px = the house 18px less body's 1px border. */
+    border-radius: 17px 17px 0 0;
     font-size: 10.5px; letter-spacing: 2px; color: #9fb6d8; font-weight: 700;
     background: rgba(16, 24, 42, 0.85); border-bottom: 1px solid var(--line);
   }
@@ -2169,9 +2156,6 @@
     // feed cards) → the Security Center folds; pending requests keep it open.
     if (!on && !permsEl.querySelector(".perm")) setSide(false);
     document.body.classList.toggle("feedmode", on);
-    // <html> carries it as well: the canvas background is the root's, and it has
-    // to step out of the way so body's fade is what reaches the desktop (CSS note).
-    document.documentElement.classList.toggle("feedmode", on);
     if (on) feedEl.scrollTop = 0;  // column-reverse: 0 = the live bottom edge
   };
   // column-reverse stream: newest = FIRST child (renders at the bottom),

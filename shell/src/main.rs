@@ -425,10 +425,10 @@ mod platform {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         EnumWindows, FindWindowExW, FindWindowW, GetAncestor, GetClassNameW, GetWindowLongW,
         GetWindowThreadProcessId, GetWindowRect, IsIconic, IsWindow,
-        IsWindowVisible, SendMessageTimeoutW, SetParent,
+        IsWindowVisible, SendMessageTimeoutW, SetLayeredWindowAttributes, SetParent,
         SetWindowLongW, ShowWindow, SystemParametersInfoW, GA_PARENT, GWL_EXSTYLE,
-        SMTO_NORMAL, SPI_SETDESKWALLPAPER, SW_HIDE, SW_SHOW,
-        WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+        LWA_ALPHA, SMTO_NORMAL, SPI_SETDESKWALLPAPER, SW_HIDE, SW_SHOW,
+        WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
     };
     use std::io::Write;
 
@@ -1173,12 +1173,48 @@ mod platform {
     pub fn region_round(window: &Window, w: f64, h: f64, radius: f64) {
         let sf = window.scale_factor();
         unsafe {
+            // CreateRoundRectRgn takes the ELLIPSE size, not the radius — so the
+            // corner it cuts is half of what you pass. Feeding it the CSS radius
+            // straight left the window silhouette squarer than the border-radius the
+            // page draws, and the opaque nub between the two arcs is what made the
+            // corners look mismatched. Double it so region and CSS agree.
             let rgn = CreateRoundRectRgn(
                 0, 0,
                 (w * sf) as i32 + 1, (h * sf) as i32 + 1,
-                (radius * sf) as i32, (radius * sf) as i32,
+                (radius * 2.0 * sf) as i32, (radius * 2.0 * sf) as i32,
             );
             SetWindowRgn(window.hwnd() as _, rgn, 1);
+        }
+    }
+
+    /// 📡 feed mode's ghost-over-your-desktop look, done the only way that actually
+    /// produces it on Windows: one uniform alpha over the finished window.
+    ///
+    /// v0.9.51 moved this into the page (CSS on a per-pixel-transparent window) on the
+    /// theory that WS_EX_LAYERED was what wedged the WebView2 host. Measuring the
+    /// result killed that idea: on a transparent overlay the page's own layers do NOT
+    /// all reach the desktop. The area under the promoted feed list composited at true
+    /// alpha while everything else — the 6px gutter, the title bar, the rounded corners
+    /// — landed on an opaque backing surface, so the edge lit up as a pale frame, the
+    /// header washed out, and the bottom corners grew white fringes. A red-canvas probe
+    /// over black and white full-screen backdrops returned the identical pixel both
+    /// times, which is the whole story: that surface is not see-through.
+    ///
+    /// So the alpha comes back, and the overlay is an opaque window again. The freeze
+    /// this was removed for was never reproduced in ~30 scripted transitions, the other
+    /// two v0.9.51 changes (never flipping `resizable`, clearing the stale size floor)
+    /// stay, and tray → "Reload chat window" is there if it ever does come back.
+    pub fn set_feed_alpha(window: &Window, feed: bool) {
+        unsafe {
+            let hwnd = window.hwnd() as HWND;
+            let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+            if feed {
+                SetWindowLongW(hwnd, GWL_EXSTYLE, (ex | WS_EX_LAYERED) as i32);
+                SetLayeredWindowAttributes(hwnd, 0, 196, LWA_ALPHA);
+            } else {
+                SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+                SetWindowLongW(hwnd, GWL_EXSTYLE, (ex & !WS_EX_LAYERED) as i32);
+            }
         }
     }
 
@@ -1663,6 +1699,17 @@ mod platform {
         round_corners(window, d / 2.0);
     }
 
+    /// 📡 feed translucency — the window's own alpha, matching Windows' 196/255.
+    pub fn set_feed_alpha(window: &Window, feed: bool) {
+        unsafe {
+            let w = window.ns_window() as *mut AnyObject;
+            if !w.is_null() {
+                let a: f64 = if feed { 0.77 } else { 1.0 };
+                let _: () = msg_send![w, setAlphaValue: a];
+            }
+        }
+    }
+
     pub fn webview_extras<'a>(b: wry::WebViewBuilder<'a>) -> wry::WebViewBuilder<'a> {
         b
     }
@@ -1903,6 +1950,7 @@ mod platform {
     pub fn suppress_nc(_w: &Window) {}
     pub fn region_round(_w: &Window, _a: f64, _b: f64, _r: f64) {}
     pub fn region_circle(_w: &Window, _d: f64) {}
+    pub fn set_feed_alpha(_w: &Window, _f: bool) {}
     pub fn webview_extras<'a>(b: wry::WebViewBuilder<'a>) -> wry::WebViewBuilder<'a> { b }
     pub fn is_autostart() -> bool { false }
     pub fn set_autostart(_on: bool) {}
@@ -2183,12 +2231,14 @@ fn main() {
     // cause. Nothing is lost by staying resizable: the webview covers the whole
     // frameless window, so the OS resize handles are unreachable and large mode's
     // JS edge strips remain the only way to drag an edge.
-    // TRANSPARENT, like the orb and the splash: 📡 feed mode is supposed to ghost
-    // over your desktop, and that see-through used to come from an OS window alpha
-    // we no longer set. With per-pixel alpha the page decides — opaque `body`
-    // background in chat/large mode, a translucent canvas in feed mode.
+    // OPAQUE — unlike the orb and the splash, which are small shaped windows whose
+    // whole surface the page paints. A full WebView2 host does not honour per-pixel
+    // alpha across all of its layers (see set_feed_alpha): the promoted feed list
+    // reached the desktop, the gutter, the header and the rounded corners landed on
+    // an opaque backing and read as a pale frame. 📡 feed's see-through is the
+    // window's own alpha instead, which covers every pixel equally.
     let overlay = chrome_window(
-        &event_loop, "BagIdea Office", FULL.0, FULL.1, PARK.0, PARK.1, app_icon(), true, true,
+        &event_loop, "BagIdea Office", FULL.0, FULL.1, PARK.0, PARK.1, app_icon(), false, true,
     );
     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
     let overlay_id = overlay.id();
@@ -2196,7 +2246,6 @@ fn main() {
     let overlay_view = platform::webview_extras(
         WebViewBuilder::new()
             .with_url("http://127.0.0.1:8787/")
-            .with_transparent(true)   // the window's alpha is only real if the surface has one
             .with_devtools(true)
             .with_ipc_handler(move |req| {
                 let _ = match req.body().as_str() {
@@ -2369,6 +2418,7 @@ fn main() {
                 overlay.set_inner_size(LogicalSize::new(FULL.0, FULL.1));
                 overlay.set_outer_position(LogicalPosition::new(overlay_x, overlay_y));
                 platform::region_round(&overlay, FULL.0, FULL.1, 18.0);
+                platform::set_feed_alpha(&overlay, false);
                 let _ = overlay.set_ignore_cursor_events(false);
                 let _ = overlay_view.load_url("http://127.0.0.1:8787/");
                 overlay.set_focus();
@@ -2442,7 +2492,7 @@ fn main() {
                     } else if feed { (FEED_W, feed_h) } else if mini { MINI } else { FULL };
                     // Fullscreen large = square corners (rounded ones would nick the
                     // screen edges); anything smaller keeps the house radius.
-                    let r = if feed { 14.0 }
+                    let r = if feed { 18.0 }
                         else if large && w >= logical_w - 2.0 && h >= logical_h - 2.0 { 0.0 }
                         else { 18.0 };
                     platform::region_round(&overlay, w, h, r);
@@ -2561,15 +2611,13 @@ fn main() {
                     let _ = overlay_view.evaluate_script(&format!(
                         "window.setFeedMode && setFeedMode({})", feed));
                     let _ = overlay.set_ignore_cursor_events(false);
-                    // Feed translucency is CSS (html.feedmode) now, never an OS window
-                    // alpha. WS_EX_LAYERED on a WebView2 host is the second thing this
-                    // shell did that WebView2 doesn't support, and flipping it off on
-                    // the way out of feed is the other half of the path where the page
-                    // came back frozen. One look, one implementation, all platforms.
+                    // Feed translucency is an OS window alpha again — see the note on
+                    // set_feed_alpha for why the CSS version had to be given up.
+                    platform::set_feed_alpha(&overlay, feed);
                     if feed {
                         overlay.set_inner_size(LogicalSize::new(FEED_W, feed_h));
                         overlay.set_outer_position(LogicalPosition::new(feed_x, feed_y));
-                        platform::region_round(&overlay, FEED_W, feed_h, 14.0);
+                        platform::region_round(&overlay, FEED_W, feed_h, 18.0);
                     } else {
                         let (w, h) = if mini { MINI } else { FULL };
                         overlay.set_inner_size(LogicalSize::new(w, h));
