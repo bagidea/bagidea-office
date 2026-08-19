@@ -2157,7 +2157,27 @@
     if (!on && !permsEl.querySelector(".perm")) setSide(false);
     document.body.classList.toggle("feedmode", on);
     if (on) feedEl.scrollTop = 0;  // column-reverse: 0 = the live bottom edge
+    // Pointing at the strip means you are reading it → tell the shell to firm the
+    // window up. The page can't do this itself any more (the translucency is the
+    // window's alpha now, not CSS), but it IS the only thing that reliably knows
+    // where the pointer is: the webview covers the window, so the native side
+    // never sees a mouse move. Re-report on entering feed as well — the pointer
+    // may already be inside, and no enter event fires for a cursor that never moved.
+    if (on) reportFeedHover(pointerInside);
   };
+  // Tracked on the document element: it spans the viewport, and enter/leave there
+  // are the window's own edges.
+  let pointerInside = false;
+  function reportFeedHover(over) {
+    if (window.__shellPost && document.body.classList.contains("feedmode"))
+      window.__shellPost("feed-hover:" + (over ? 1 : 0));
+  }
+  document.documentElement.addEventListener("mouseenter", () => {
+    pointerInside = true; reportFeedHover(true);
+  });
+  document.documentElement.addEventListener("mouseleave", () => {
+    pointerInside = false; reportFeedHover(false);
+  });
   // column-reverse stream: newest = FIRST child (renders at the bottom),
   // scrollTop 0 = bottom. History scrolls; we only auto-stick when the user
   // is already at the live edge — scrolled-up reading is never yanked away.
@@ -6205,6 +6225,10 @@
   // NB: wry injects a global named `ipc` — never shadow it with const/let!
   const shellPost = window.ipc && window.ipc.postMessage
     ? (m) => window.ipc.postMessage(m) : null;
+  // Published so code defined earlier in the file (the feed's hover reporter) can
+  // reach it — it only ever runs after this line, but it can't close over a const
+  // that is declared below it.
+  window.__shellPost = shellPost;
   if (shellPost) {
     document.getElementById("titlebar").addEventListener("mousedown", (e) => {
       if (e.button === 0 && !e.target.closest("button") && !e.target.closest(".winbtn"))

@@ -97,6 +97,10 @@ const MINI: (f64, f64) = (390.0, 430.0);
 // screen, centered; can never shrink below FULL (that's what MINI is for).
 const LARGE_FRAC: f64 = 0.86;
 const FEED_W: f64 = 330.0;
+// 📡 feed mode's window alpha. Resting is the house translucency the mode has
+// always had; pointing at the strip means you are reading it, so it firms up.
+const FEED_ALPHA: u8 = 196;
+const FEED_ALPHA_READ: u8 = 245;
 const PARK: (f64, f64) = (-9000.0, 100.0);
 const SPLASH_SIZE: f64 = 210.0;
 
@@ -112,6 +116,7 @@ enum UserEvent {
                         // webview covers the whole window, so native borders never
                         // see the mouse — "resize:<n|s|e|w|ne|nw|se|sw>")
     FeedToggle,
+    FeedHover(bool), // pointer entered/left the feed strip → firm it up for reading
     SetHotkey(String),
     PttKey(bool), // global voice hotkey: true = pressed, false = released
     WorldReady,
@@ -1204,16 +1209,26 @@ mod platform {
     /// this was removed for was never reproduced in ~30 scripted transitions, the other
     /// two v0.9.51 changes (never flipping `resizable`, clearing the stale size floor)
     /// stay, and tray → "Reload chat window" is there if it ever does come back.
-    pub fn set_feed_alpha(window: &Window, feed: bool) {
+    /// `Some(a)` = layer the window and hold it at that alpha; `None` = fully opaque
+    /// and the layered style comes back off. While feed mode is on the style stays
+    /// put and only the VALUE moves (hover), so the ex-style is flipped exactly twice
+    /// per feed session — the fewer times that happens around a WebView2 host, the
+    /// better (see the doc comment above).
+    pub fn set_feed_alpha(window: &Window, alpha: Option<u8>) {
         unsafe {
             let hwnd = window.hwnd() as HWND;
             let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
-            if feed {
-                SetWindowLongW(hwnd, GWL_EXSTYLE, (ex | WS_EX_LAYERED) as i32);
-                SetLayeredWindowAttributes(hwnd, 0, 196, LWA_ALPHA);
-            } else {
-                SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
-                SetWindowLongW(hwnd, GWL_EXSTYLE, (ex & !WS_EX_LAYERED) as i32);
+            match alpha {
+                Some(a) => {
+                    if ex & WS_EX_LAYERED == 0 {
+                        SetWindowLongW(hwnd, GWL_EXSTYLE, (ex | WS_EX_LAYERED) as i32);
+                    }
+                    SetLayeredWindowAttributes(hwnd, 0, a, LWA_ALPHA);
+                }
+                None => {
+                    SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+                    SetWindowLongW(hwnd, GWL_EXSTYLE, (ex & !WS_EX_LAYERED) as i32);
+                }
             }
         }
     }
@@ -1699,12 +1714,12 @@ mod platform {
         round_corners(window, d / 2.0);
     }
 
-    /// 📡 feed translucency — the window's own alpha, matching Windows' 196/255.
-    pub fn set_feed_alpha(window: &Window, feed: bool) {
+    /// 📡 feed translucency — the window's own alpha, same scale as Windows' 0-255.
+    pub fn set_feed_alpha(window: &Window, alpha: Option<u8>) {
         unsafe {
             let w = window.ns_window() as *mut AnyObject;
             if !w.is_null() {
-                let a: f64 = if feed { 0.77 } else { 1.0 };
+                let a: f64 = alpha.map(|a| a as f64 / 255.0).unwrap_or(1.0);
                 let _: () = msg_send![w, setAlphaValue: a];
             }
         }
@@ -1950,7 +1965,7 @@ mod platform {
     pub fn suppress_nc(_w: &Window) {}
     pub fn region_round(_w: &Window, _a: f64, _b: f64, _r: f64) {}
     pub fn region_circle(_w: &Window, _d: f64) {}
-    pub fn set_feed_alpha(_w: &Window, _f: bool) {}
+    pub fn set_feed_alpha(_w: &Window, _a: Option<u8>) {}
     pub fn webview_extras<'a>(b: wry::WebViewBuilder<'a>) -> wry::WebViewBuilder<'a> { b }
     pub fn is_autostart() -> bool { false }
     pub fn set_autostart(_on: bool) {}
@@ -2253,6 +2268,8 @@ fn main() {
                     "hide" => p_overlay.send_event(UserEvent::HideOverlay),
                     "mini" => p_overlay.send_event(UserEvent::MiniToggle),
                     "large" => p_overlay.send_event(UserEvent::LargeToggle),
+                    "feed-hover:1" => p_overlay.send_event(UserEvent::FeedHover(true)),
+                    "feed-hover:0" => p_overlay.send_event(UserEvent::FeedHover(false)),
                     s if s.starts_with("resize:") =>
                         p_overlay.send_event(UserEvent::ResizeDrag(s[7..].to_string())),
                     s if s.starts_with("hotkey:") =>
@@ -2418,7 +2435,7 @@ fn main() {
                 overlay.set_inner_size(LogicalSize::new(FULL.0, FULL.1));
                 overlay.set_outer_position(LogicalPosition::new(overlay_x, overlay_y));
                 platform::region_round(&overlay, FULL.0, FULL.1, 18.0);
-                platform::set_feed_alpha(&overlay, false);
+                platform::set_feed_alpha(&overlay, None);
                 let _ = overlay.set_ignore_cursor_events(false);
                 let _ = overlay_view.load_url("http://127.0.0.1:8787/");
                 overlay.set_focus();
@@ -2613,7 +2630,9 @@ fn main() {
                     let _ = overlay.set_ignore_cursor_events(false);
                     // Feed translucency is an OS window alpha again — see the note on
                     // set_feed_alpha for why the CSS version had to be given up.
-                    platform::set_feed_alpha(&overlay, feed);
+                    // Enter at the resting alpha: the page re-reports hover on its own
+                    // if the pointer happens to already be over the strip.
+                    platform::set_feed_alpha(&overlay, if feed { Some(FEED_ALPHA) } else { None });
                     if feed {
                         overlay.set_inner_size(LogicalSize::new(FEED_W, feed_h));
                         overlay.set_outer_position(LogicalPosition::new(feed_x, feed_y));
@@ -2625,6 +2644,16 @@ fn main() {
                         platform::region_round(&overlay, w, h, 18.0);
                     }
                     raise_orb(&orb);
+                }
+                UserEvent::FeedHover(over) => {
+                    // Only meaningful in feed mode — chat and large are opaque, and a
+                    // stale hover report must never leave the window half-faded.
+                    if feed {
+                        platform::set_feed_alpha(
+                            &overlay,
+                            Some(if over { FEED_ALPHA_READ } else { FEED_ALPHA }),
+                        );
+                    }
                 }
                 UserEvent::DragOrb => { let _ = orb.drag_window(); }
                 UserEvent::DragOverlay => { let _ = overlay.drag_window(); }
