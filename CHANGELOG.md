@@ -6,6 +6,42 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+## [0.9.53] — 📡 The feed goes back to glass, and reads on hover
+
+**Fixed**
+- **The 📡 feed strip had a pale frame, a washed-out header and white corners.**
+  0.9.52 made the office window per-pixel transparent and handed the fading to the
+  page — and a full WebView2 host does not carry that evenly across its layers. The
+  feed list reached your desktop at true alpha, but the 6px gutter around it, the
+  title bar and everything outside the window's rounded corners landed on an opaque
+  backing surface: the edge lit up as a pale frame against a bright wallpaper, the
+  header lost its contrast until the text behind it was easier to read than the
+  title, and the bottom corners grew white arcs. No arrangement of CSS fixes that,
+  so the translucency is **the window's own uniform alpha** again — every pixel
+  faded equally, which is what the mode looked like from the beginning.
+- **The four corners of every window now match.** Two bugs, both long-standing:
+  Windows' `CreateRoundRectRgn` takes the *ellipse* size rather than the radius, so
+  the window was being cut with a corner half the size the page draws — leaving an
+  opaque nub between the two arcs; and the feed's title bar painted square corners
+  of its own over the top two, so the strip had soft corners at the bottom and hard
+  ones at the top.
+
+**Added**
+- **Point at the feed and it firms up to read.** Resting translucency is unchanged;
+  while the pointer is over the strip the window goes nearly solid, then fades back
+  when you leave. (The webview covers the whole window, so the native side never
+  sees a mouse move — the page reports the pointer and the shell moves the alpha.)
+
+**Changed**
+- The freeze mitigations from 0.9.51 that were **not** about the window alpha stay
+  exactly as they were: the overlay's resizable style is still never flipped, the
+  stale size floor is still cleared on the way out of ⛶ large, and tray → **Reload
+  chat window** is still there. The alpha itself is back because the freeze it was
+  removed for was never once reproduced — around 30 scripted mode switches then, and
+  more since — while the damage it did to the look was visible on every bright
+  desktop. The layered style is also flipped far less than it used to be: on once
+  when feed starts, off once when it ends, with only the *value* moving in between.
+
 ## [0.9.52] — 📡 The feed goes see-through again
 
 **Fixed**
