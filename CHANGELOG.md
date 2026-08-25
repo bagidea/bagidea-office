@@ -6,6 +6,8 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+## [0.9.54] — 🍎 The Mac wallpaper stops crawling, and no PR ships blind
+
 **Fixed**
 - **macOS: the wallpaper ran at 2 fps while it was in plain sight.** The occlusion
   monitor that throttles the world when it's hidden had two independent bugs, both
@@ -32,6 +34,12 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
   won't. `meetings.test.js` is excluded (it drives a real agent conversation and
   needs a brain CI doesn't have) — `RELEASING.md` now names the same bar so a
   release is never held to a weaker standard than a PR.
+- **The plugin guide now shows how to edit a record safely.** `docs/guide/plugins.md`
+  gained a second `/cmd` worked example — Scar Board's `update`, which locks a record's
+  identity and recall history (`id`, `authorId`, `createdAt`, `recallCount`,
+  `lastRecalledAt`), refuses an unknown id instead of silently creating one, and writes
+  atomically (temp + rename). That lock-immutable-fields + atomic-write pair is the
+  template for any plugin that edits records it also appends to.
 
 ## [0.9.53] — 📡 The feed goes back to glass, and reads on hover
 

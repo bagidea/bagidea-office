@@ -197,6 +197,22 @@ curl -s -X POST http://127.0.0.1:8787/plugin/hello/cmd \
 Because the panel and agents both go through `/cmd`, an agent saying *"loop the
 playlist"* really controls the panel open in front of the user.
 
+**A second example — editing a record safely (🩹 Scar Board).** Scar Board's
+`update` command refines an existing scar but **locks** its identity and recall
+history (`id`, `authorId`, `createdAt`, `recallCount`, `lastRecalledAt`) — only
+`context` / `lesson` / `tags` / `severity` may change, and the file is written
+**atomically** (temp + rename) so a crash never corrupts the board:
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/plugin/scar-board/cmd \
+  -H "content-type: application/json" \
+  -d '{"cmd":"update","args":"s_abc123 :: refined context :: sharper lesson #tag"}'
+```
+
+An unknown `id` returns a clear `{ok:false, msg:"scar not found: …"}` — it never
+silently creates a scar. That **lock-immutable-fields + atomic-write** pair is a good
+template for any plugin that edits records it also appends.
+
 **An agent can also CREATE a plugin**: write the folder + files under `plugins/`,
 then `curl -s -X POST http://127.0.0.1:8787/plugins/reload -H "x-bagidea-ui: 1"`.
 Point the agent at this guide and it has everything it needs.
