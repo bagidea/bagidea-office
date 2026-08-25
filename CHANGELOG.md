@@ -22,6 +22,17 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
   display it actually overlaps most. Single-monitor English installs are unchanged,
   and real fullscreen occlusion still throttles to 2 fps as before.
 
+**Changed**
+- **Every pull request now gets a build signal.** `.github/workflows/ci.yml` builds
+  the Rust shell on Windows, macOS and Linux and runs the daemon test suite on Node
+  20 and 22, on every PR and every push to `main`. Before this the repo had no CI on
+  pull requests at all — and a build on one OS says nothing about the others, because
+  `#[cfg(target_os = ...)]` code for a platform you're not on is parsed but never
+  type-checked. #43 had to be verified by hand on a throwaway branch; the next one
+  won't. `meetings.test.js` is excluded (it drives a real agent conversation and
+  needs a brain CI doesn't have) — `RELEASING.md` now names the same bar so a
+  release is never held to a weaker standard than a PR.
+
 ## [0.9.53] — 📡 The feed goes back to glass, and reads on hover
 
 **Fixed**
