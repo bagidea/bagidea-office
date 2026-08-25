@@ -1463,7 +1463,10 @@ mod platform {
     ///
     /// Uses CGWindowListCopyWindowInfo via toll-free-bridged NSArray/NSDictionary
     /// so we can use msg_send! without adding extra crates.
-    pub fn spawn_occlusion_monitor() {
+    ///
+    /// `office_pid` is the world (Godot) process, used to find which display the
+    /// wallpaper is on. Pass 0 to fall back to the main display.
+    pub fn spawn_occlusion_monitor(office_pid: u32) {
         use std::ffi::c_void;
 
         #[repr(C)] struct OccPoint  { x: f64, y: f64 }
@@ -1475,6 +1478,7 @@ mod platform {
             fn CGMainDisplayID() -> u32;
             fn CGDisplayIsAsleep(d: u32) -> u32;
             fn CGDisplayBounds(d: u32) -> OccRect;
+            fn CGGetActiveDisplayList(max: u32, list: *mut u32, count: *mut u32) -> i32;
             fn CGWindowListCopyWindowInfo(opt: u32, rel: u32) -> *mut AnyObject;
         }
         #[link(name = "CoreFoundation", kind = "framework")]
@@ -1483,6 +1487,7 @@ mod platform {
         const OCC_FLAG: &str = "/private/tmp/bagidea_occ";
         const ON_SCREEN_ONLY: u32 = 1;
         const NULL_WINDOW:    u32 = 0;
+        const MAX_DISPLAYS:   u32 = 8;
 
         std::thread::spawn(move || {
             // Require 2 consecutive "covered" readings before writing the flag.
@@ -1499,30 +1504,94 @@ mod platform {
                 let pool: *mut AnyObject = unsafe { msg_send![class!(NSAutoreleasePool), new] };
 
                 let covered_now = unsafe {
-                    let display = CGMainDisplayID();
-                    if CGDisplayIsAsleep(display) != 0 {
-                        true
+                    let list: *mut AnyObject =
+                        CGWindowListCopyWindowInfo(ON_SCREEN_ONLY, NULL_WINDOW);
+                    if list.is_null() {
+                        false
                     } else {
-                        let screen: OccRect = CGDisplayBounds(display);
+                        let count: usize = msg_send![list, count];
+                        let mut found = false;
 
-                        let list: *mut AnyObject =
-                            CGWindowListCopyWindowInfo(ON_SCREEN_ONLY, NULL_WINDOW);
-                        if list.is_null() {
-                            false
+                        // Hoist dictionary keys outside the per-window loops so they
+                        // are created once per poll, not once per window.
+                        let lk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowLayer\0".as_ptr()];
+                        let ak: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowAlpha\0".as_ptr()];
+                        let pk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowOwnerPID\0".as_ptr()];
+                        let bk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowBounds\0".as_ptr()];
+                        let xk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"X\0".as_ptr()];
+                        let yk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Y\0".as_ptr()];
+                        let wk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Width\0".as_ptr()];
+                        let hk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Height\0".as_ptr()];
+
+                        // Judge occlusion on the display the wallpaper is ACTUALLY on,
+                        // not on CGMainDisplayID(). With a second monitor the world
+                        // frequently lives on the secondary display, where a fullscreen
+                        // app on the primary hides nothing — checking the primary pins a
+                        // wallpaper that is in plain sight at 2 fps, which is exactly how
+                        // this reads to the user: the agents crawl while the desktop they
+                        // are drawn on is fully visible.
+                        //
+                        // Locate the world's own desktop-level window by pid, then take
+                        // the active display it overlaps most. Falls back to the main
+                        // display when the window is not up yet (early boot) or the pid
+                        // is unknown, which reproduces the previous behaviour.
+                        let display = {
+                            let (mut wx, mut wy, mut ww, mut wh) = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
+                            let mut got = false;
+                            for i in 0..count {
+                                let dict: *mut AnyObject = msg_send![list, objectAtIndex: i];
+                                if dict.is_null() { continue; }
+                                let pn: *mut AnyObject = msg_send![dict, objectForKey: pk];
+                                if pn.is_null() { continue; }
+                                let owner_pid: u32 = msg_send![pn, unsignedIntValue];
+                                if office_pid == 0 || owner_pid != office_pid { continue; }
+                                // The world sits at the desktop level (deeply negative);
+                                // ignore any ordinary window the same process may own.
+                                let ln: *mut AnyObject = msg_send![dict, objectForKey: lk];
+                                if ln.is_null() { continue; }
+                                let layer: i64 = msg_send![ln, longLongValue];
+                                if layer >= 0 { continue; }
+                                let bd: *mut AnyObject = msg_send![dict, objectForKey: bk];
+                                if bd.is_null() { continue; }
+                                let xn: *mut AnyObject = msg_send![bd, objectForKey: xk];
+                                let yn: *mut AnyObject = msg_send![bd, objectForKey: yk];
+                                let wn: *mut AnyObject = msg_send![bd, objectForKey: wk];
+                                let hn: *mut AnyObject = msg_send![bd, objectForKey: hk];
+                                if wn.is_null() || hn.is_null() { continue; }
+                                let x: f64 = if xn.is_null() { 0.0 } else { msg_send![xn, doubleValue] };
+                                let y: f64 = if yn.is_null() { 0.0 } else { msg_send![yn, doubleValue] };
+                                let w: f64 = msg_send![wn, doubleValue];
+                                let h: f64 = msg_send![hn, doubleValue];
+                                wx = x; wy = y; ww = w; wh = h;
+                                got = true;
+                                break;
+                            }
+
+                            let mut chosen = CGMainDisplayID();
+                            if got {
+                                let mut ids = [0u32; MAX_DISPLAYS as usize];
+                                let mut n: u32 = 0;
+                                if CGGetActiveDisplayList(MAX_DISPLAYS, ids.as_mut_ptr(), &mut n) == 0 {
+                                    let mut best = 0.0f64;
+                                    for k in 0..(n as usize).min(MAX_DISPLAYS as usize) {
+                                        let db: OccRect = CGDisplayBounds(ids[k]);
+                                        let ix = ((db.origin.x + db.size.w).min(wx + ww)
+                                            - db.origin.x.max(wx)).max(0.0);
+                                        let iy = ((db.origin.y + db.size.h).min(wy + wh)
+                                            - db.origin.y.max(wy)).max(0.0);
+                                        let area = ix * iy;
+                                        if area > best { best = area; chosen = ids[k]; }
+                                    }
+                                }
+                            }
+                            chosen
+                        };
+
+                        if CGDisplayIsAsleep(display) != 0 {
+                            CFRelease(list as *const c_void);
+                            true
                         } else {
-                            let count: usize = msg_send![list, count];
-                            let mut found = false;
-
-                            // Hoist dictionary keys outside the per-window loop so they
-                            // are created once per poll, not once per window.
-                            let lk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowLayer\0".as_ptr()];
-                            let ak: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowAlpha\0".as_ptr()];
-                            let ok: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowOwnerName\0".as_ptr()];
-                            let bk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowBounds\0".as_ptr()];
-                            let xk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"X\0".as_ptr()];
-                            let yk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Y\0".as_ptr()];
-                            let wk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Width\0".as_ptr()];
-                            let hk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Height\0".as_ptr()];
+                            let screen: OccRect = CGDisplayBounds(display);
 
                             for i in 0..count {
                                 let dict: *mut AnyObject = msg_send![list, objectAtIndex: i];
@@ -1549,15 +1618,35 @@ mod platform {
                                 }
 
                                 // Owner check: skip known system chrome that covers the screen
-                                // but doesn't hide content — the Dock creates a full-screen
-                                // opaque event-capture window (layer 20, alpha 1.0, cov 100%)
-                                // during auto-hide reveal; this is not a real occlusion.
-                                let on: *mut AnyObject = msg_send![dict, objectForKey: ok];
-                                if !on.is_null() {
-                                    let owner_ptr: *const i8 = msg_send![on, UTF8String];
-                                    if !owner_ptr.is_null() {
-                                        let owner = std::ffi::CStr::from_ptr(owner_ptr).to_string_lossy();
-                                        if owner == "Dock" { continue; }
+                                // but doesn't hide content — the Dock owns a full-screen opaque
+                                // window (layer 20, alpha 1.0, cov 100%); this is not a real
+                                // occlusion.
+                                //
+                                // Identify it by BUNDLE ID, not by kCGWindowOwnerName: that key
+                                // carries the *localized* process name, so matching the literal
+                                // "Dock" silently fails on every non-English system (it reads
+                                // "程序坞" on a Chinese one). When the match fails, the Dock's
+                                // own window counts as an app covering 100 % of the screen, so
+                                // the flag is written on every poll and the wallpaper is pinned
+                                // at 2 fps forever, whatever is actually on screen.
+                                let pn: *mut AnyObject = msg_send![dict, objectForKey: pk];
+                                if !pn.is_null() {
+                                    let pid: i32 = msg_send![pn, intValue];
+                                    let app: *mut AnyObject = msg_send![
+                                        class!(NSRunningApplication),
+                                        runningApplicationWithProcessIdentifier: pid
+                                    ];
+                                    if !app.is_null() {
+                                        let bid: *mut AnyObject = msg_send![app, bundleIdentifier];
+                                        if !bid.is_null() {
+                                            let b_ptr: *const i8 = msg_send![bid, UTF8String];
+                                            if !b_ptr.is_null()
+                                                && std::ffi::CStr::from_ptr(b_ptr).to_bytes()
+                                                    == b"com.apple.dock"
+                                            {
+                                                continue;
+                                            }
+                                        }
                                     }
                                 }
 
@@ -2199,14 +2288,16 @@ fn main() {
 
     platform::spawn_hotkey_thread(event_loop.create_proxy());
 
+    let office_pid = office_child.as_ref().map(|c| c.id()).unwrap_or(0);
+
     // macOS only: poll CGWindowList for full-screen windows / display sleep
     // and write /tmp/bagidea_occ so Godot throttles to 2 fps when invisible.
+    // The pid lets the monitor judge occlusion on the display the wallpaper is
+    // actually on rather than always on the primary one.
     #[cfg(target_os = "macos")]
     if office_child.is_some() {
-        platform::spawn_occlusion_monitor();
+        platform::spawn_occlusion_monitor(office_pid);
     }
-
-    let office_pid = office_child.as_ref().map(|c| c.id()).unwrap_or(0);
 
     // ---- screen-aware default positions
     let (screen_w, screen_h, sf) = event_loop
