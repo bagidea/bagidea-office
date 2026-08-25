@@ -32,9 +32,12 @@ const skillsSync = require("./skills");
 const providers = require("./providers");
 const proxy = require("./proxy");
 const { RunWatchdog } = require("./watchdog");
+const { bashScopeVerdict } = require("./bashscope");
 const { stripStatus, verdict: autoVerdict, readStatus } = require("./autopilot");
 const projtrust = require("./projecttrust");
 const joborder = require("./joborder");
+const { resolveThread } = require("./reportthread");
+const artifact = require("./artifact");
 const { wireWorkspaceSettings } = require("./wire-hooks-runtime");
 const { killTree } = require("./kill-tree");   // cross-platform child reap (issue #15 review)
 
@@ -140,6 +143,45 @@ function loadReg() {
   saveReg();
 }
 function saveReg() { fs.writeFileSync(REGISTRY, JSON.stringify(reg, null, 2)); }
+
+// Los tres que RRIA no toca por ninguna vía, ni para modificar ni para dar de baja.
+const INTOCABLES = {
+  main: "Shino (main) es intocable: él decide y pide, no se lo modifica",
+  rria: "RRIA no puede modificarse a sí misma",
+  ceo: "el CEO no es un agente, es el asiento de Sergio",
+};
+
+// Qué puede tocar RRIA de un agente, y con qué límites. Es la misma lista que usa el
+// alta, para que crear y modificar no tengan dos criterios distintos — si conceder
+// algo al crear estuviera prohibido y al modificar no, la puerta angosta sería un
+// rodeo de un paso.
+const CAMPOS_MODIFICABLES = new Set(["tools", "model", "prompt", "skills",
+  "readDirs", "noTouch", "persona", "role", "name"]);
+const HERRAMIENTAS_CONCEDIBLES = new Set(["Read", "Glob", "Grep", "Skill", "Write",
+  "Edit", "WebSearch", "WebFetch", "TodoWrite"]);
+const MODELOS_PERMITIDOS = new Set(["claude-sonnet-5", "claude-haiku-4-5-20251001",
+  "claude-opus-5"]);
+
+function validarCambios(cambios) {
+  for (const k of Object.keys(cambios)) {
+    if (!CAMPOS_MODIFICABLES.has(k)) return `campo no modificable por esta ruta: ${k}`;
+  }
+  if (cambios.model && !MODELOS_PERMITIDOS.has(String(cambios.model))) {
+    return `modelo no permitido: ${cambios.model}`;
+  }
+  if (cambios.tools) {
+    if (!Array.isArray(cambios.tools)) return "'tools' tiene que ser una lista";
+    for (const t of cambios.tools.map(String)) {
+      const bare = t.replace(/\(.*$/, "");
+      if (bare === "Bash") {
+        if (!/^Bash\(.+\)$/.test(t)) return "Bash solo se concede acotado, nunca pelado";
+        continue;
+      }
+      if (!HERRAMIENTAS_CONCEDIBLES.has(bare)) return `herramienta no concedible por esta ruta: ${t}`;
+    }
+  }
+  return null;
+}
 loadReg();
 
 // 🌱 Eco mode (reg.ecoMode): ONE switch that cuts the office's idle token burn —
@@ -1618,15 +1660,20 @@ function dispatchJob(job) {
   const keyRef = { key: job.sessionKey || "" }, dele = { hit: false };
   const text = joborder.jobPrompt(job.prompt, {
     director, directorNote: director ? directorNote() : "", autoNote: autoNote() });
+  const jobFilter = director
+    ? makeDelegateFilter(0, keyRef, () => { dele.hit = true; })
+    : null;
   runClaude(job.agent, text, {
     session: job.sessionKey || "new",
     logPrompt: "📋 [งานที่สั่งไว้] " + job.prompt,
-    // Built at filter time, not now: a first firing has no thread yet, and the
-    // report-back must resume the thread this job actually ran on (onEntry has
-    // filled keyRef by then) so the Director answers with his own order in view.
-    filterText: (t) => stripStatus(
-      director ? makeDelegateFilter(0, keyRef.key || undefined,
-        () => { dele.hit = true; })(t) : t),
+    // The thread is resolved at filter time, not now: a first firing has no thread
+    // yet, and the report-back must resume the thread this job actually ran on
+    // (onEntry has filled keyRef by then) so the Director answers with his own
+    // order in view. Handing keyRef to the filter is what makes that late read
+    // happen — the same rule every other dispatch path now follows.
+    filterText: director
+      ? (t) => stripStatus(jobFilter(t))
+      : (t) => stripStatus(t),
     onEntry: (key) => {
       job.sessionKey = key; keyRef.key = key;
       autoRounds.delete(key);   // each firing is a fresh chain, not a continuation
@@ -1777,6 +1824,96 @@ const SUB_NOTE = `
 SUB: <งานย่อยที่ชัดเจนครบถ้วนในตัวเอง พร้อมบริบทที่จำเป็นทั้งหมด>
 ระบบจะส่งร่างโคลนไปทำขนานกัน แล้วรวมผลกลับมาให้คุณสรุปเป็นคำตอบสุดท้าย.
 </system-capability>`;
+
+// 🔒 Per-agent HARD lock, shared by real runs and ghosts (Aignition patch, 2026-08-16).
+// --allowedTools only skips the permission PROMPT; it does not remove a tool.
+// Verified: with --allowedTools "Read,Glob,Grep" and no deny list, the model still
+// has Bash. permissions.deny is what actually removes it — a denied tool never
+// reaches the model at all. So everything the owner did NOT grant is denied outright
+// and the roster's tool list becomes a real boundary instead of a written promise.
+// Side effect, intended: a denied tool never reaches the Security Center, so "Allow
+// forever" can no longer widen an agent's powers by a permission click.
+// Returns the path of the settings file to hand to `claude --settings`.
+function perAgentSettings(agent, picked, mcpNames) {
+  const sharedSettings = path.join(WORKSPACE, ".claude", "settings.json");
+  try {
+    const base = JSON.parse(fs.readFileSync(sharedSettings, "utf8"));
+    // A grant can be SCOPED: "Bash(npm test:*)" grants only that command shape.
+    // Verified: a blanket deny of the base tool removes it outright and the scoped
+    // allow never fires — so the base name must stay OUT of the deny list, and the
+    // scoped rules go into permissions.allow to run without a prompt. Anything else
+    // that agent tries with the tool is settled by bashScopeVerdict at /perm/request.
+    const bare = (t) => t.replace(/\(.*$/, "");
+    const local = picked.filter((t) => !t.startsWith("mcp:"));
+    const keep = new Set(local.map(bare));
+    const scoped = local.filter((t) => /\(.*\)$/.test(t));
+    // "Agent"/"Workflow" spawn sub-agents that would carry their OWN tool sets,
+    // so they are denied too unless granted — otherwise they are a hole around
+    // this whole mechanism.
+    //
+    // 🔒 BUILTIN_TOOLS is the MENU BagIdea offers the owner, not the set of tools
+    // Claude Code actually ships. Building the deny list from the menu means every
+    // tool the menu doesn't list stays reachable. Found the hard way: with Bash
+    // locked down to its granted shapes, the read-only Reviewer reached for
+    // `PowerShell` — `Set-Content -Path PRUEBA-ESCRITURA.txt` — and it was never
+    // denied, because PowerShell isn't on the menu. It only failed because nobody
+    // was awake to stamp the card, which is the failure mode this patch exists to
+    // remove. So the write channels Claude Code ships outside the menu are named
+    // here explicitly. `Artifact` is on the list for the same reason as the rest:
+    // it publishes content to the web, and an auditor that can publish is not
+    // read-only. (Tools that only READ or SCHEDULE — CronCreate, EnterWorktree,
+    // SendMessage and the others — are deliberately NOT here: making "read-only"
+    // literal is Sergio's open decision, see infra/bagidea-candado-por-agente.md.)
+    const OFF_MENU_WRITE_TOOLS = ["PowerShell", "Artifact"];
+    const deny = [...Object.keys(BUILTIN_TOOLS), "Agent", "Workflow",
+      ...OFF_MENU_WRITE_TOOLS]
+      .filter((t, i, a) => a.indexOf(t) === i && !keep.has(t));
+    // Account-level MCP connectors (claude.ai: Drive, Notion, Supabase, Shopify…)
+    // ride in with the authenticated session, NOT through --mcp-config, so a
+    // "read-only" agent could still WRITE to those services. If the owner granted
+    // this agent no MCP server, deny the whole surface.
+    if (!mcpNames.length) deny.push("mcp__*");
+    // Nota: ToolSearch NO se agrega acá. Se probó, y no sirve — el hook PreToolUse
+    // pregunta igual y la respuesta la decide /perm/request contra la lista de tools
+    // del registro. La concesión vive allá; ver el comentario en esa ruta.
+    base.permissions = { ...(base.permissions || {}), deny,
+      allow: [...((base.permissions || {}).allow || []), ...scoped] };
+    const f = path.join(__dirname,
+      `settings_${String(agent).replace(/[^\w-]/g, "_")}.json`);
+    fs.writeFileSync(f, JSON.stringify(base, null, 2));
+    return f;
+  } catch (e) {
+    console.error("[lock] per-agent settings:", e.message);
+    return sharedSettings;
+  }
+}
+
+// 📖 Extra directories an agent may READ (Aignition patch, 2026-08-16).
+//
+// An auditor that cannot reach the code it is auditing returns "no verificable" on
+// every checkbox that matters. The Reviewer said it plainly after the lock probe:
+// "confirmo el comportamiento, no la regla que lo produce" — the config that imposes
+// its own lock lived outside the project it runs in.
+//
+// This does NOT widen what it can DO. Write and Edit are denied outright, Bash is
+// scoped to its granted command shapes, and redirection is refused, so an extra
+// directory only extends the reach of Read/Grep/Glob. Verified by probe, not assumed:
+// see infra/bagidea-candado-por-agente.md.
+//
+// Owner-set, per agent, in the registry: "readDirs": ["<absolute path>", …].
+// Empty or missing → nothing is added, which is the default for everyone else.
+// `extra` is per-RUN rather than per-agent: the artifact folder is granted only
+// on the turns that actually reference a file in it, so a standing grant never
+// widens what an agent can reach for the rest of its life.
+function addReadDirs(args, a, extra) {
+  const dirs = (a && Array.isArray(a.readDirs) ? a.readDirs : [])
+    .concat(Array.isArray(extra) ? extra : [])
+    .map((d) => String(d || "").trim()).filter(Boolean);
+  for (const d of dirs) {
+    if (!fs.existsSync(d)) { console.error(`[readDirs] no existe, se omite: ${d}`); continue; }
+    args.push("--add-dir", d);
+  }
+}
 
 function runClaude(agent, prompt, opts = {}) {
   const task = "t" + ++taskCounter;
@@ -1941,13 +2078,17 @@ function runClaude(agent, prompt, opts = {}) {
       `die when your session closes. That is how timed work actually runs here.\n</role-lock>\n\n`;
   }
 
+  const settingsFile = perAgentSettings(agent, picked, mcpNames);
+
   const args = ["-p", "--output-format", "stream-json", "--verbose",
     "--allowedTools", tools,
     // The permission-broker hooks live in the workspace settings; agents
     // now run inside PROJECT directories, so the settings must travel
-    // explicitly or the Security Center goes silent.
-    "--settings", path.join(WORKSPACE, ".claude", "settings.json")];
+    // explicitly or the Security Center goes silent. Since 2026-08-16 this is a
+    // per-agent copy of those settings plus the deny list built above.
+    "--settings", settingsFile];
   if (mcpConfig) args.push("--mcp-config", mcpConfig);
+  addReadDirs(args, a, opts.addDirs);
   // Native skills: refresh this agent's SKILL.md files (hash-gated) and expose
   // them to the session — progressive disclosure, so bodies never hit the prompt.
   if (nativeSkills) {
@@ -2487,7 +2628,10 @@ function ceoFlow(prompt, session, project, opts = {}) {
   // 🤖 AUTO: a fresh order starts a fresh chain (the round budget resets), and if
   // the Director ends this turn still owing work, it opens the next turn itself.
   const keyRef = { key: session || "" }, dele = { hit: false };
-  const df = makeDelegateFilter(0, session, () => { dele.hit = true; });
+  // keyRef, not `session`: a CEO order usually opens a FRESH thread, so the key
+  // only exists once onEntry has fired. Capturing `session` here filed the team's
+  // results in whatever thread happened to be latest when they finished.
+  const df = makeDelegateFilter(0, keyRef, () => { dele.hit = true; });
   return runClaude("main", wrapped, {
     session,
     project,
@@ -2613,7 +2757,9 @@ function autoContinue(agent, project, keyRef, next, isDirector, dele) {
     // A breath between turns: the office reads as a team working, not a loop.
     setTimeout(() => {
       const d2 = { hit: false };
-      const df = isDirector ? makeDelegateFilter(0, key, () => { d2.hit = true; }) : null;
+      // keyRef, not the `key` snapshot: an AUTO round can land on a fresh thread
+      // (compaction forks one), and the report must follow the work, not the snapshot.
+      const df = isDirector ? makeDelegateFilter(0, keyRef, () => { d2.hit = true; }) : null;
       runClaude(agent, cont, {
         session: key || undefined, project,
         logPrompt: `🤖 AUTO: ทำต่อเอง (รอบ ${n}/${AUTOPILOT_MAX})`,
@@ -2627,8 +2773,18 @@ function autoContinue(agent, project, keyRef, next, isDirector, dele) {
 
 // DELEGATE:-line parser shared by the CEO order and every report-back turn.
 // onHit fires per dispatched assignment ("did he hand off more work?").
-function makeDelegateFilter(depth, session, onHit) {
+//
+// `sessionRef` is the thread the report-back must come home to. Pass the run's
+// `keyRef` — NOT a bare `session` string — on any path where the filter is built
+// before the run starts: a fresh thread has no key until runClaude's `onEntry`
+// fires, and a captured `undefined` means "continue the agent's LATEST thread",
+// which by report time is whatever the owner has opened since. That is how a
+// finished task ended up filed in a thread nobody was reading. See reportthread.js.
+function makeDelegateFilter(depth, sessionRef, onHit) {
   return (text) => {
+    // Resolve LATE: onEntry has run by the time any text is filtered, so this is
+    // the thread the turn actually landed on — not the one it was requested with.
+    const session = resolveThread(sessionRef);
     const keep = [];
     for (const ln of String(text).split("\n")) {
       // PROJECT: <name> @ <place ชื่อย่อ | full path> — the Director creates
@@ -2715,7 +2871,7 @@ function makeDelegateFilter(depth, session, onHit) {
 function verifyThenReport(fromId, task, out, ok, depth, session, proj) {
   // Eco mode skips the QA double-pass — it re-runs a whole review turn per
   // delegated task, the single biggest optional token cost in the office.
-  if (!reg.verifyDelegated || reg.ecoMode || !ok) return reportToMain(fromId, out, ok, depth, session);
+  if (!reg.verifyDelegated || reg.ecoMode || !ok) return reportToMain(fromId, out, ok, depth, session, task);
   const a = reg.agents[fromId] || { name: fromId };
   // Snapshot the assignee's WORK thread now — before the review run spawns a new one.
   const wl = sess[fromId] || [];
@@ -2735,7 +2891,7 @@ function verifyThenReport(fromId, task, out, ok, depth, session, proj) {
     onDone: (verdict, vok) => {
       const txt = String(verdict || "");
       const flagged = vok && /(^|\n)\s*ISSUES\s*:/i.test(txt) && !/^\s*APPROVED\s*$/im.test(txt);
-      if (!flagged) return reportToMain(fromId, out, ok, depth, session);  // approved / inconclusive → ship
+      if (!flagged) return reportToMain(fromId, out, ok, depth, session, task);  // approved / inconclusive → ship
       // One fix-back loop: hand the findings to the assignee on their own thread, then
       // report the revised result (no second review — bounded).
       const fixPrompt =
@@ -2745,33 +2901,57 @@ function verifyThenReport(fromId, task, out, ok, depth, session, proj) {
         project: proj, session: workSess, noSub: true,
         logPrompt: `🛠 ${a.name} แก้งานตามรีวิว`,
         onDone: (out2, ok2) =>
-          reportToMain(fromId, `${out2}\n\n(ตรวจแล้ว + แก้ตามรีวิว)`, ok2, depth, session),
+          reportToMain(fromId, `${out2}\n\n(ตรวจแล้ว + แก้ตามรีวิว)`, ok2, depth, session, task),
       });
     },
   });
 }
 
-function reportToMain(fromId, text, ok, depth, session) {
+// Where teammates' reports are filed. Inside the workspace so it travels with
+// the office and is reachable from any thread via --add-dir. See artifact.js for
+// why the report goes to disk instead of into the Director's thread.
+const ARTIFACTS = path.join(WORKSPACE, "informes");
+
+// Write one report to disk and hand back its path, or null if that failed.
+// Fails OPEN on purpose: a report that costs too much is bad, a report that
+// vanishes is worse, so a write error falls back to the old inline behaviour.
+function fileReport(fromId, name, text, ok, task) {
+  try {
+    fs.mkdirSync(ARTIFACTS, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const file = path.join(ARTIFACTS, artifact.reportFileName(fromId, stamp));
+    fs.writeFileSync(file, artifact.reportFileBody({
+      name, fromId, ok, task, when: new Date().toISOString(), text,
+    }), "utf8");
+    return file;
+  } catch (e) {
+    console.error("[artifact] no se pudo guardar el informe:", e.message);
+    return null;
+  }
+}
+
+function reportToMain(fromId, text, ok, depth, session, task) {
   const a = reg.agents[fromId] || { name: fromId };
-  const wrapped =
-    `Report back from your team member ${a.name} (${fromId})` +
-    (ok ? "" : " — THE TASK FAILED") + `:\n` +
-    `"""${String(text || "(no result)").slice(0, 6000)}"""\n\n` +
-    (depth < 2
-      ? `If they asked you a question or something is missing, answer / follow ` +
-        `up with a line: DELEGATE: ${fromId} :: <your answer or next instruction> ` +
-        `(exact format — it resumes their session with full context). ` +
-        `If the work is complete, write the final summary for the owner (CEO): ` +
-        `clear, concrete, in the language of the original order.`
-      : `Write the final summary for the owner (CEO) now — clear, concrete, in ` +
-        `the language of the original order. Do not delegate further.`);
+  // The artifact pattern: the full result lives in a file; the thread carries a
+  // head plus the path. Without this the whole report is re-sent as cached input
+  // on EVERY later turn of this thread — the single largest line in the office's
+  // bill (see artifact.js for the measured split).
+  const { head, full, truncated } = artifact.splitReport(text || "(no result)");
+  const file = fileReport(fromId, a.name, full, ok, task);
+  const wrapped = artifact.buildReportPrompt({
+    name: a.name, fromId, ok, depth, head, truncated, full, file,
+  });
   queueDirectorTurn((release) => {
     const dele = { hit: false };
     const keyRef = { key: session || "" };
-    const df = depth < 2 ? makeDelegateFilter(depth + 1, session, () => { dele.hit = true; }) : null;
+    // keyRef starts pinned to `session` and onEntry keeps it honest, so a follow-up
+    // DELEGATE from this very report-back turn comes home to the same thread.
+    const df = depth < 2 ? makeDelegateFilter(depth + 1, keyRef, () => { dele.hit = true; }) : null;
     runClaude("main", wrapped + autoNote(), {
       session,
       noSub: true,
+      // Granted only on this turn, and only when there is a file to open.
+      addDirs: file ? [ARTIFACTS] : undefined,
       logPrompt: `📨 รายงานผลจาก ${a.name}`,
       filterText: df ? (t) => stripStatus(df(t)) : (t) => stripStatus(t),
       onEntry: (k) => { keyRef.key = k; },
@@ -2868,8 +3048,15 @@ function runSub(parentId, subId, taskText, entry, onDone) {
   }
   const args = ["-p", "--output-format", "stream-json", "--verbose",
     "--allowedTools", tools,
-    "--settings", path.join(WORKSPACE, ".claude", "settings.json")];
+    // 🔒 Ghosts ran on the SHARED settings — no deny list, so a clone of a
+    // read-only agent came back with Write, Edit and a full shell (Aignition
+    // patch, 2026-08-16). The parent can't split itself (Agent/Workflow are
+    // denied), but the Director can order the split, which made this the same
+    // hole through another door. A ghost is its parent, so it gets the parent's
+    // lock — and /perm/request already resolves "revisor#s1" back to "revisor".
+    "--settings", perAgentSettings(parentId, picked, mcpNames)];
   if (mcpConfig) args.push("--mcp-config", mcpConfig);
+  addReadDirs(args, a);   // a ghost reads what its parent reads
   // Ghosts inherit the parent's native skills (additive — ghosts had none before).
   if (reg.nativeSkills !== false) {
     try {
@@ -4133,7 +4320,12 @@ const server = http.createServer((req, res) => {
                 onDone: reply })
           : agent === "main"
             ? (() => {
-                const df = makeDelegateFilter(0, session, () => { dele.hit = true; });
+                // keyRef, not `session`: this is the path the owner uses all day.
+                // Talking to the Director on a fresh thread sends `session:
+                // undefined`, and that undefined used to ride down the whole
+                // delegation chain — so the team's answers came back to the wrong
+                // thread and the order looked like it was never answered.
+                const df = makeDelegateFilter(0, keyRef, () => { dele.hit = true; });
                 return runClaude("main", prompt + directorNote() + autoNote(),
                   { session, project, logPrompt: origPrompt,
                     filterText: (t) => stripStatus(df(t)),
@@ -4447,6 +4639,149 @@ const server = http.createServer((req, res) => {
         res.writeHead(400);
         res.end(String(e.message));
       }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/agent/create") {
+    // 🚪 La puerta angosta (Aignition, 2026-08-16). Decisión de Sergio: "yo soy
+    // cuello de botella", así que RRIA da de alta sin esperarlo.
+    //
+    // Conserva la misma compuerta que el resto de /registry. La llama el lanzador
+    // tools/alta-agente.js, que vive en esta carpeta y por eso ningún agente puede
+    // reescribirlo. Lo que protege de verdad no es la compuerta, sino la ESTRECHEZ
+    // de lo que esta ruta acepta.
+    //
+    // Hace UNA cosa y se niega a cualquier otra: crear un agente que NO existe.
+    // No modifica, no borra, no toca cerebros, no toca los puestos protegidos, y
+    // solo concede herramientas de una lista fija. Cambiar un agente que ya existe
+    // sigue siendo exclusivamente de Sergio, por la pantalla.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      const no = (msg) => { res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, error: msg }));
+        console.log(`[alta] rechazada — ${msg}`);
+        broadcast({ type: "agent.alta.rechazada", error: msg }); };
+      let a;
+      try { a = JSON.parse(body); } catch { return no("cuerpo ilegible"); }
+
+      const id = String(a.id || "").trim();
+      if (!/^[a-z][a-z0-9_]{1,30}$/.test(id)) return no(`id inválido: "${id}"`);
+      if (reg.agents[id]) return no(`"${id}" ya existe — esta ruta NO modifica, solo crea`);
+      if (["main", "ceo", "rria", "revisor"].includes(id)) return no(`"${id}" es un puesto protegido`);
+
+      // Las herramientas se conceden de una lista fija. Nada de Agent/Workflow, que
+      // traen su propio juego de herramientas, ni de conectores MCP.
+      const PERMITIDAS = new Set(["Read", "Glob", "Grep", "Skill", "Write", "Edit",
+        "WebSearch", "WebFetch", "TodoWrite"]);
+      const tools = Array.isArray(a.tools) ? a.tools.map(String) : [];
+      for (const t of tools) {
+        const bare = t.replace(/\(.*$/, "");
+        if (bare === "Bash") {
+          // Bash solo acotado: "Bash(git log:*)" sí, "Bash" pelado no.
+          if (!/^Bash\(.+\)$/.test(t)) return no("Bash solo se concede acotado, nunca pelado");
+          continue;
+        }
+        if (!PERMITIDAS.has(bare)) return no(`herramienta no concedible por esta ruta: ${t}`);
+      }
+
+      const MODELOS = new Set(["claude-sonnet-5", "claude-haiku-4-5-20251001", "claude-opus-5"]);
+      const model = String(a.model || "claude-sonnet-5");
+      if (!MODELOS.has(model)) return no(`modelo no permitido: ${model}`);
+
+      reg.agents[id] = {
+        name: String(a.name || id).slice(0, 60),
+        role: String(a.role || "Especialista").slice(0, 60),
+        avatar: Number(a.avatar) || 4,
+        aura: "", tier: 2, voice: "",
+        provider: "claude", model,
+        prompt: String(a.prompt || ""),
+        persona: {
+          expertise: String((a.persona || {}).expertise || ""),
+          personality: String((a.persona || {}).personality || ""),
+          language: String((a.persona || {}).language || "es"),
+          rules: String((a.persona || {}).rules || ""),
+        },
+        skills: Array.isArray(a.skills) ? a.skills.map(String) : [],
+        tools,
+        readDirs: Array.isArray(a.readDirs) ? a.readDirs.map(String) : [],
+        noTouch: Array.isArray(a.noTouch) ? a.noTouch.map(String) : [],
+        altaPor: "rria",
+      };
+      saveReg();
+      console.log(`[alta] ${id} · ${tools.join(", ")} · ${model}`);
+      // Queda en el feed y en el journal: el alta la audita el Revisor, y Sergio la
+      // ve pasar sin tener que aprobarla.
+      broadcast({ type: "agent.alta", agent: id, tools, model, role: reg.agents[id].role });
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: true, id, tools, model }));
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/agent/modify") {
+    // ✏️ RRIA modifica. Nadie más (Aignition, 2026-08-16, tarde).
+    //
+    // Corrección de Sergio sobre el diseño anterior: "Shino no puede tocar a nadie. A
+    // nadie. Solamente le da instrucciones a RRIA de lo que necesita hacer."
+    //
+    // El circuito de dos firmas que había acá antes estaba mal planteado: hacía que
+    // Shino aprobara aplicando, o sea tocando. La separación correcta es la de una
+    // empresa — el que DECIDE no ejecuta, el que EJECUTA no decide:
+    //
+    //   especialista o gerente pide  →  Shino evalúa y DECIDE  →  RRIA CONSTRUYE
+    //
+    // Por eso `motivo` y `pedidoPor` son obligatorios: un cambio sin quién lo pidió
+    // es RRIA decidiendo sola, que es exactamente lo que no puede hacer.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      const no = (msg) => { res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, error: msg }));
+        console.log(`[modificar] rechazado — ${msg}`); };
+      let p;
+      try { p = JSON.parse(body); } catch { return no("cuerpo ilegible"); }
+
+      const id = String(p.id || "").trim();
+      if (!reg.agents[id]) return no(`"${id}" no existe — para crear está /registry/agent/create`);
+      if (INTOCABLES[id]) return no(INTOCABLES[id]);
+      if (!String(p.motivo || "").trim()) return no("falta el motivo del cambio");
+      if (!String(p.pedidoPor || "").trim()) return no("falta pedidoPor: quién pidió este cambio");
+
+      const cambios = p.cambios && typeof p.cambios === "object" ? p.cambios : null;
+      if (!cambios) return no("falta el objeto 'cambios'");
+      const err = validarCambios(cambios);
+      if (err) return no(err);
+
+      const antes = {};
+      for (const [k, v] of Object.entries(cambios)) { antes[k] = reg.agents[id][k]; reg.agents[id][k] = v; }
+      reg.agents[id].ultimoCambio = { por: "rria", pedidoPor: String(p.pedidoPor),
+        motivo: String(p.motivo), campos: Object.keys(cambios), ts: Date.now() };
+      saveReg();
+      console.log(`[modificar] ${id}: ${Object.keys(cambios).join(", ")} · pedido por ${p.pedidoPor}`);
+      broadcast({ type: "agent.modificado", agent: id, campos: Object.keys(cambios),
+        motivo: String(p.motivo), pedidoPor: String(p.pedidoPor), por: "rria", antes });
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: true, id, campos: Object.keys(cambios) }));
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/agent/retire") {
+    // 🚪 La baja, también de RRIA. Mismos intocables.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      const no = (msg) => { res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, error: msg }));
+        console.log(`[baja] rechazada — ${msg}`); };
+      let p;
+      try { p = JSON.parse(body); } catch { return no("cuerpo ilegible"); }
+      const id = String(p.id || "").trim();
+      if (!reg.agents[id]) return no(`"${id}" no existe`);
+      if (INTOCABLES[id]) return no(INTOCABLES[id]);
+      if (!String(p.motivo || "").trim()) return no("falta el motivo de la baja");
+      if (!String(p.pedidoPor || "").trim()) return no("falta pedidoPor: quién pidió esta baja");
+      const ficha = reg.agents[id];
+      delete reg.agents[id];
+      saveReg();
+      console.log(`[baja] ${id} · pedido por ${p.pedidoPor} · ${p.motivo}`);
+      broadcast({ type: "agent.baja", agent: id, nombre: ficha.name,
+        motivo: String(p.motivo), pedidoPor: String(p.pedidoPor), por: "rria" });
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: true, id, nombre: ficha.name }));
     });
 
   } else if (req.method === "POST" && req.url === "/registry/agent/delete") {
@@ -6170,16 +6505,53 @@ end tell`;
         ...(((reg.agents[base] || {}).tools) || []),
         ...(((reg.autoAllow || {})[base]) || []),
       ];
+      const tieneMcp = granted.some((g) => g.startsWith("mcp:"));
       const isGranted = granted.includes(tool) ||
         // MCP grants are stored as "mcp:<server>"; hook tool names arrive
         // as "mcp__<server>__<tool>".
         granted.some((g) => g.startsWith("mcp:") &&
-          String(tool).startsWith("mcp__" + g.slice(4) + "__"));
+          String(tool).startsWith("mcp__" + g.slice(4) + "__")) ||
+        // Conceder un servidor MCP sin ToolSearch es conceder nada: las herramientas
+        // MCP llegan diferidas y ToolSearch es lo único que carga sus esquemas. Sin
+        // esto el agente pide tarjeta para poder usar lo que YA se le dio, y con nadie
+        // mirando la pantalla se le vence y vuelve al camino viejo.
+        //
+        // Pasó con RRIA el 16/08: se le sacó la consola y se le dieron sus tres
+        // operaciones por MCP, y quedó pidiendo ToolSearch en cada corrida — dos veces
+        // vencida por timeout, y las que sí pasaron fueron con Sergio clickeando. Es
+        // el mismo defecto que candado-rendija: un permiso que depende de un clic.
+        //
+        // Va acá, en la puerta que decide de verdad, y NO en el `allow` del settings:
+        // ese archivo lo consulta Claude Code, pero el hook PreToolUse pregunta igual
+        // y la respuesta sale de esta lista. Se probó al revés primero y no sirvió.
+        //
+        // No amplía nada: ToolSearch solo LEE definiciones de herramientas. Ejecutar
+        // sigue pasando por su propia regla, y un agente sin MCP tiene `mcp__*` negado.
+        (tieneMcp && tool === "ToolSearch");
       if (isGranted) {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ decision: "allow" }));
         broadcast({ type: "perm.approved", agent, task, tool, perm: id, via: "rule" });
         return;
+      }
+      // 🔒 A scope-limited agent doesn't get to ask (Aignition patch, 2026-08-16).
+      // The owner wrote which command shapes this agent may run; that list decides,
+      // not a card at 3am. See bashScopeVerdict for why the two rules are there.
+      // No card is shown either way: in scope it runs, out of scope it is refused.
+      if (tool === "Bash" && !granted.includes("Bash")) {
+        const scopedBash = granted.filter((g) => /^Bash\(.+\)$/.test(g));
+        if (scopedBash.length) {
+          let cmd = "";
+          try { cmd = (JSON.parse(input || "{}") || {}).command || ""; } catch {}
+          const noTouch = ((reg.agents[base] || {}).noTouch) || [];
+          const v = bashScopeVerdict(cmd, scopedBash, noTouch);
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ decision: v.ok ? "allow" : "deny" }));
+          broadcast({ type: v.ok ? "perm.approved" : "perm.denied",
+            agent, task, tool, perm: id, via: "lock", input, reason: v.why });
+          if (!v.ok) console.log(`[lock] ${agent}: Bash rechazado — ${v.why}`);
+          return;
+        }
       }
       // Unattended mode (opt-in, reg.autoApprove): the owner can't come click Allow
       // — e.g. they queued work and stepped out — so every prompt is auto-approved
@@ -6226,18 +6598,20 @@ end tell`;
         const { id, decision, always } = JSON.parse(body);
         // "Allow ตลอดไป": remember the grant — broker auto-approves future
         // requests AND the tool joins the agent's allowlist for new runs.
+        // 🔒 "Allow forever" no longer persists (Aignition patch, 2026-08-16).
+        // It used to do two things: remember the grant in reg.autoAllow AND push
+        // the tool into the agent's own tools array. That means a single click on
+        // a permission card silently REWROTE the agent's role — the read-only
+        // Reviewer gained permanent shell four separate times that way, each time
+        // during a run where approving was the only way to let the work continue.
+        // A permission answer is about THIS request; widening a role is a config
+        // decision and must be made on purpose, by editing the agent.
+        // The request itself is still approved below — only the persistence is
+        // dropped, so "forever" degrades to "this once".
         if (always && decision === "allow") {
           const pend = pendingPerms.get(id);
-          if (pend) {
-            const base = String(pend.agent).split("#")[0];
-            reg.autoAllow = reg.autoAllow || {};
-            reg.autoAllow[base] = [...new Set([...(reg.autoAllow[base] || []), pend.tool])];
-            const a = reg.agents[base];
-            if (a && Array.isArray(a.tools) && !a.tools.includes(pend.tool))
-              a.tools.push(pend.tool);
-            saveReg();
-            pushRoster();
-          }
+          if (pend) console.log(`[lock] "allow forever" not persisted for ` +
+            `${pend.agent}/${pend.tool} — edit the agent's tools to grant it`);
         }
         const ok = finishPerm(id, decision === "allow" ? "allow" : "deny", "user");
         res.writeHead(ok ? 200 : 404);
@@ -6315,6 +6689,9 @@ end tell`;
             proj = createProject(p.name, "", path.join(playDir, p.name.replace(/[^\wก-๙ -]/g, "_")));
           } catch (e) { /* duplicate name → Director routes to the existing one */ }
           queueDirectorTurn((release) => {
+            // Same rule as every other dispatch path: the team's results must come
+            // back to THIS approval turn's thread, not to whatever is latest by then.
+            const keyRef = { key: "" };
             runClaude("main",
               `CEO อนุมัติข้อเสนอโปรเจคของทีมแล้ว 🎉\n` +
               `ชื่อ: ${p.name}\nไอเดีย: ${p.detail}\nผู้เสนอ: ${p.agents.join(", ")}\n` + noteLine +
@@ -6326,7 +6703,8 @@ end tell`;
               `ให้คนที่เสนอไอเดียได้ทำเป็นหลัก แล้วสรุปแผนสั้นๆ` +
               (note ? ` และนำข้อความของเจ้าของไปปรับทิศทางงานด้วย` : ""),
               { logPrompt: `✅ อนุมัติข้อเสนอ: ${p.name}`,
-                filterText: makeDelegateFilter(0, undefined),
+                filterText: makeDelegateFilter(0, keyRef),
+                onEntry: (k) => { keyRef.key = k; },
                 onDone: () => release() });
           });
         } else if (decision === "reject" && note) {
