@@ -1,0 +1,87 @@
+name: CI
+
+# Every pull request gets a build signal. Before this existed a community PR
+# arrived with none at all, and macOS-only code was the worst case: a Windows or
+# Linux build PARSES `#[cfg(target_os = "macos")]` blocks but never type-checks
+# them, and cross-checking that module from Windows is not possible (its FFI deps
+# need a C toolchain plus the macOS SDK). So a macOS-only fix could only be
+# verified by hand on a throwaway branch. Now the matrix does it.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A PR that gets three pushes in a minute doesn't need three full matrices.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---- The Rust shell, on every platform we ship ---------------------------------
+  # `build`, not `check`: the shell is mostly FFI, and a wrong framework or symbol
+  # name type-checks perfectly and only falls over at link time. --locked so a PR
+  # can't quietly drift Cargo.lock.
+  shell:
+    name: shell (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev libxdo-dev
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            shell/target
+            shell/macos/wallpaper_shim/target
+          key: cargo-${{ matrix.os }}-${{ hashFiles('shell/Cargo.lock') }}
+          restore-keys: cargo-${{ matrix.os }}-
+
+      - name: Build shell
+        working-directory: shell
+        run: cargo build --locked
+
+      # Ships as its own dylib in the release, so it needs its own signal.
+      - name: Build wallpaper shim
+        if: runner.os == 'macOS'
+        working-directory: shell/macos/wallpaper_shim
+        run: cargo build --locked
+
+  # ---- The daemon's test suite --------------------------------------------------
+  daemon:
+    name: daemon tests (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # meetings.test.js drives a real agent conversation, which needs a Claude CLI
+      # and a brain that CI does not have — it fails here for the environment, not
+      # for the change, and a suite that is red on arrival teaches everyone to
+      # ignore it. Run it locally (`npm run test:meetings`) before touching
+      # meetings code. Everything else must stay green.
+      - name: Run tests (excluding meetings)
+        run: node --test $(ls daemon/tests/*.test.js | grep -v meetings.test.js)
