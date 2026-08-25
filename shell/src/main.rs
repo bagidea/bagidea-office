@@ -1517,7 +1517,7 @@ mod platform {
                             // are created once per poll, not once per window.
                             let lk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowLayer\0".as_ptr()];
                             let ak: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowAlpha\0".as_ptr()];
-                            let ok: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowOwnerName\0".as_ptr()];
+                            let pk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowOwnerPID\0".as_ptr()];
                             let bk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowBounds\0".as_ptr()];
                             let xk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"X\0".as_ptr()];
                             let yk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Y\0".as_ptr()];
@@ -1549,15 +1549,35 @@ mod platform {
                                 }
 
                                 // Owner check: skip known system chrome that covers the screen
-                                // but doesn't hide content — the Dock creates a full-screen
-                                // opaque event-capture window (layer 20, alpha 1.0, cov 100%)
-                                // during auto-hide reveal; this is not a real occlusion.
-                                let on: *mut AnyObject = msg_send![dict, objectForKey: ok];
-                                if !on.is_null() {
-                                    let owner_ptr: *const i8 = msg_send![on, UTF8String];
-                                    if !owner_ptr.is_null() {
-                                        let owner = std::ffi::CStr::from_ptr(owner_ptr).to_string_lossy();
-                                        if owner == "Dock" { continue; }
+                                // but doesn't hide content — the Dock owns a full-screen opaque
+                                // window (layer 20, alpha 1.0, cov 100%); this is not a real
+                                // occlusion.
+                                //
+                                // Identify it by BUNDLE ID, not by kCGWindowOwnerName: that key
+                                // carries the *localized* process name, so matching the literal
+                                // "Dock" silently fails on every non-English system (it reads
+                                // "程序坞" on a Chinese one). When the match fails, the Dock's
+                                // own window counts as an app covering 100 % of the screen, so
+                                // the flag is written on every poll and the wallpaper is pinned
+                                // at 2 fps forever, whatever is actually on screen.
+                                let pn: *mut AnyObject = msg_send![dict, objectForKey: pk];
+                                if !pn.is_null() {
+                                    let pid: i32 = msg_send![pn, intValue];
+                                    let app: *mut AnyObject = msg_send![
+                                        class!(NSRunningApplication),
+                                        runningApplicationWithProcessIdentifier: pid
+                                    ];
+                                    if !app.is_null() {
+                                        let bid: *mut AnyObject = msg_send![app, bundleIdentifier];
+                                        if !bid.is_null() {
+                                            let b_ptr: *const i8 = msg_send![bid, UTF8String];
+                                            if !b_ptr.is_null()
+                                                && std::ffi::CStr::from_ptr(b_ptr).to_bytes()
+                                                    == b"com.apple.dock"
+                                            {
+                                                continue;
+                                            }
+                                        }
                                     }
                                 }
 
