@@ -34,6 +34,15 @@ function banner() {
   console.log(`  ${c.gray}your wallpaper, at work${c.reset}`);
 }
 
+// ---- quoting a path into somebody else's language ----------------------------
+// A path handed to a shell or to AppleScript has to be quoted for THAT language,
+// not eyeballed. The install root and the temp dir both follow the user's account
+// name, and an account called O'Brien puts an apostrophe in the middle of every
+// path we build — which closes a single-quoted string and turns the rest of the
+// path into code to run.
+const shQuote  = (s) => "'" + String(s).replace(/'/g, "'\\''") + "'";
+const osaQuote = (s) => '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+
 // ---- tiny http ---------------------------------------------------------------
 function req(method, p, body, asBuffer) {
   return new Promise((resolve, reject) => {
@@ -434,9 +443,11 @@ async function main() {
       if (keepData) shArgs.push("--keep-data");
       const go = () => {
         info("Uninstalling… a new Terminal window finishes up.");
-        const escapedArgs = shArgs.map(a => a.replace(/'/g, "'\\''"));
+        // Two languages, two quotings: the command is built for the shell, then
+        // the whole thing is quoted again as an AppleScript string literal.
+        const inner = "bash " + shArgs.map(shQuote).join(" ");
         spawn("osascript", ["-e",
-          `tell application "Terminal" to do script "bash '${escapedArgs.join("' '")}'"`,
+          `tell application "Terminal" to do script ${osaQuote(inner)}`,
         ], { detached: true, stdio: "ignore" }).unref();
         process.exit(0);
       };
@@ -650,8 +661,12 @@ async function main() {
     const wav = path.join(require("os").tmpdir(), "bagidea_say.wav");
     fs.writeFileSync(wav, r.buf);
     if (process.platform === "win32") {
+      // The path travels in the ENVIRONMENT, never in the command text — so there
+      // is no string for an apostrophe in it to close. Interpolated here, one
+      // statement became three on any account whose name has one.
       spawn("powershell", ["-NoProfile", "-Command",
-        `(New-Object Media.SoundPlayer '${wav}').PlaySync()`], { stdio: "ignore" })
+        "(New-Object Media.SoundPlayer $env:BAGIDEA_SAY_WAV).PlaySync()"],
+        { stdio: "ignore", env: { ...process.env, BAGIDEA_SAY_WAV: wav } })
         .on("close", () => ok("Done speaking"));
     } else if (process.platform === "darwin") {
       spawn("afplay", [wav], { stdio: "ignore" })

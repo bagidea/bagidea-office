@@ -6,6 +6,28 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+**Fixed**
+- **`bagidea say` was broken on Windows for anyone whose account name has an
+  apostrophe.** The WAV's path was interpolated into a single-quoted PowerShell
+  string, and `os.tmpdir()` follows `%TEMP%` — which is
+  `C:\Users\<account>\AppData\Local\Temp` by default. An account named O'Brien
+  closed the string mid-path, PowerShell reported *"The string is missing the
+  terminator"*, and nothing played. The same line was a command-injection primitive
+  for anything able to influence `TEMP`: one statement parsed as four. The path now
+  travels in the **environment**, so there is no string for an apostrophe to close.
+- **Three more paths pasted into somebody else's language unquoted**, all carrying
+  the install root, which follows the account name the same way: `bagidea uninstall`
+  on macOS escaped for the shell and then dropped the result into an **AppleScript**
+  string literal without escaping it again (two languages need two quotings); and
+  both the macOS and Linux branches of `POST /update` — the in-app 🔄 button —
+  interpolated `cd '${root}'` with no escaping at either layer.
+- **The in-app 🔄 update button rebuilt nothing on Linux.** It ran `build-mac.sh`.
+  Now `build-linux.sh`, which is what every other Linux path in the repo uses.
+
+  All four found while reviewing [#45](https://github.com/bagidea/bagidea-office/pull/45),
+  an automated scanner report that flagged a neighbouring line built entirely from a
+  constant lookup table — safe — and walked past these.
+
 ## [0.9.54] — 🍎 The Mac wallpaper stops crawling, and no PR ships blind
 
 **Fixed**

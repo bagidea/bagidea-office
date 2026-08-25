@@ -6551,14 +6551,22 @@ end tell`;
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps],
         { detached: true, stdio: "ignore", windowsHide: false }).unref();
     } else if (process.platform === "darwin") {
-      // macOS: git pull + rebuild in a visible Terminal window
+      // macOS: git pull + rebuild in a visible Terminal window.
+      // The install root follows the account name, so it can carry an apostrophe
+      // ("/Users/O'Brien/…") — quote it for the shell, then quote the whole
+      // command again as an AppleScript string. Pasted in raw it ends the quote
+      // and the rest of the path becomes commands to run.
       const root = path.join(__dirname, "..");
-      const script = `tell application "Terminal" to do script "cd '${root}' && git pull && ./build-mac.sh"`;
+      const shq = "'" + root.replace(/'/g, "'\\''") + "'";
+      const inner = `cd ${shq} && git pull && ./build-mac.sh`;
+      const script = `tell application "Terminal" to do script "${inner.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
       spawn("osascript", ["-e", script], { detached: true, stdio: "ignore" }).unref();
     } else {
-      // Linux: same idea, x-terminal-emulator
+      // Linux: same idea, x-terminal-emulator. build-LINUX.sh — this ran the
+      // macOS build script, so the in-app update button rebuilt nothing here.
       const root = path.join(__dirname, "..");
-      spawn("x-terminal-emulator", ["-e", `cd '${root}' && git pull && bash build-mac.sh`],
+      const shq = "'" + root.replace(/'/g, "'\\''") + "'";
+      spawn("x-terminal-emulator", ["-e", `cd ${shq} && git pull && bash build-linux.sh`],
         { detached: true, stdio: "ignore" }).unref();
     }
     res.writeHead(200); res.end("ok");
