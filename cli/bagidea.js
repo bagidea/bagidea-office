@@ -660,12 +660,14 @@ async function main() {
       // Linux: try common players in order until one plays the WAV.
       const players = [["paplay", [wav]], ["aplay", ["-q", wav]],
         ["ffplay", ["-nodisp", "-autoexit", "-loglevel", "quiet", wav]], ["play", [wav]]];
-      (function tryPlay(i) {
-        if (i >= players.length) return info("Saved the voice but found no audio player (install pulseaudio-utils or alsa-utils): " + wav);
-        const p = spawn(players[i][0], players[i][1], { stdio: "ignore" });
-        p.on("error", () => tryPlay(i + 1));
-        p.on("close", (code) => code === 0 ? ok("Done speaking") : tryPlay(i + 1));
-      })(0);
+      let playerIdx = 0;
+      (function tryPlay() {
+        if (playerIdx >= players.length) return info("Saved the voice but found no audio player (install pulseaudio-utils or alsa-utils): " + wav);
+        const [playerCmd, playerArgs] = players[playerIdx];
+        const p = spawn(playerCmd, playerArgs, { stdio: "ignore" });
+        p.on("error", () => { playerIdx++; tryPlay(); });
+        p.on("close", (code) => code === 0 ? ok("Done speaking") : (playerIdx++, tryPlay()));
+      })();
     }
     return;
   }
