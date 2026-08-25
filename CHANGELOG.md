@@ -6,6 +6,22 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+**Fixed**
+- **macOS: the wallpaper ran at 2 fps while it was in plain sight.** The occlusion
+  monitor that throttles the world when it's hidden had two independent bugs, both
+  found and fixed by [@kmmao](https://github.com/kmmao)
+  ([#43](https://github.com/bagidea/bagidea-office/pull/43)):
+  it skipped the Dock's full-screen window by matching the **localized** process name
+  against the literal `"Dock"`, so on any non-English system the match failed and the
+  Dock counted as an app covering the whole screen on *every* poll — the throttle flag
+  could never clear, and restarting didn't help. It's now matched by bundle id
+  (`com.apple.dock`), which is locale-independent. And coverage was always judged on
+  `CGMainDisplayID()`, so with two monitors a fullscreen app on the primary throttled
+  a wallpaper that was fully visible on the secondary; the monitor now finds the
+  world's own desktop-level window and judges both coverage and display-sleep on the
+  display it actually overlaps most. Single-monitor English installs are unchanged,
+  and real fullscreen occlusion still throttles to 2 fps as before.
+
 ## [0.9.53] — 📡 The feed goes back to glass, and reads on hover
 
 **Fixed**

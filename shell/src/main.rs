@@ -1455,11 +1455,14 @@ mod platform {
     /// Background monitor: writes /tmp/bagidea_occ when the wallpaper is
     /// invisible so Godot throttles to 2 fps and stops wasting GPU.
     ///
-    /// Two conditions signal invisibility:
-    ///   1. Display asleep (lid closed / display off) — CGDisplayIsAsleep.
-    ///   2. A window at a layer ABOVE the wallpaper level (–2147483622) covers
-    ///      ≥ 95 % of the main screen — e.g. a fullscreen app, a screensaver, or
-    ///      any maximised window filling the screen.
+    /// Two conditions signal invisibility, both judged on the display the
+    /// wallpaper is actually on rather than on the primary one:
+    ///   1. That display asleep (lid closed / display off) — CGDisplayIsAsleep.
+    ///   2. An ORDINARY window (layer >= 0, so never the desktop or the icon
+    ///      layer) with alpha >= 0.1 covers >= 90 % of that display — a
+    ///      fullscreen app, a screensaver, or any maximised window filling it.
+    ///      System chrome that covers the screen without hiding it (the Dock,
+    ///      matched by bundle id) does not count.
     ///
     /// Uses CGWindowListCopyWindowInfo via toll-free-bridged NSArray/NSDictionary
     /// so we can use msg_send! without adding extra crates.
@@ -1507,7 +1510,11 @@ mod platform {
                     let list: *mut AnyObject =
                         CGWindowListCopyWindowInfo(ON_SCREEN_ONLY, NULL_WINDOW);
                     if list.is_null() {
-                        false
+                        // No window list, so no way to tell which display the world
+                        // is on — but sleep is the one condition that should never
+                        // need one. Fall back to the main display for it rather than
+                        // reporting "visible" while the machine is dark.
+                        CGDisplayIsAsleep(CGMainDisplayID()) != 0
                     } else {
                         let count: usize = msg_send![list, count];
                         let mut found = false;

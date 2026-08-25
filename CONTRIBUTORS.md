@@ -48,6 +48,13 @@ early macOS support, when the project was Windows-only:
   never installed) aborts the whole installer before `|| true` can run — plus the exact
   version-independent fix ([#38](https://github.com/bagidea/bagidea-office/issues/38),
   a bug report + diagnosis).
+- **[@kmmao](https://github.com/kmmao)** (allen) — unpinned the macOS wallpaper from
+  2 fps *while it was fully visible*, with two independent root causes found on their
+  own hardware: the occlusion monitor matched the Dock by its **localized** process
+  name, so on a non-English system it never matched and the Dock's own full-screen
+  window counted as occlusion on every poll; and coverage was judged on
+  `CGMainDisplayID()`, so a fullscreen app on the primary throttled a wallpaper living
+  on a second monitor ([#43](https://github.com/bagidea/bagidea-office/pull/43)).
 
 > Want to be on this list? Open a PR — see [docs/guide/plugin-hub.md](docs/guide/plugin-hub.md)
 > for plugins, or fix anything in the repo. Every merged contribution is credited here
