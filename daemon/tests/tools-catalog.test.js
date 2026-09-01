@@ -169,3 +169,73 @@ test("catalog: the game and 3D tools are present", () => {
     assert.ok(t.cmd, `${id}: no launch command`);
   }
 });
+
+// ── every language, every string ────────────────────────────────────────
+// This product ships globally and English is its default language, so a tool
+// card must not fall back to English on 12 of the 14 supported languages just
+// because someone added an entry and forgot the translations.
+//
+// Thai is authored inline in the catalog; the other twelve overlay the English
+// source from assets/tools-i18n/<lang>.json, keyed by that source string. This
+// test is the thing that makes "we support 14 languages" checkable rather than
+// aspirational.
+const I18N_DIR = path.join(__dirname, "..", "..", "web", "assets", "tools-i18n");
+// The site's own list, minus the two that live in the catalog itself.
+const OVERLAY_LANGS = ["zh", "es", "hi", "ar", "pt", "ru", "ja", "de", "fr", "ko", "id", "vi"];
+
+function sourceStrings() {
+  const out = new Set();
+  for (const t of TOOLS) {
+    for (const k of ["desc", "risk", "needs"]) if (t.en && t.en[k]) out.add(t.en[k]);
+  }
+  return out;
+}
+
+test("i18n: every supported language has an overlay file", () => {
+  for (const l of OVERLAY_LANGS) {
+    assert.ok(fs.existsSync(path.join(I18N_DIR, l + ".json")),
+      `no tool translations for "${l}" — that language would read English`);
+  }
+});
+
+test("i18n: every English string is translated in every language", () => {
+  const src = sourceStrings();
+  for (const l of OVERLAY_LANGS) {
+    const map = JSON.parse(fs.readFileSync(path.join(I18N_DIR, l + ".json"), "utf8"));
+    const missing = [...src].filter((s) => !(s in map));
+    assert.deepStrictEqual(missing, [],
+      `${l}.json is missing ${missing.length} string(s), starting with: ` +
+      (missing[0] || "").slice(0, 60));
+  }
+});
+
+test("i18n: no translation is just the English left in place", () => {
+  // A copied-through string is the failure that looks like success — the file
+  // has the key, the card renders, and the reader still gets English.
+  for (const l of OVERLAY_LANGS) {
+    const map = JSON.parse(fs.readFileSync(path.join(I18N_DIR, l + ".json"), "utf8"));
+    const copied = Object.keys(map).filter((k) => map[k] === k);
+    assert.deepStrictEqual(copied, [],
+      `${l}.json leaves ${copied.length} string(s) in English`);
+  }
+});
+
+test("i18n: no overlay carries a string the catalog no longer has", () => {
+  // Stale keys are how a file drifts: it looks complete while translating text
+  // nobody shows any more.
+  const src = sourceStrings();
+  for (const l of OVERLAY_LANGS) {
+    const map = JSON.parse(fs.readFileSync(path.join(I18N_DIR, l + ".json"), "utf8"));
+    const stale = Object.keys(map).filter((k) => !src.has(k));
+    assert.deepStrictEqual(stale, [],
+      `${l}.json has ${stale.length} stale key(s), starting with: ` +
+      (stale[0] || "").slice(0, 60));
+  }
+});
+
+test("i18n: every entry is authored in Thai in the catalog itself", () => {
+  // Thai does not use an overlay file — it is written next to the English.
+  for (const t of TOOLS) {
+    assert.ok(t.th && t.th.desc, `${t.id}: no Thai description`);
+  }
+});

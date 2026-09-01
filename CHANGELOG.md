@@ -4,6 +4,40 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [1.0.1] — 🌐 Fourteen languages, actually
+
+This office ships worldwide, and 1.0.0 quietly assumed otherwise in three
+places. Nothing here changes behaviour; it changes what the product says, and
+to whom.
+
+**Fixed**
+- **The Tools page read English in 12 of the 14 languages.** The site's language
+  files cover page *chrome*; the tool descriptions live in the catalog, which
+  only ever carried English and Thai — so a reader in Japanese or Arabic got a
+  translated page wrapped around English cards. All 79 catalog strings are now
+  translated into every supported language (`web/assets/tools-i18n/<lang>.json`,
+  fetched on demand, English as the fallback). "Falls back to English" is not
+  the same as "supported".
+- **Three new settings had no stable name outside Thai.** Every field in the
+  chat window leads with an ALL-CAPS English term — 🔌 MCP SERVERS, ⚡ SYSTEM
+  TOOLS, 🔑 API KEYS — with the Thai after it. That is not decoration: the
+  window is Thai-source and a DOM pass machine-translates it at runtime, so the
+  English term is the part that survives unchanged. It is the name an English
+  office shows and the only name the docs can cite. The 1.0.0 additions were
+  Thai-only; they are now **📦 RUN LOCATION**, **🔎 SEMANTIC RECALL** and
+  **👻 GHOST ISOLATION**.
+- **The English guide cited Thai labels.** Doubly wrong: a reader of an English
+  page is running an English office and would never see them. Those pages now
+  cite the English names, and the example of a word-match failure that ran in
+  Thai runs in English on the English-facing pages.
+
+**Added**
+- **Tests that keep it true.** The catalog now fails CI if a language is
+  missing an overlay file, if any English string is untranslated in any
+  language, if a "translation" is just the English copied through — the failure
+  that looks like success — or if a file carries a string the catalog no longer
+  has.
+
 ## [1.0.0] — 🏢 An office that can run anywhere, recall what you meant, and correct itself
 
 > **On the version number:** nothing here breaks. Every addition is opt-in and an

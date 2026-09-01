@@ -141,11 +141,26 @@
   };
   let CATALOG = [];
   let QUERY = "";
-  const lang = () => (document.documentElement.lang === "th" ? "th" : "en");
+  const lang = () => document.documentElement.lang || "en";
+  let TT_TOOLS = {};        // english source -> translation, for the current language
+  let TT_LANG = null;
+  async function ensureToolLang(l) {
+    if (l === TT_LANG) return;
+    TT_LANG = l;
+    if (l === "en" || l === "th") { TT_TOOLS = {}; return; }
+    try {
+      const r = await fetch("assets/tools-i18n/" + l + ".json", { cache: "force-cache" });
+      TT_TOOLS = r.ok ? await r.json() : {};
+    } catch { TT_TOOLS = {}; }
+  }
   const esc = (s) => String(s || "").replace(/[<>&"]/g, (c) => ({ "<":"&lt;", ">":"&gt;", "&":"&amp;", '"':"&quot;" }[c]));
 
   function card(t, u, L) {
-    const desc = (t[L] && t[L].desc) || (t.en && t.en.desc) || (t.th && t.th.desc) || "";
+    // Thai is authored in the catalog itself; every other language overlays the
+    // English source. A missing translation shows English rather than nothing.
+    const en = (t.en && t.en.desc) || "";
+    const desc = L === "th" ? ((t.th && t.th.desc) || en)
+                            : (TT_TOOLS[en] || en);
     if (t.kind === "builtin") {
       return `<div class="pcard"><div class="tic">${esc(t.icon)}</div><h3>${esc(t.name)}</h3>
         <p class="pdesc">${esc(desc)}</p>
@@ -188,10 +203,11 @@
   }
   let tt; function toast(t){ const e=document.getElementById("ptoast"); e.textContent=t; e.classList.add("show"); clearTimeout(tt); tt=setTimeout(()=>e.classList.remove("show"),3600); }
 
-  new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
+  const onLang = () => ensureToolLang(lang()).then(render);
+  new MutationObserver(onLang).observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
   fetch("tools.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
     CATALOG = (d.tools || []).filter((t) => t && t.id && t.kind);
-    render();
+    onLang();
   }).catch(() => render());
 
   const tsearch = document.getElementById("tsearch");
