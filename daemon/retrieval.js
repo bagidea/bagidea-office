@@ -5,6 +5,11 @@
 // into the prompt (the "Hermes way"). No embeddings, no network — pure JS,
 // works offline.
 //
+// BM25 matches WORDS. When the office is also running the optional semantic
+// tier (daemon/semantic.js), a caller can hand search() a query VECTOR and the
+// two rankings are fused — words and meaning, neither replacing the other. With
+// no vector, the behaviour here is byte for byte what it always was.
+//
 // Cost: search scores only the documents that share a term with the query
 // (union of postings lists), never the whole corpus → scales with query length.
 //
@@ -13,6 +18,9 @@
 
 const fs = require("fs");
 const path = require("path");
+// Optional partner: retrieval works fully without it, and must keep doing so.
+let semantic = null;
+try { semantic = require("./semantic"); } catch { semantic = null; }
 
 const VER = 1;                 // bump to force a full rebuild after tokenizer changes
 const K1 = 1.2, B = 0.75;      // standard BM25 knobs
@@ -163,7 +171,49 @@ function search(query, opts = {}) {
     if (score > 0) scored.push({ id, tier: doc.tier, ref: doc.ref, text: doc.text, score });
   }
   scored.sort((a, b) => b.score - a.score);
+
+  // opts.qvec: the caller already embedded the query — only they can, because
+  // it costs a network round trip and this module is synchronous. Rank by
+  // meaning too, then fuse the two orders.
+  //
+  // Fusion cannot WIDEN a search: the semantic side is restricted to ids that
+  // pass the same tier and ref filters, so nothing becomes reachable that was
+  // not already. It is deliberately not restricted to the word-match set,
+  // because those are exactly the documents semantics exist to find.
+  if (opts.qvec && semantic && semantic.ready()) {
+    const allowed = new Set();
+    for (const [id, doc] of docs) {
+      if (tiers && !tiers.has(doc.tier)) continue;
+      if (refs) {
+        const want = refs[doc.tier];
+        if (want !== undefined && want !== true && String(want) !== doc.ref) continue;
+      }
+      allowed.add(id);
+    }
+    const byMeaning = semantic.rank(opts.qvec, allowed, Math.max(k * 3, 20)).map((r) => r.id);
+    if (byMeaning.length) {
+      const bm = new Map(scored.map((x) => [x.id, x]));
+      const fused = semantic.fuse(scored.map((x) => x.id), byMeaning, k);
+      const out = [];
+      for (const id of fused) {
+        if (bm.has(id)) { out.push(bm.get(id)); continue; }
+        const d = docs.get(id);
+        // Found by meaning alone: it shares no query term, so its BM25 score
+        // really is 0. Saying so beats inventing a number.
+        if (d) out.push({ id, tier: d.tier, ref: d.ref, text: d.text, score: 0, viaMeaning: true });
+      }
+      return out;
+    }
+  }
   return scored.slice(0, k);
+}
+
+// Every indexed document, for whoever needs to walk the whole corpus — today
+// that is the semantic tier keeping its vectors in step with this index.
+function allDocs() {
+  const out = [];
+  for (const [id, d] of docs) out.push({ id, tier: d.tier, ref: d.ref, text: d.text });
+  return out;
 }
 
 function stats() {
@@ -233,5 +283,5 @@ function init(paths = {}) {
 module.exports = {
   tokenize, unitsFromMarkdown,            // exported for tests
   init, addDoc, removeDoc, removeDocs, reindexFile, reindexSkill,
-  search, stats, persist, loadPersisted, clear,
+  search, stats, persist, loadPersisted, clear, allDocs,
 };

@@ -949,6 +949,7 @@
   <div class="opt" id="workflowBtn">🔀 <span>Workflow Builder</span></div>
   <div class="opt" id="toolshubBtn">🧰 <span>Tools Hub</span></div>
   <div class="opt" id="pluginshubBtn">🧩 <span>Plugins Hub</span></div>
+  <div class="opt" id="studioBtn">🎨 <span>Media Studio</span></div>
   <div class="opt" id="editBtn">🎨 <span>จัดออฟฟิศ</span></div>
   <div class="opt" id="discussBtn">🗣 <span>ประชุม agents</span></div>
   <div class="opt" id="mapBtn">🗺 <span>แผนที่</span></div>
@@ -1376,6 +1377,7 @@
   let BUILTIN_DESC = {}, REGMCP = {}, SOUND = true, HEARTBEAT = 0;
   let REGBACKENDS = {}, REGBACKEND = "local";
   let GHOSTWT = false;
+  let SEMANTIC = { enabled:false, ready:false, vectors:0, model:"", baseUrl:"" };
   let FEATURES = { openai: false, gemini: false, stt: false, tts: false, live: false, image: false };
   let TTSON = true, SOCIALMIN = 60, MAXSTAFF = 18, PROPOSALMIN = 120;
   let PROJECTS_CACHE = [];
@@ -3156,6 +3158,21 @@
           <div class="knob"></div> Auto-learn: agents distill finished work into new skills</div>
         <div class="switch ${VERIFY ? "on" : ""}" id="verifySw">
           <div class="knob"></div> ${tr("ตรวจงานก่อนส่ง CEO: reviewer เช็คงานที่มอบหมาย แล้วให้แก้ 1 รอบถ้าเจอปัญหา (ช้าลง+ใช้ token เพิ่ม)")}</div>
+        <div class="field"><label>🔎 ค้นความจำด้วยความหมาย (ไม่ใช่แค่คำ)</label>
+          <div style="font-size:11px;color:var(--dim);margin-bottom:8px">
+            ปกติออฟฟิศค้นความจำด้วย<b>คำ</b> — ถามว่า “ทำไมวอลเปเปอร์หาย” แล้วโน้ตที่เขียนว่า
+            “WorkerW teardown kills the embedded world” จะไม่ขึ้น เพราะไม่มีคำไหนตรงกันเลย<br>
+            เปิดอันนี้แล้วจะค้นด้วย<b>ความหมาย</b>เพิ่มอีกทาง แล้วรวมสองอันดับเข้าด้วยกัน<br>
+            ใส่ endpoint แบบ OpenAI — <code>http://localhost:11434/v1</code> (Ollama ในเครื่อง ฟรีและไม่ส่งข้อมูลออก)
+            หรือของเจ้าอื่นก็ได้ · โมเดลแนะนำ <code>nomic-embed-text</code></div>
+          <div class="assistrow">
+            <input id="semUrl" placeholder="http://localhost:11434/v1">
+            <input id="semModel" placeholder="nomic-embed-text" style="flex:0 0 190px">
+            <input id="semKey" placeholder="ชื่อ key (ถ้าต้องใช้)" style="flex:0 0 150px">
+            <button class="sparkle" id="semSave">บันทึก</button>
+          </div>
+          <div id="semHint" style="font-size:10.5px;color:var(--dim);margin-top:6px"></div>
+        </div>
         <input id="sFilter" class="filterbox" placeholder="🔍 ค้นหา skill…">
         <div id="slist" class="biglist"></div><button class="bigbtn" id="newSkill">＋ New skill</button>`;
     } else if (tab === "tools") {
@@ -3333,6 +3350,30 @@
         await api("/registry/autoskills", { enabled: !AUTOSKILLS });
         e.currentTarget.classList.toggle("on", !AUTOSKILLS);
       };
+      const semUrl = modalCard.querySelector("#semUrl");
+      if (semUrl) {
+        semUrl.value = SEMANTIC.baseUrl || "";
+        modalCard.querySelector("#semModel").value = SEMANTIC.model || "";
+        modalCard.querySelector("#semKey").value = SEMANTIC.keyName || "";
+        const sh = modalCard.querySelector("#semHint");
+        sh.textContent = SEMANTIC.ready
+          ? tr("✓ เปิดอยู่ · จำได้แล้ว %n ชิ้น").replace("%n", SEMANTIC.vectors)
+          : (SEMANTIC.enabled ? tr("⚠ ตั้งไว้แล้วแต่ยังต่อไม่ได้") : tr("ปิดอยู่ — ค้นด้วยคำอย่างเดียว"));
+        modalCard.querySelector("#semSave").onclick = async () => {
+          const baseUrl = semUrl.value.trim();
+          const model = modalCard.querySelector("#semModel").value.trim();
+          const keyName = modalCard.querySelector("#semKey").value.trim();
+          sh.textContent = tr("กำลังทดสอบ…");
+          // Saving TESTS the endpoint. An embeddings endpoint that only fails
+          // later fails silently: recall quietly drops back to word matching
+          // and nothing says why.
+          const r = await api("/registry/semantic", { enabled: !!(baseUrl && model), baseUrl, model, keyName });
+          if (r && r.error) { sh.textContent = "⚠ " + r.error; return; }
+          sh.textContent = r && r.ready
+            ? tr("✓ ต่อได้ (%d มิติ) — กำลังทยอยจำความจำเดิมอยู่เบื้องหลัง").replace("%d", r.dims || "?")
+            : (baseUrl && model ? tr("⚠ ต่อไม่ได้ — เช็ค URL, ชื่อโมเดล และว่ามันรันอยู่ไหม") : tr("ปิดแล้ว"));
+        };
+      }
       modalCard.querySelector("#verifySw").onclick = async (e) => {
         await api("/registry/verify", { enabled: !VERIFY });
         VERIFY = !VERIFY;
@@ -4167,6 +4208,13 @@
   document.getElementById("toolshubBtn").onclick = () => {
     document.getElementById("moreMenu").classList.remove("open");
     popWindow("/toolshub", "🧰 Tools Hub", "toolshub", { w: 860, h: 720 });
+  };
+  // 🎨 Media Studio — make a picture, change one, make it move. Its own window
+  // because the work is iterative: you look at the last result while writing
+  // the next instruction.
+  document.getElementById("studioBtn").onclick = () => {
+    document.getElementById("moreMenu").classList.remove("open");
+    popWindow("/studio", "🎨 Media Studio", "studio", { w: 880, h: 760 });
   };
   // 🧩 Plugins Hub — community plugin catalog, one-click install, its own window
   document.getElementById("pluginshubBtn").onclick = () => {
@@ -5751,6 +5799,7 @@
       REGBACKENDS = ev.backends || {};
       REGBACKEND = ev.backend || "local";
       GHOSTWT = ev.ghostWorktrees === true;
+      SEMANTIC = ev.semantic || SEMANTIC;
       AUTOSKILLS = ev.autoSkills !== false;
       VERIFY = ev.verifyDelegated === true;
       AUTOAPPROVE = ev.autoApprove === true;

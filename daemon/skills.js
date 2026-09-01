@@ -87,4 +87,17 @@ function syncAll(agentsRoot, agents, skills) {
   return { wrote, pruned };
 }
 
-module.exports = { agentDir, skillsRoot, frontmatter, syncAgent, syncAll, effectiveIds };
+// May the office rewrite this skill's own instructions?
+//
+// Reflection after a task can revise a skill it decides was wrong. That is
+// only ever allowed on skills the office WROTE ITSELF and nobody has since
+// touched. A builtin is part of the office's contract with every user, and a
+// skill a human edited is that human's writing — neither is a draft the model
+// gets to improve. Kept here, as one function, so the rule cannot drift
+// between the place that enforces it and the place that documents it.
+function canRefine(sk) {
+  return !!(sk && sk.auto && !sk.builtin && !sk.edited);
+}
+
+module.exports = { agentDir, skillsRoot, frontmatter, syncAgent, syncAll, effectiveIds,
+  canRefine };

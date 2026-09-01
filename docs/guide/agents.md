@@ -110,6 +110,22 @@ they'll travel with every new session of that agent
 whether the task could be distilled into a reusable skill — if so, a new skill is saved, assigned to the person who
 did it, and announced 📚 in the office (you'll see gold light burst above their head)
 
+**Self-correction**: the same reflection can now go back and *fix* a skill, not
+only write new ones. A skill whose steps are subtly wrong used to stay wrong
+forever and get handed to more agents over time — confidently wrong, in writing.
+
+The strongest signal for this is a task that **failed**: whatever the skill told
+the agent to do did not work. So a failed run now reflects too, for revision
+only — it has no success to generalise from. When a skill is revised the office
+announces it with the reason, and the previous version is kept so you can undo it.
+
+Two rules bound it, and they are not negotiable:
+
+- **Built-in skills are never touched.** They are the same in every office; a
+  model rewriting one would fork the product's behaviour on one machine.
+- **Once you have edited a skill, it is yours.** Your writing is not the model's
+  draft, so the office stops revising it from that point on.
+
 ## MCP Servers — unlimited new abilities
 
 The quickest route is the **🧰 Tools Hub**, a browsable catalog with an Add

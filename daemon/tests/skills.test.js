@@ -63,3 +63,34 @@ test("syncAll covers every agent in the roster", () => {
   assert.ok(fs.existsSync(path.join(S.skillsRoot(root, "sahara"), "office-ops", "SKILL.md")));
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+// ── canRefine: who may rewrite a skill's instructions ────────────────────
+// The office revises its own skills after a task teaches it one was wrong.
+// This is the rule that decides which skills are in scope, and getting it
+// wrong means the model quietly rewrites either the office's own contract or
+// something a human wrote.
+const { canRefine } = require("../skills");
+
+test("canRefine: a skill the office wrote itself may be revised", () => {
+  assert.strictEqual(canRefine({ auto: true, content: "x" }), true);
+});
+
+test("canRefine: a BUILTIN skill may never be revised", () => {
+  // Builtins are the same in every office. A model rewriting one would fork
+  // the product's behaviour on one person's machine.
+  assert.strictEqual(canRefine({ builtin: true, content: "x" }), false);
+  assert.strictEqual(canRefine({ builtin: true, auto: true, content: "x" }), false);
+});
+
+test("canRefine: once a human has edited it, it is theirs", () => {
+  assert.strictEqual(canRefine({ auto: true, edited: true, content: "x" }), false);
+});
+
+test("canRefine: a hand-written skill is not auto, so it is out of scope", () => {
+  assert.strictEqual(canRefine({ content: "x" }), false);
+});
+
+test("canRefine: nothing at all is not refinable", () => {
+  assert.strictEqual(canRefine(null), false);
+  assert.strictEqual(canRefine(undefined), false);
+});
