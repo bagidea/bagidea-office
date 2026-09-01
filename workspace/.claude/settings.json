@@ -1,3 +1,15 @@
 {
-  "hooks": {}
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"E:\\\\Projects\\\\bagidea-ai-agents-office\\\\daemon\\\\perm.js\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
 }
