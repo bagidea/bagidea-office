@@ -6,6 +6,47 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+**Added — the five things the field had and we didn't**
+
+A survey of where the open-source agent projects have got to (OpenClaw,
+Hermes Agent, thClaws, ARRA Oracle) found five real gaps once the ones we had
+already closed were set aside. All five are here.
+
+- **📦 An agent can run somewhere that isn't your desktop.** Every run was
+  `claude -p` on this machine, so an agent that went wrong went wrong on the
+  real computer and the office could never be bigger than one of them. ⚙ →
+  TOOLS now takes a **Docker** image or an **SSH** host; set it for the office
+  or per agent. A container gets the office read-only at `/office` and the
+  working directory at `/work`, and nothing else on the disk exists as far as
+  that agent is concerned. Keys pass by *name*, so values never appear in a
+  process listing. A backend that cannot be built correctly is **refused, not
+  downgraded** — most importantly when `--settings` cannot be placed, because
+  that is what installs the permission broker, and a run that quietly loses it
+  works fine with nobody watching.
+- **👻 Ghost clones stop overwriting each other.** Parallel ghosts have always
+  shared one directory. Each can now get its own `git worktree`, with the work
+  coming back as `office/ghost-<id>` branches to review. Your checkout is never
+  touched, a ghost that changed nothing leaves nothing, and a ghost that failed
+  still keeps what it wrote. Off by default: it moves where a ghost's edits
+  land.
+- **🔎 Recall by meaning, not only by words.** Memory search matched words —
+  ask *"ทำไมวอลเปเปอร์หาย"* and a note reading *"WorkerW teardown kills the
+  embedded world"* shares no token with the question and never came back. Point
+  ⚙ → SKILLS at any OpenAI-shaped `/embeddings` (a local Ollama costs nothing
+  and keeps your memory on the machine) and both rankings are fused. Off by
+  default; word search is untouched and still runs alone.
+- **📚 Skills that fix themselves.** The office wrote itself new skills and never
+  revised one, so a skill with subtly wrong steps stayed wrong forever and got
+  handed to more agents over time. Reflection can now correct one — and it runs
+  after **failures** too, which is the strongest evidence a skill is wrong and
+  was previously thrown away. Never a built-in, never one you have edited, and
+  the previous version is kept.
+- **🎨 Media Studio.** The office could make a picture but not change one, so
+  any real production job left halfway through. Make, change and animate in one
+  window; an edit never overwrites its input and its result becomes the
+  selection, so the next instruction refines rather than restarts. Agents can
+  make and edit pictures; video is owner-only and says its price on the button.
+
 **Added**
 - **The engines are in the office.** 🧰 Tools Hub gains a *Creative & game dev*
   tier — **Blender**, **Godot**, **Unity**, **Unreal Engine** and **Roblox
