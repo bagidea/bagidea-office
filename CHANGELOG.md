@@ -26,6 +26,16 @@ how many languages it tells you.
   strings × 14 languages, written rather than left to fall back — English,
   ไทย, 中文, Español, हिन्दी, العربية, Português, Русский, 日本語, Deutsch,
   Français, 한국어, Indonesia, Tiếng Việt.
+- **The Plugins Hub read English in 12 of the 14 languages** — the last known
+  gap of this kind. `web/plugins.json` carried English and Thai, and the page
+  collapsed every other language to one of those two before rendering, so a
+  reader in Korean got a fully translated page wrapped around English plugin
+  cards. The catalog now has per-language overlays
+  (`web/assets/plugins-i18n/<lang>.json`, keyed by the English source, fetched
+  on demand) and `plugins.html` reads the real document language. Guarded by
+  `daemon/tests/plugins-catalog.test.js` — eight tests, including one that
+  fails if the page stops fetching the overlays, because twelve translated
+  files no page loads is twelve files of dead weight and the bug still ships.
 - **A guide for the 🧰 Tools Hub** ([`docs/guide/tools-hub.md`](docs/guide/tools-hub.md)):
   the 43 entries and what separates the 15 built-in abilities from the 28 MCP
   servers, the creative shelf (Blender, Godot, Unity, Unreal Engine, Roblox
@@ -38,8 +48,8 @@ how many languages it tells you.
   translated everywhere, no language carries a key English has dropped, no
   *paragraph* is the English left in place, every `data-i18n` key on every page
   has an English source, the v1.0 capabilities are present in all 14 languages,
-  and the ALL-CAPS setting names the docs cite still exist in the app. The suite
-  goes from 242 to 250 tests.
+  and the ALL-CAPS setting names the docs cite still exist in the app. With the
+  eight plugin-catalog tests, the suite goes from 242 to 258.
 
 **Changed**
 - **README.** The daemon feature list now documents 📦 run location and 🔎
