@@ -47,12 +47,16 @@
     <a href="#projects" data-i18n="dn_projects">Projects</a>
     <a href="#security" data-i18n="dn_security">Permissions</a>
     <a href="#auto" data-i18n="dn_auto">Keep going (AUTO)</a>
+    <a href="#where" data-i18n="dn_where">Where agents run</a>
+    <a href="#recall" data-i18n="dn_recall">Recall by meaning</a>
     <a href="#editor" data-i18n="dn_editor">3D Editor</a>
     <a href="#voice" data-i18n="dn_voice">Voice & channels</a>
     <a href="#updates" data-i18n="dn_updates">Updates & start-up</a>
     <h4 data-i18n="dn_features">More</h4>
     <a href="#brains" data-i18n="dn_brains">Swappable brains</a>
     <a href="#plugins" data-i18n="dn_plugins">Plugins & skills</a>
+    <a href="#tools" data-i18n="dn_tools">Tools Hub</a>
+    <a href="#media" data-i18n="dn_media">Media Studio</a>
     <a href="#workflow" data-i18n="dn_workflow">Workflow Builder</a>
     <a href="#lang" data-i18n="dn_lang">Languages</a>
     <a href="#sponsors" data-i18n="dn_sponsors">Sponsoring</a>
@@ -88,6 +92,7 @@
       <a class="btn ghost sm" href="https://github.com/bagidea/bagidea-office/blob/main/docs/guide/voice-feed.md" target="_blank" rel="noopener" data-i18n="dn_voice">🎤 Voice & feed</a>
       <a class="btn ghost sm" href="https://github.com/bagidea/bagidea-office/blob/main/docs/guide/plugins.md" target="_blank" rel="noopener" data-i18n="dn_plugins">🔌 Plugins & skills</a>
       <a class="btn ghost sm" href="https://github.com/bagidea/bagidea-office/blob/main/docs/guide/plugin-hub.md" target="_blank" rel="noopener" data-i18n="dg_hub">🧩 Plugin Hub</a>
+      <a class="btn ghost sm" href="https://github.com/bagidea/bagidea-office/blob/main/docs/guide/tools-hub.md" target="_blank" rel="noopener" data-i18n="dn_tools">🧰 Tools Hub</a>
       <a class="btn ghost sm" href="https://github.com/bagidea/bagidea-office/blob/main/docs/guide/workflows.md" target="_blank" rel="noopener" data-i18n="dn_workflow">🔀 Workflow Builder</a>
       <a class="btn ghost sm" href="https://github.com/bagidea/bagidea-office/blob/main/docs/guide/editor.md" target="_blank" rel="noopener" data-i18n="dn_editor">🏢 3D Editor</a>
       <a class="btn ghost sm" href="https://github.com/bagidea/bagidea-office/blob/main/docs/guide/ai-features.md" target="_blank" rel="noopener" data-i18n="dg_ai">✨ AI features</a>
@@ -186,6 +191,12 @@ bagidea start   # launch the office</code></pre>
     <h3 id="auto" data-i18n="d_auto_h">Keep going without you (AUTO)</h3>
     <p data-i18n="d_auto_p">By default, an agent that reaches a fork stops to ask your opinion and the job waits until you answer. Turn AUTO on (⚙ → TOOLS, or bagidea auto on) and it decides for itself and opens its own next turn until the work is genuinely finished — at most 8 self-driven rounds per job, each announced in chat. It still stops for a credential it cannot get, or an action that cannot be undone (push, deploy, delete, spend), and that block is pushed to your channels. Scheduled jobs run as real orders too. AUTO removes the wait for an opinion; what an agent may do is still the separate 🔓 auto-approve switch.</p>
 
+    <h3 id="where" data-i18n="d_where_h">Where agents run</h3>
+    <p data-i18n="d_where_p">By default every agent runs on the machine the office is on. ⚙ → TOOLS → 📦 RUN LOCATION points the whole office — or one agent — somewhere else: a throwaway Docker container, or another machine over SSH. A container gets exactly two mounts, the office root at /office read-only and the working directory at /work, and API keys are passed by name, so the values travel in Docker’s own environment and never appear in a process listing. The image must have the claude CLI on its PATH — the office does not install it for you. And a backend that cannot be built correctly is refused, not quietly downgraded, above all when the settings file that installs the permission broker cannot be placed: a run that loses it works fine with nobody watching.</p>
+    <h3 id="ghostiso" data-i18n="d_ghostiso_h">Ghosts that don’t overwrite each other</h3>
+    <p data-i18n="d_ghostiso_p">Ghost clones have always shared one directory, and two of them editing one file is not a race careful prompting wins. ⚙ → TOOLS → 👻 GHOST ISOLATION gives each ghost its own git worktree on a project that is a git repository: both succeed, their work comes back as office/ghost-&lt;id&gt; branches for you to review, a ghost that changed nothing leaves no directory and no branch, and your working copy is never touched — not even to stash. It is off by default, because turning it on moves where a ghost’s edits land.</p>
+    <h3 id="recall" data-i18n="d_recall_h">Recall by meaning, not only by words</h3>
+    <p data-i18n="d_recall_p">What decides which memory a session sees is a search over everything the office knows, and that search matches words — BM25, no dependencies, offline. It is fast and often enough, and it has one blind spot: ask “why did the wallpaper vanish” and a note reading “WorkerW teardown kills the embedded world” shares no meaningful token with the question, so however good that note is, it does not come back. ⚙ → SKILLS → 🔎 SEMANTIC RECALL points the office at any OpenAI-shaped /embeddings endpoint — a local Ollama is the recommended setup, because it costs nothing and your memory never leaves the machine — and fuses the two rankings so words and meaning each get a say. It is off until you turn it on, saving tests the endpoint and reports the vector size, and if the endpoint later goes down recall quietly returns to matching words rather than failing.</p>
     <h3 id="editor" data-i18n="d_editor_h">The 3D Editor</h3>
     <p data-i18n="d_editor_p">Open the editor (the 🎨 button or bagidea editor) to rearrange the office in true 3D: click two rooms to swap them on the 3×3 grid, move the Ghost Deck, place furniture and decor, and import your own .glb/.gltf/.fbx models and images. Save and the wallpaper updates instantly — furniture, agent seats, navigation and pets all follow.</p>
     <img src="img/editor.png" alt="The 3D Office Editor">
@@ -218,6 +229,12 @@ bagidea start   # launch the office</code></pre>
     <pre><code>bagidea plugin install https://github.com/bagidea/bagidea-office-template</code></pre>
     <p data-i18n="d_skills_p">Every office ships with 15 builtin skill packs — deep research, web automation, office control, office operations, plugin building, code review, doc writing, debugging, data wrangling, project kickoff, diagram making, archive recall, workflow building, a file &amp; media toolkit (read/convert PDF·Excel·Word·PowerPoint, build slide decks, transcribe video, edit images), and office-scheduled jobs — that you can assign to any agent, plus Hermes-style skills the office learns automatically after real work. Add new raw capability via MCP servers.</p>
 
+    <h3 data-i18n="d_selfskill_h">Skills that correct themselves</h3>
+    <p data-i18n="d_selfskill_p">After a real multi-tool task, a reflection pass decides whether the work distills into a reusable skill. Since v1.0.0 the same pass can also correct a skill it wrote earlier, and it runs after failures too — the strongest evidence a skill is wrong, and previously the one case that was thrown away. It never touches a built-in and never touches a skill you edited by hand, and the previous version is kept, so a correction can be undone.</p>
+    <h2 id="tools" data-i18n="d_tools_h">The Tools Hub</h2>
+    <p data-i18n="d_tools_p">⋯ → 🧰 Tools Hub is a browsable catalog of 43 entries: the 15 abilities every agent already has, and 28 MCP servers you can add with one click — browser automation, GitHub, Notion, Slack, Postgres, and a creative shelf with Blender, Godot, Unity, Unreal Engine and Roblox Studio. Every card carries a plain-language risk line, because a search server and a database server are not the same question, and adding a server to the office stays a separate step from granting it to an agent. The catalog is a file the office fetches live, so a renamed package is a pull request rather than a release.</p>
+    <h2 id="media" data-i18n="d_media_h">Media Studio</h2>
+    <p data-i18n="d_media_p">⋯ → Media Studio opens the office’s media room: make a picture, change one, then make it move — in one window, because the work is iterative. An edit never overwrites its input; you always get a new file and the result becomes the selection, so a second instruction refines the first rather than starting over. Everything lands in workspace/uploads, so it shows in chat straight away. Agents can make and change pictures; only you can make video, because a clip costs around $2 and the button says the price next to it.</p>
     <h2 id="workflow" data-i18n="d_wf_h">Workflow Builder</h2>
     <p data-i18n="d_wf_p">Plan work as plain-language nodes on a drag-drop canvas (⋯ menu → Workflow Builder) — each node is a step (trigger / fetch / action / decision / output) and the flow reads top to bottom. Press <b>Analyze</b> and the Director reads your plan and tells you which skills and tools it needs, what permissions or extra agents to add, and what's still undecided — so you can plan work even if you don't know how to instruct it, and let the team work out the execution.</p>
     <ol>

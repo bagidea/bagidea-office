@@ -4,6 +4,55 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [1.0.2] — 📖 The documentation catches up with the product
+
+v1.0.0 shipped five real capabilities and v1.0.1 made the office speak fourteen
+languages properly. Neither of them reached the surfaces most people actually
+read: the website's feature grid, the docs site, and the guide set had no idea
+any of it existed. A capability nobody can find is a capability nobody has.
+
+Nothing here changes behaviour. It changes what the product tells you, and in
+how many languages it tells you.
+
+**Added**
+- **The website now describes what v1.0 added.** Four new cards on the landing
+  page — 📦 *Run it somewhere else*, 🔎 *Recall by meaning*, 🎨 *Media
+  Studio* and 📚 *Skills that correct themselves* — and six new sections on the
+  docs page: where agents run, ghosts that don't overwrite each other, recall by
+  meaning, self-correcting skills, the Tools Hub and the Media Studio. Each one
+  cites the **ALL-CAPS English setting name** the app itself shows, so the page
+  and the office agree on what a thing is called.
+- **All of it in all fourteen languages, on the same commit.** 24 new site
+  strings × 14 languages, written rather than left to fall back — English,
+  ไทย, 中文, Español, हिन्दी, العربية, Português, Русский, 日本語, Deutsch,
+  Français, 한국어, Indonesia, Tiếng Việt.
+- **A guide for the 🧰 Tools Hub** ([`docs/guide/tools-hub.md`](docs/guide/tools-hub.md)):
+  the 43 entries and what separates the 15 built-in abilities from the 28 MCP
+  servers, the creative shelf (Blender, Godot, Unity, Unreal Engine, Roblox
+  Studio), why keys should be named rather than pasted, how to read the risk
+  line, and how to submit an entry — including why every one is checked against
+  the registry before it merges. Linked from the README, the docs site and the
+  tools page.
+- **`daemon/tests/site-i18n.test.js` — the website's i18n is now checkable.**
+  Eight tests: every advertised language has a table, every English key is
+  translated everywhere, no language carries a key English has dropped, no
+  *paragraph* is the English left in place, every `data-i18n` key on every page
+  has an English source, the v1.0 capabilities are present in all 14 languages,
+  and the ALL-CAPS setting names the docs cite still exist in the app. The suite
+  goes from 242 to 250 tests.
+
+**Changed**
+- **README.** The daemon feature list now documents 📦 run location and 🔎
+  semantic recall as their own entries, and the ghost, skills and tools entries
+  say what v1.0.0 actually did to them. Eight new HTTP API rows
+  (`/registry/backend`, `/registry/ghostworktrees`, `/registry/semantic`,
+  `/registry/skill/revert`, `/gen/image/edit`, `/gen/video`, `/studio`,
+  `/tools/catalog`), the Media Studio in the media section, the Tools Hub guide
+  in the guide table, and seven v1.0 items on the roadmap.
+- **The ghost card on the landing page** stopped describing only the part that
+  was true before v1.0.0 — it now mentions the private `git worktree` each
+  ghost gets and the branches its work comes back as.
+
 ## [1.0.1] — 🌐 Fourteen languages, actually
 
 This office ships worldwide, and 1.0.0 quietly assumed otherwise in three

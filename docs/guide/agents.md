@@ -128,11 +128,12 @@ Two rules bound it, and they are not negotiable:
 
 ## MCP Servers — unlimited new abilities
 
-The quickest route is the **🧰 Tools Hub**, a browsable catalog with an Add
-button per entry, grouped by what each one is for — browser, memory & thinking,
-**creative & game dev**, search, work & data. The catalog is fetched live, so a
-package that gets renamed or deprecated is corrected without waiting for an
-office release.
+The quickest route is the **🧰 Tools Hub** (⋯ menu), a browsable catalog of
+**43 entries** with an Add button on each, grouped by what they are for — browser,
+memory & thinking, **creative & game dev** (Blender, Godot, Unity, Unreal, Roblox
+Studio), search, work & data. The catalog is fetched live, so a package that gets
+renamed or deprecated is corrected without waiting for an office release.
+→ Full guide: [**tools-hub.md**](tools-hub.md).
 
 To add one by hand: ⚙ → TOOLS → MCP SERVERS, enter a name + run command, e.g.
 
