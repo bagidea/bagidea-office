@@ -158,7 +158,7 @@ else is run as a command with its arguments. Nothing extra to choose.
 
 By default every agent runs on the machine the office is on. That is fine while
 you are watching, and less fine when a team of them is working overnight on a
-repo you care about. ⚙ → TOOLS → **ที่ทำงานของน้องๆ / where agents run** lets you
+repo you care about. ⚙ → TOOLS → **📦 RUN LOCATION** lets you
 define somewhere else and point the whole office — or one agent — at it.
 
 | Kind | You give it | What you get |
@@ -185,7 +185,7 @@ The `ssh` backend needs `officeDir`: the path to an office checkout **on that
 machine**. Without one there is no settings file to point at, so it is rejected
 when you define it rather than at 3am on somebody's task.
 
-Set it per agent in the agent editor (**📦 ที่ทำงาน**); leave that blank and the
+Set it per agent in the agent editor (**📦 RUN LOCATION**); leave that blank and the
 agent follows the office default. Ghost clones always run wherever their parent
 runs.
 
@@ -193,7 +193,7 @@ runs.
 
 Ghost clones have always worked in the same directory as each other. Two of them
 editing one file is not a race careful prompting wins — it is a race the office
-should not have started. ⚙ → TOOLS → **แยกที่ทำงานให้ร่างผี** gives each ghost its
+should not have started. ⚙ → TOOLS → **👻 GHOST ISOLATION** gives each ghost its
 own `git worktree`: the same repository, checked out separately, on its own
 branch.
 

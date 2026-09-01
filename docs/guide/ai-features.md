@@ -137,11 +137,11 @@ It grows with you while staying token-efficient:
 What decides *which* memory a session sees is a search over everything the office
 knows. That search matches **words** — BM25, no dependencies, works offline. It
 is fast and it is often enough, and it has one blind spot you will eventually
-hit: ask *"ทำไมวอลเปเปอร์หาย"* and a note reading *"WorkerW teardown kills the
-embedded world"* shares not a single token with the question, so however good
-that note is, it does not come back.
+hit: ask *"why did the wallpaper vanish"* and a note reading *"WorkerW teardown
+kills the embedded world"* shares not one meaningful token with the question, so
+however good that note is, it does not come back.
 
-⚙ → SKILLS → **ค้นความจำด้วยความหมาย** adds the other half. Point it at any
+⚙ → SKILLS → **🔎 SEMANTIC RECALL** adds the other half. Point it at any
 OpenAI-shaped `/embeddings` endpoint and each memory also gets a vector; a search
 then runs both ways and **fuses the two rankings**, so words and meaning each get
 a say and neither replaces the other.

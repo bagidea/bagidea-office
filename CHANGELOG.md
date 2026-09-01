@@ -35,9 +35,9 @@ already closed were set aside. All five are here.
   still keeps what it wrote. Off by default: it moves where a ghost's edits
   land.
 - **🔎 Recall by meaning, not only by words.** Memory search matched words —
-  ask *"ทำไมวอลเปเปอร์หาย"* and a note reading *"WorkerW teardown kills the
-  embedded world"* shares no token with the question and never came back. Point
-  ⚙ → SKILLS at any OpenAI-shaped `/embeddings` (a local Ollama costs nothing
+  ask *"why did the wallpaper vanish"* and a note reading *"WorkerW teardown kills
+  the embedded world"* shares no meaningful token with the question and never came
+  back. Point ⚙ → SKILLS → **🔎 SEMANTIC RECALL** at any OpenAI-shaped `/embeddings` (a local Ollama costs nothing
   and keeps your memory on the machine) and both rankings are fused. Off by
   default; word search is untouched and still runs alone.
 - **📚 Skills that fix themselves.** The office wrote itself new skills and never

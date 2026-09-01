@@ -3158,7 +3158,7 @@
           <div class="knob"></div> Auto-learn: agents distill finished work into new skills</div>
         <div class="switch ${VERIFY ? "on" : ""}" id="verifySw">
           <div class="knob"></div> ${tr("ตรวจงานก่อนส่ง CEO: reviewer เช็คงานที่มอบหมาย แล้วให้แก้ 1 รอบถ้าเจอปัญหา (ช้าลง+ใช้ token เพิ่ม)")}</div>
-        <div class="field"><label>🔎 ค้นความจำด้วยความหมาย (ไม่ใช่แค่คำ)</label>
+        <div class="field"><label>🔎 SEMANTIC RECALL — ค้นความจำด้วยความหมาย ไม่ใช่แค่คำ</label>
           <div style="font-size:11px;color:var(--dim);margin-bottom:8px">
             ปกติออฟฟิศค้นความจำด้วย<b>คำ</b> — ถามว่า “ทำไมวอลเปเปอร์หาย” แล้วโน้ตที่เขียนว่า
             “WorkerW teardown kills the embedded world” จะไม่ขึ้น เพราะไม่มีคำไหนตรงกันเลย<br>
@@ -3182,7 +3182,7 @@
         <div class="switch ${AUTOAPPROVE ? "on" : ""}" id="autoApproveSw">
           <div class="knob"></div> ${tr("🔓 อนุมัติอัตโนมัติ: ให้ทุกคำขอใช้เครื่องมือผ่านเองโดยไม่ต้องกด Allow — เหมาะตอนสั่งงานทิ้งไว้แล้วไม่ได้เฝ้า (ยังเห็นใน feed ว่าอนุมัติอะไรบ้าง · ปิดไว้ = ปลอดภัยกว่า)")}</div>
         <div class="switch ${GHOSTWT ? "on" : ""}" id="ghostWtSw">
-          <div class="knob"></div> ${tr("👻 แยกที่ทำงานให้ร่างผี: ตอนแตกร่างทำงานขนาน ให้แต่ละตัวมี checkout ของ git เป็นของตัวเอง จะได้ไม่แก้ไฟล์ทับกัน — งานที่ทำเสร็จจะมาเป็น branch ให้ merge แทนที่จะแก้ลงในโฟลเดอร์ตรงๆ (ใช้ได้เฉพาะโปรเจกต์ที่เป็น git)")}</div>
+          <div class="knob"></div> ${tr("👻 GHOST ISOLATION — แยกที่ทำงานให้ร่างผี: ตอนแตกร่างทำงานขนาน ให้แต่ละตัวมี checkout ของ git เป็นของตัวเอง จะได้ไม่แก้ไฟล์ทับกัน — งานที่ทำเสร็จจะมาเป็น branch ให้ merge แทนที่จะแก้ลงในโฟลเดอร์ตรงๆ (ใช้ได้เฉพาะโปรเจกต์ที่เป็น git)")}</div>
         <input id="tFilter" class="filterbox" placeholder="🔍 ค้นหาเครื่องมือ / MCP server…">
         <div class="field"><label>⚡ SYSTEM TOOLS — ความสามารถกลางของออฟฟิศ (agents เรียกใช้เองได้)</label>
           <div id="systools"></div></div>
@@ -3201,7 +3201,7 @@
             <input id="mCmd" placeholder="คำสั่งรัน เช่น npx -y @modelcontextprotocol/server-github">
             <button class="sparkle" id="addMcp">＋</button>
           </div></div>
-        <div class="field"><label>📦 ที่ทำงานของน้องๆ — งานของ agent รันที่ไหน</label>
+        <div class="field"><label>📦 RUN LOCATION — ที่ทำงานของน้องๆ: งานของ agent รันที่ไหน</label>
           <div style="font-size:11px;color:var(--dim);margin-bottom:8px">
             ปกติน้องรันบนเครื่องนี้ · ตั้งกล่องปิด (Docker) หรือเครื่องอื่น (SSH) ได้
             แล้วเลือกให้ทั้งออฟฟิศ หรือตั้งรายคนในหน้าแก้ไข agent<br>
@@ -3648,7 +3648,7 @@
          <option value="2">หัวหน้าทีม (Lead)</option>
          <option value="3">ทีมงาน (Staff)</option>
        </select></div>
-       <div class="field"><label>📦 ที่ทำงาน — คนนี้รันที่ไหน</label>
+       <div class="field"><label>📦 RUN LOCATION — คนนี้รันที่ไหน</label>
          <select id="eBackend"></select>
          <div style="font-size:10.5px;color:var(--dim);margin-top:4px">เว้นไว้ = ใช้ค่าของทั้งออฟฟิศ (ตั้งใน ⚙ → TOOLS)</div>
        </div>
