@@ -6,7 +6,56 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
+**Added**
+- **The engines are in the office.** 🧰 Tools Hub gains a *Creative & game dev*
+  tier — **Blender**, **Godot**, **Unity**, **Unreal Engine** and **Roblox
+  Studio** — so an agent can model, light and render, run a scene and read the
+  debug output back, or edit a script and playtest it, inside the real tool
+  instead of only writing files and hoping. Plus **Figma** (read the actual
+  layout, not a screenshot of it) and **ElevenLabs** (voice) for the rest of a
+  production.
+- **Chrome DevTools, Context7, Exa and Firecrawl.** DevTools gives an agent a
+  performance trace and the console when a page is broken; Context7 pulls the
+  *current* docs for the library being written against — the cure for
+  confidently-wrong code from a stale memory of an API.
+- **A hosted MCP server can now be added by pasting its URL.** An `https://…`
+  goes in the same one-line box as a launch command and connects over HTTP;
+  anything else is still run as a program. Nothing extra to choose. Linear ships
+  as the first entry of that kind.
+- **New builtin skill: 3D & Game Production** — how to work through an engine:
+  check the tool is actually connected before planning around it, read the scene
+  before changing it, change small and then *look* (render, run, screenshot,
+  read the output), and never claim what you have not seen.
+
 **Fixed**
+- **Seven Tools Hub entries were dead buttons.** npm has deprecated the
+  reference servers for GitHub, Brave Search, Postgres, Slack, Puppeteer and
+  Google Drive, and `@google-workspace/mcp-server` — offered for one-click
+  install — **never existed at all**; it 404s. Every command in the catalog was
+  re-checked against the live npm / PyPI / GHCR registries and replaced with the
+  maintained server (GitHub's own, Brave's own, Notion's own, and so on).
+  Puppeteer and the separate Drive server are gone, covered by Playwright +
+  Chrome DevTools and by Google Workspace.
+- **The hub called the built-in browser `browser`; the registry calls it `web`.**
+  So the Playwright card never showed as installed even though every office
+  ships with it seeded, and pressing Add created a *second* copy under the other
+  name. Card ids now come from the catalog, which is the same file the rest of
+  the office reads.
+- **A server you added by hand was invisible here** — the hub only listed what it
+  had a card for, so a custom MCP could be added from this page and then never
+  removed from it. Anything in the registry the catalog does not describe now
+  gets a card of its own.
+
+**Changed**
+- **The tool catalog is data, not markup.** It lived hard-coded inside
+  `toolshub.html`, which is why it could rot for months behind Add buttons that
+  could only fail. It now lives in `web/tools.json` — one source of truth shared
+  by the website's Tools page and the in-office hub, fetched live (bundled copy
+  offline) exactly like the plugin catalog. A renamed package is now a PR, not a
+  release. The hub also groups cards by what they are *for*, and prints the one
+  setup step each server needs, in the office's language.
+
+**Fixed (quoting)**
 - **`bagidea say` was broken on Windows for anyone whose account name has an
   apostrophe.** The WAV's path was interpolated into a single-quoted PowerShell
   string, and `os.tmpdir()` follows `%TEMP%` — which is

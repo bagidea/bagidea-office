@@ -112,15 +112,31 @@ did it, and announced 📚 in the office (you'll see gold light burst above thei
 
 ## MCP Servers — unlimited new abilities
 
-⚙ → TOOLS → MCP SERVERS: enter a name + run command, e.g.
+The quickest route is the **🧰 Tools Hub**, a browsable catalog with an Add
+button per entry, grouped by what each one is for — browser, memory & thinking,
+**creative & game dev**, search, work & data. The catalog is fetched live, so a
+package that gets renamed or deprecated is corrected without waiting for an
+office release.
+
+To add one by hand: ⚙ → TOOLS → MCP SERVERS, enter a name + run command, e.g.
 
 | Name | Command |
 |---|---|
-| `github` | `npx -y @modelcontextprotocol/server-github` |
-| `playwright` | `npx -y @playwright/mcp` (can drive a browser) |
+| `playwright` | `npx -y @playwright/mcp` (drives a real browser) |
+| `blender` | `uvx blender-mcp` (models and renders in a running Blender) |
+| `linear` | `https://mcp.linear.app/mcp` |
 
-then tick `mcp:github` in the agent's edit screen — that server's entire tool set
-becomes available to the agent (through the permission system, like any normal tool)
+then tick `mcp:playwright` in the agent's edit screen — that server's entire tool
+set becomes available to the agent (through the permission system, like any
+normal tool)
+
+A server is either **a program to launch** or **a hosted endpoint**. Paste
+either into the same box: an `https://` URL is connected over HTTP, anything
+else is run as a command with its arguments. Nothing extra to choose.
+
+> A note on tokens: prefer a server that reads its credential from the
+> environment (⚙ → 🔗 CONNECT) over one that wants it inside the command. The
+> command string is stored in the office registry; the environment is not.
 
 ## What agents do on their own, without being taught
 

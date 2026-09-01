@@ -1,127 +1,710 @@
 {
-  "_comment": "BagIdea Office — tools catalog for the website Tools page. 'builtin' = native Claude Code tools every agent can be granted (no setup; mirrors the app's TOOLS list). 'mcp' = add-on capabilities wired in as an MCP server (⚙ → MCP SERVERS) and assigned per agent. Many MCP servers need an API key/token set in 🔑 API KEYS — see each repo. To add an integration: open a PR. See docs/guide/plugins.md.",
-  "updated": "2026-06-21",
+  "_comment": "BagIdea Office — tool catalog (source of truth for BOTH the website Tools page and the in-office 🧰 Tools Hub, which fetches this file live). kind: 'builtin' ships with every agent; kind: 'mcp' is an MCP server the owner adds. 'cmd' is either a program to launch or a hosted https:// URL. Check a command against npm/PyPI before adding one — a dead package behind a one-click button is worse than no entry. To add: open a PR.",
+  "updated": "2026-09-01",
   "tools": [
-    { "id": "read", "kind": "builtin", "icon": "📖", "name": "Read",
-      "en": { "desc": "Read files, images and PDFs — the agent sees what you point it to." },
-      "th": { "desc": "อ่านไฟล์ รูปภาพ และ PDF — น้องดูสิ่งที่คุณชี้ให้ได้จริง" } },
-    { "id": "write", "kind": "builtin", "icon": "✍️", "name": "Write",
-      "en": { "desc": "Create new files or overwrite existing ones." },
-      "th": { "desc": "สร้างไฟล์ใหม่ หรือเขียนทับไฟล์เดิม" } },
-    { "id": "edit", "kind": "builtin", "icon": "✏️", "name": "Edit",
-      "en": { "desc": "Make precise, surgical edits inside existing files." },
-      "th": { "desc": "แก้ไขจุดที่ต้องการในไฟล์ที่มีอยู่อย่างแม่นยำ" } },
-    { "id": "bash", "kind": "builtin", "icon": "💻", "name": "Bash",
-      "en": { "desc": "Run shell commands and programs — build, test, install, automate." },
-      "th": { "desc": "รันคำสั่งเชลล์และโปรแกรม — build, test, ติดตั้ง, ทำงานอัตโนมัติ" } },
-    { "id": "grep", "kind": "builtin", "icon": "🔎", "name": "Grep",
-      "en": { "desc": "Search text and code across files, fast." },
-      "th": { "desc": "ค้นหาข้อความและโค้ดในไฟล์ได้รวดเร็ว" } },
-    { "id": "glob", "kind": "builtin", "icon": "🗂️", "name": "Glob",
-      "en": { "desc": "Find files by name or pattern." },
-      "th": { "desc": "ค้นหาไฟล์จากชื่อหรือแพทเทิร์น" } },
-    { "id": "websearch", "kind": "builtin", "icon": "🌐", "name": "Web Search",
-      "en": { "desc": "Search the web for up-to-date information." },
-      "th": { "desc": "ค้นหาข้อมูลล่าสุดบนเว็บ" } },
-    { "id": "webfetch", "kind": "builtin", "icon": "📄", "name": "Web Fetch",
-      "en": { "desc": "Open and read a web page's content." },
-      "th": { "desc": "เปิดอ่านเนื้อหาของหน้าเว็บ" } },
-    { "id": "task", "kind": "builtin", "icon": "👥", "name": "Sub-agents",
-      "en": { "desc": "Spin up helper sub-agents to take on parallel subtasks." },
-      "th": { "desc": "ปล่อย sub-agent มาช่วยทำงานย่อยแบบขนานกัน" } },
-    { "id": "todowrite", "kind": "builtin", "icon": "✅", "name": "Task list",
-      "en": { "desc": "Track a multi-step plan and tick items off as it works." },
-      "th": { "desc": "จดและติดตามรายการงานหลายขั้น ทำเสร็จแล้วติ๊กออก" } },
-    { "id": "skill", "kind": "builtin", "icon": "🎓", "name": "Skills",
-      "en": { "desc": "Invoke a skill assigned to the agent — packaged know-how it can call on." },
-      "th": { "desc": "เรียกใช้สกิลที่มอบให้ agent — ชุดความรู้สำเร็จรูปที่เรียกใช้ได้" } },
-    { "id": "notebookedit", "kind": "builtin", "icon": "📓", "name": "Notebook Edit",
-      "en": { "desc": "Edit Jupyter notebook cells." },
-      "th": { "desc": "แก้ไขเซลล์ของ Jupyter notebook" } },
-    { "id": "slashcommand", "kind": "builtin", "icon": "⌨️", "name": "Slash Commands",
-      "en": { "desc": "Run an installed slash command." },
-      "th": { "desc": "เรียกใช้คำสั่ง slash ที่ติดตั้งไว้" } },
-    { "id": "bashoutput", "kind": "builtin", "icon": "📡", "name": "Background Output",
-      "en": { "desc": "Read the output of a long-running background job." },
-      "th": { "desc": "อ่านผลลัพธ์ของงานเบื้องหลังที่สั่งรันค้างไว้" } },
-    { "id": "killshell", "kind": "builtin", "icon": "⛔", "name": "Kill Shell",
-      "en": { "desc": "Stop a background job it started." },
-      "th": { "desc": "หยุดงานเบื้องหลังที่สั่งรันไว้" } },
-
-    { "id": "web", "kind": "mcp", "icon": "🧭", "name": "Web Automation", "official": true,
+    {
+      "id": "read",
+      "kind": "builtin",
+      "icon": "📖",
+      "name": "Read",
+      "en": {
+        "desc": "Read files, images and PDFs — the agent sees what you point it to."
+      },
+      "th": {
+        "desc": "อ่านไฟล์ รูปภาพ และ PDF — น้องดูสิ่งที่คุณชี้ให้ได้จริง"
+      }
+    },
+    {
+      "id": "write",
+      "kind": "builtin",
+      "icon": "✍️",
+      "name": "Write",
+      "en": {
+        "desc": "Create new files or overwrite existing ones."
+      },
+      "th": {
+        "desc": "สร้างไฟล์ใหม่ หรือเขียนทับไฟล์เดิม"
+      }
+    },
+    {
+      "id": "edit",
+      "kind": "builtin",
+      "icon": "✏️",
+      "name": "Edit",
+      "en": {
+        "desc": "Make precise, surgical edits inside existing files."
+      },
+      "th": {
+        "desc": "แก้ไขจุดที่ต้องการในไฟล์ที่มีอยู่อย่างแม่นยำ"
+      }
+    },
+    {
+      "id": "bash",
+      "kind": "builtin",
+      "icon": "💻",
+      "name": "Bash",
+      "en": {
+        "desc": "Run shell commands and programs — build, test, install, automate."
+      },
+      "th": {
+        "desc": "รันคำสั่งเชลล์และโปรแกรม — build, test, ติดตั้ง, ทำงานอัตโนมัติ"
+      }
+    },
+    {
+      "id": "grep",
+      "kind": "builtin",
+      "icon": "🔎",
+      "name": "Grep",
+      "en": {
+        "desc": "Search text and code across files, fast."
+      },
+      "th": {
+        "desc": "ค้นหาข้อความและโค้ดในไฟล์ได้รวดเร็ว"
+      }
+    },
+    {
+      "id": "glob",
+      "kind": "builtin",
+      "icon": "🗂️",
+      "name": "Glob",
+      "en": {
+        "desc": "Find files by name or pattern."
+      },
+      "th": {
+        "desc": "ค้นหาไฟล์จากชื่อหรือแพทเทิร์น"
+      }
+    },
+    {
+      "id": "websearch",
+      "kind": "builtin",
+      "icon": "🌐",
+      "name": "Web Search",
+      "en": {
+        "desc": "Search the web for up-to-date information."
+      },
+      "th": {
+        "desc": "ค้นหาข้อมูลล่าสุดบนเว็บ"
+      }
+    },
+    {
+      "id": "webfetch",
+      "kind": "builtin",
+      "icon": "📄",
+      "name": "Web Fetch",
+      "en": {
+        "desc": "Open and read a web page's content."
+      },
+      "th": {
+        "desc": "เปิดอ่านเนื้อหาของหน้าเว็บ"
+      }
+    },
+    {
+      "id": "task",
+      "kind": "builtin",
+      "icon": "👥",
+      "name": "Sub-agents",
+      "en": {
+        "desc": "Spin up helper sub-agents to take on parallel subtasks."
+      },
+      "th": {
+        "desc": "ปล่อย sub-agent มาช่วยทำงานย่อยแบบขนานกัน"
+      }
+    },
+    {
+      "id": "todowrite",
+      "kind": "builtin",
+      "icon": "✅",
+      "name": "Task list",
+      "en": {
+        "desc": "Track a multi-step plan and tick items off as it works."
+      },
+      "th": {
+        "desc": "จดและติดตามรายการงานหลายขั้น ทำเสร็จแล้วติ๊กออก"
+      }
+    },
+    {
+      "id": "skill",
+      "kind": "builtin",
+      "icon": "🎓",
+      "name": "Skills",
+      "en": {
+        "desc": "Invoke a skill assigned to the agent — packaged know-how it can call on."
+      },
+      "th": {
+        "desc": "เรียกใช้สกิลที่มอบให้ agent — ชุดความรู้สำเร็จรูปที่เรียกใช้ได้"
+      }
+    },
+    {
+      "id": "notebookedit",
+      "kind": "builtin",
+      "icon": "📓",
+      "name": "Notebook Edit",
+      "en": {
+        "desc": "Edit Jupyter notebook cells."
+      },
+      "th": {
+        "desc": "แก้ไขเซลล์ของ Jupyter notebook"
+      }
+    },
+    {
+      "id": "slashcommand",
+      "kind": "builtin",
+      "icon": "⌨️",
+      "name": "Slash Commands",
+      "en": {
+        "desc": "Run an installed slash command."
+      },
+      "th": {
+        "desc": "เรียกใช้คำสั่ง slash ที่ติดตั้งไว้"
+      }
+    },
+    {
+      "id": "bashoutput",
+      "kind": "builtin",
+      "icon": "📡",
+      "name": "Background Output",
+      "en": {
+        "desc": "Read the output of a long-running background job."
+      },
+      "th": {
+        "desc": "อ่านผลลัพธ์ของงานเบื้องหลังที่สั่งรันค้างไว้"
+      }
+    },
+    {
+      "id": "killshell",
+      "kind": "builtin",
+      "icon": "⛔",
+      "name": "Kill Shell",
+      "en": {
+        "desc": "Stop a background job it started."
+      },
+      "th": {
+        "desc": "หยุดงานเบื้องหลังที่สั่งรันไว้"
+      }
+    },
+    {
+      "id": "web",
+      "kind": "mcp",
+      "group": "browser",
+      "icon": "🧭",
+      "name": "Web Automation",
+      "official": true,
+      "feat": true,
       "cmd": "npx -y @playwright/mcp@latest --headed --isolated",
       "repo": "https://github.com/microsoft/playwright-mcp",
-      "en": { "desc": "Drive a REAL browser — open pages, click, type, fill forms and screenshot — so an agent does tasks on the web for you. Isolated profile, not logged in. Ships built-in." },
-      "th": { "desc": "ขับเบราว์เซอร์จริง — เปิดหน้าเว็บ คลิก พิมพ์ กรอกฟอร์ม สกรีนช็อต ให้น้องทำงานบนเว็บแทนคุณ โปรไฟล์แยกไม่ล็อกอิน มาพร้อมในตัว" } },
-    { "id": "agent-browser", "kind": "mcp", "icon": "⚡", "name": "agent-browser (fast)",
+      "en": {
+        "risk": "drives a browser",
+        "desc": "Drive a REAL browser — open pages, click, type, fill forms and screenshot — so an agent does tasks on the web for you. Isolated profile, not logged in. Ships built-in."
+      },
+      "th": {
+        "risk": "คุมเบราว์เซอร์",
+        "desc": "ขับเบราว์เซอร์จริง — เปิดหน้าเว็บ คลิก พิมพ์ กรอกฟอร์ม สกรีนช็อต ให้น้องทำงานบนเว็บแทนคุณ โปรไฟล์แยกไม่ล็อกอิน มาพร้อมในตัว"
+      }
+    },
+    {
+      "id": "web-bg",
+      "kind": "mcp",
+      "group": "browser",
+      "icon": "🤫",
+      "name": "Web Automation (background)",
+      "official": true,
+      "feat": true,
+      "cmd": "npx -y @playwright/mcp@latest --headless --isolated",
+      "repo": "https://github.com/microsoft/playwright-mcp",
+      "en": {
+        "risk": "drives a browser",
+        "desc": "The same browser with no window — it works in the background instead of taking over your screen. Pick this one when agents run while you are using the machine."
+      },
+      "th": {
+        "risk": "คุมเบราว์เซอร์",
+        "desc": "เบราว์เซอร์ตัวเดียวกันแต่ไม่เปิดหน้าต่าง — ทำงานเบื้องหลังแทนที่จะยึดจอคุณ เลือกตัวนี้ถ้าน้องทำงานตอนคุณใช้เครื่องอยู่"
+      }
+    },
+    {
+      "id": "chrome-devtools",
+      "kind": "mcp",
+      "group": "browser",
+      "icon": "🔬",
+      "name": "Chrome DevTools",
+      "feat": true,
+      "cmd": "npx -y chrome-devtools-mcp@latest",
+      "repo": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+      "en": {
+        "risk": "drives a browser",
+        "desc": "Google's own DevTools as a tool: record a performance trace, read console errors and network requests, and debug a page the way a front-end engineer does. The one to reach for when a site is broken, not just to be clicked."
+      },
+      "th": {
+        "risk": "คุมเบราว์เซอร์",
+        "desc": "DevTools ของ Google เองในรูปเครื่องมือ: อัด performance trace อ่าน console error กับ network request แล้วดีบักหน้าเว็บแบบวิศวกร front-end ใช้ตอนเว็บพัง ไม่ใช่แค่ตอนอยากคลิก"
+      }
+    },
+    {
+      "id": "agent-browser",
+      "kind": "mcp",
+      "group": "browser",
+      "icon": "⚡",
+      "name": "agent-browser (fast)",
       "cmd": "agent-browser mcp",
       "repo": "https://github.com/vercel-labs/agent-browser",
-      "en": { "desc": "A power alternative to the built-in web tool: Vercel's native Rust browser (CDP) — faster, with stable element refs (low context), an encrypted auth vault, and a live viewport you can watch (pair with the 👁 Web View plugin). Install first: npm i -g agent-browser && agent-browser install." },
-      "th": { "desc": "ตัวเลือกแรงแทน web tool ในตัว: เบราว์เซอร์ Rust ของ Vercel (CDP) — เร็วกว่า, มี element refs คงที่ (กิน context น้อย), auth vault เข้ารหัส, และดู viewport สดได้ (คู่กับ plugin 👁 Web View) ต้องลงก่อน: npm i -g agent-browser && agent-browser install" } },
-    { "id": "github", "kind": "mcp", "icon": "🐙", "name": "GitHub",
-      "cmd": "npx -y @modelcontextprotocol/server-github",
-      "repo": "https://github.com/github/github-mcp-server",
-      "en": { "desc": "Read and manage repos, issues, PRs and code on GitHub. Needs a GitHub token in 🔑 API KEYS. The most-installed MCP server." },
-      "th": { "desc": "อ่านและจัดการ repo, issue, PR และโค้ดบน GitHub · ต้องมี GitHub token ใน 🔑 API KEYS · เป็น MCP ที่คนใช้มากที่สุด" } },
-    { "id": "filesystem", "kind": "mcp", "icon": "📁", "name": "Filesystem",
-      "cmd": "npx -y @modelcontextprotocol/server-filesystem <path>",
-      "repo": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
-      "en": { "desc": "Scoped read/write access to a specific folder. The most-installed reference server." },
-      "th": { "desc": "เข้าถึงโฟลเดอร์ที่ระบุ (อ่าน/เขียน) แบบจำกัดขอบเขต · reference server ที่คนติดตั้งมากที่สุด" } },
-    { "id": "memory", "kind": "mcp", "icon": "🧠", "name": "Memory",
+      "en": {
+        "risk": "drives a browser",
+        "desc": "A power alternative to the built-in web tool: Vercel's native Rust browser (CDP) — faster, with stable element refs (low context), an encrypted auth vault, and a live viewport you can watch (pair with the 👁 Web View plugin). Install first: npm i -g agent-browser && agent-browser install.",
+        "needs": "npm i -g agent-browser && agent-browser install"
+      },
+      "th": {
+        "risk": "คุมเบราว์เซอร์",
+        "desc": "ตัวเลือกแรงแทน web tool ในตัว: เบราว์เซอร์ Rust ของ Vercel (CDP) — เร็วกว่า, มี element refs คงที่ (กิน context น้อย), auth vault เข้ารหัส, และดู viewport สดได้ (คู่กับ plugin 👁 Web View) ต้องลงก่อน: npm i -g agent-browser && agent-browser install",
+        "needs": "ลงก่อน: npm i -g agent-browser && agent-browser install"
+      }
+    },
+    {
+      "id": "memory",
+      "kind": "mcp",
+      "group": "think",
+      "icon": "🧠",
+      "name": "Memory",
+      "feat": true,
       "cmd": "npx -y @modelcontextprotocol/server-memory",
       "repo": "https://github.com/modelcontextprotocol/servers/tree/main/src/memory",
-      "en": { "desc": "A persistent knowledge graph — the agent remembers facts across sessions." },
-      "th": { "desc": "knowledge graph ถาวร — น้องจำข้อมูลข้ามเซสชันได้" } },
-    { "id": "seqthinking", "kind": "mcp", "icon": "🤔", "name": "Sequential Thinking",
+      "en": {
+        "risk": "stores data locally",
+        "desc": "A persistent knowledge graph — the agent remembers facts and how they connect, across sessions."
+      },
+      "th": {
+        "risk": "เก็บข้อมูลในเครื่อง",
+        "desc": "knowledge graph ถาวร — น้องจำข้อเท็จจริงและความเชื่อมโยงข้ามเซสชันได้"
+      }
+    },
+    {
+      "id": "seqthinking",
+      "kind": "mcp",
+      "group": "think",
+      "icon": "🤔",
+      "name": "Sequential Thinking",
+      "feat": true,
       "cmd": "npx -y @modelcontextprotocol/server-sequential-thinking",
       "repo": "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking",
-      "en": { "desc": "Structured step-by-step reasoning for harder problems." },
-      "th": { "desc": "ช่วยคิดเป็นขั้นเป็นตอนกับโจทย์ที่ยากขึ้น" } },
-    { "id": "bravesearch", "kind": "mcp", "icon": "🦁", "name": "Brave Search",
-      "cmd": "npx -y @modelcontextprotocol/server-brave-search",
-      "repo": "https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search",
-      "en": { "desc": "Private web + local search via the Brave API. Needs a BRAVE_API_KEY." },
-      "th": { "desc": "ค้นเว็บ + ค้นหาในพื้นที่ผ่าน Brave API · ต้องมี BRAVE_API_KEY" } },
-    { "id": "postgres", "kind": "mcp", "icon": "🐘", "name": "PostgreSQL",
-      "cmd": "npx -y @modelcontextprotocol/server-postgres postgresql://USER:PASS@HOST/DB",
-      "repo": "https://github.com/modelcontextprotocol/servers/tree/main/src/postgres",
-      "en": { "desc": "Query a Postgres database in plain language — explore schemas, run read-only SQL." },
-      "th": { "desc": "คุยกับฐานข้อมูล Postgres ด้วยภาษาธรรมดา — ดู schema, รัน SQL อ่านอย่างเดียว" } },
-    { "id": "puppeteer", "kind": "mcp", "icon": "🎭", "name": "Puppeteer",
-      "cmd": "npx -y @modelcontextprotocol/server-puppeteer",
-      "repo": "https://github.com/modelcontextprotocol/servers/tree/main/src/puppeteer",
-      "en": { "desc": "Headless Chrome automation — scrape and screenshot pages programmatically." },
-      "th": { "desc": "คุม Chrome แบบ headless — ดึงข้อมูล/สกรีนช็อตหน้าเว็บอัตโนมัติ" } },
-    { "id": "slack", "kind": "mcp", "icon": "🔷", "name": "Slack",
-      "cmd": "npx -y @modelcontextprotocol/server-slack",
-      "repo": "https://github.com/modelcontextprotocol/servers/tree/main/src/slack",
-      "en": { "desc": "Read and post in Slack channels. Needs a Slack bot token." },
-      "th": { "desc": "อ่านและโพสต์ในช่อง Slack · ต้องมี Slack bot token" } },
-    { "id": "gdrive", "kind": "mcp", "icon": "📂", "name": "Google Drive",
-      "cmd": "npx -y @modelcontextprotocol/server-gdrive",
-      "repo": "https://github.com/modelcontextprotocol/servers/tree/main/src/gdrive",
-      "en": { "desc": "Search and read files from Google Drive." },
-      "th": { "desc": "ค้นหาและอ่านไฟล์จาก Google Drive" } },
-    { "id": "sqlite", "kind": "mcp", "icon": "🗄️", "name": "SQLite",
-      "repo": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/sqlite",
-      "en": { "desc": "Query a local .db SQLite file — great for prototypes and local apps. See the repo for setup." },
-      "th": { "desc": "คุยกับไฟล์ .db SQLite ในเครื่อง — เหมาะกับ prototype/แอปในเครื่อง · ดูวิธีตั้งที่ repo" } },
-    { "id": "notion", "kind": "mcp", "icon": "📝", "name": "Notion",
+      "en": {
+        "risk": "no risk",
+        "desc": "Structured step-by-step reasoning for harder problems."
+      },
+      "th": {
+        "risk": "ไม่มีความเสี่ยง",
+        "desc": "ช่วยคิดเป็นขั้นเป็นตอนกับโจทย์ที่ยากขึ้น"
+      }
+    },
+    {
+      "id": "context7",
+      "kind": "mcp",
+      "group": "think",
+      "icon": "📚",
+      "name": "Context7 (live docs)",
+      "feat": true,
+      "cmd": "npx -y @upstash/context7-mcp",
+      "repo": "https://github.com/upstash/context7",
+      "en": {
+        "risk": "reads the web",
+        "desc": "Pulls the CURRENT docs for whatever library the agent is coding against, straight into the prompt. The cure for confidently-wrong code written from a stale memory of an API."
+      },
+      "th": {
+        "risk": "อ่านเว็บ",
+        "desc": "ดึงเอกสาร ณ ปัจจุบัน ของไลบรารีที่น้องกำลังเขียนโค้ดด้วย เข้ามาใน prompt ตรงๆ — ยาแก้อาการเขียนโค้ดผิดอย่างมั่นใจเพราะจำ API รุ่นเก่า"
+      }
+    },
+    {
+      "id": "filesystem",
+      "kind": "mcp",
+      "group": "think",
+      "icon": "📁",
+      "name": "Filesystem",
+      "cmd": "npx -y @modelcontextprotocol/server-filesystem <folder>",
+      "repo": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
+      "en": {
+        "risk": "reads/writes files",
+        "desc": "Scoped read/write access to one specific folder — edit the path at the end of the command before adding.",
+        "needs": "edit the folder path first"
+      },
+      "th": {
+        "risk": "อ่าน/เขียนไฟล์",
+        "desc": "เข้าถึงโฟลเดอร์ที่ระบุ (อ่าน/เขียน) แบบจำกัดขอบเขต — แก้ path ท้ายคำสั่งก่อนเพิ่ม",
+        "needs": "แก้ path โฟลเดอร์ก่อน"
+      }
+    },
+    {
+      "id": "fetch",
+      "kind": "mcp",
+      "group": "think",
+      "icon": "🔗",
+      "name": "Web Fetch",
+      "feat": true,
+      "cmd": "npx -y @kazuph/mcp-fetch",
+      "repo": "https://github.com/kazuph/mcp-fetch",
+      "en": {
+        "risk": "reads web pages",
+        "desc": "Pull a web page down as plain text/markdown for the agent to read — far lighter than driving a whole browser."
+      },
+      "th": {
+        "risk": "อ่านเว็บ",
+        "desc": "ดึงหน้าเว็บมาเป็นข้อความ/markdown ให้น้องอ่าน — เบากว่าเปิดเบราว์เซอร์ทั้งตัวเยอะ"
+      }
+    },
+    {
+      "id": "blender",
+      "kind": "mcp",
+      "group": "create",
+      "icon": "🧊",
+      "name": "Blender 3D",
+      "cmd": "uvx blender-mcp",
+      "repo": "https://github.com/ahujasid/blender-mcp",
+      "en": {
+        "risk": "drives Blender",
+        "desc": "Model, texture, light and render inside a running Blender — the agent creates and edits objects, applies materials, and can pull assets from Poly Haven and Sketchfab. Install the add-on from the repo, hit Connect in Blender's sidebar, and needs uv (astral.sh/uv) on PATH.",
+        "needs": "install the Blender add-on + uv"
+      },
+      "th": {
+        "risk": "คุม Blender",
+        "desc": "ปั้นโมเดล ทำ texture จัดไฟ และเรนเดอร์ใน Blender ที่เปิดอยู่จริง — น้องสร้าง/แก้ออบเจกต์ ใส่ material และดึง asset จาก Poly Haven กับ Sketchfab ได้ ต้องลง add-on จาก repo กด Connect ในแถบข้างของ Blender และมี uv (astral.sh/uv) ใน PATH",
+        "needs": "ลง add-on ของ Blender + uv"
+      }
+    },
+    {
+      "id": "godot",
+      "kind": "mcp",
+      "group": "create",
+      "icon": "🎮",
+      "name": "Godot Engine",
+      "cmd": "npx -y @coding-solo/godot-mcp",
+      "repo": "https://github.com/Coding-Solo/godot-mcp",
+      "en": {
+        "risk": "runs your project",
+        "desc": "Launch the editor, run a scene, and read the debug output back — so an agent can actually SEE why the game misbehaved instead of guessing from the source. The same engine the office world itself runs on.",
+        "needs": "Godot installed (set GODOT_PATH if it is not found)"
+      },
+      "th": {
+        "risk": "รันโปรเจกต์ของคุณ",
+        "desc": "เปิด editor รันซีน แล้วอ่าน debug output กลับมา — น้องเลยเห็นจริงๆ ว่าเกมพังเพราะอะไร แทนที่จะเดาจากซอร์ส เอนจินเดียวกับที่โลกออฟฟิศนี้รันอยู่",
+        "needs": "ติดตั้ง Godot ไว้ (ถ้าหาไม่เจอให้ตั้ง GODOT_PATH)"
+      }
+    },
+    {
+      "id": "unity",
+      "kind": "mcp",
+      "group": "create",
+      "icon": "🕹️",
+      "name": "Unity Editor",
+      "cmd": "uvx mcpforunityserver",
+      "repo": "https://github.com/CoplayDev/unity-mcp",
+      "en": {
+        "risk": "drives the editor",
+        "desc": "Manage assets, build and edit scenes, wire components and run scripts inside a live Unity Editor. Add the package to your Unity project via Package Manager first (Unity 2021.3 LTS – 6.x), then Window → MCP for Unity.",
+        "needs": "install the MCP for Unity package in your project + uv"
+      },
+      "th": {
+        "risk": "คุม editor",
+        "desc": "จัดการ asset สร้าง/แก้ซีน ต่อ component และรันสคริปต์ใน Unity Editor ที่เปิดอยู่จริง ต้องเพิ่ม package เข้าโปรเจกต์ Unity ผ่าน Package Manager ก่อน (Unity 2021.3 LTS – 6.x) แล้วไป Window → MCP for Unity",
+        "needs": "เพิ่ม package MCP for Unity เข้าโปรเจกต์ + uv"
+      }
+    },
+    {
+      "id": "unreal",
+      "kind": "mcp",
+      "group": "create",
+      "icon": "🔺",
+      "name": "Unreal Engine",
+      "cmd": "npx -y unreal-engine-mcp-server",
+      "repo": "https://github.com/ChiR24/Unreal_mcp",
+      "en": {
+        "risk": "drives the editor",
+        "desc": "Control Unreal from natural language — spawn and place actors, edit Blueprints, drive the editor and run automation. Needs the bundled C++ plugin compiled into your project; Blueprint-only projects must be converted first.",
+        "needs": "build the UE plugin into a C++ project (UE 5.0–5.8)"
+      },
+      "th": {
+        "risk": "คุม editor",
+        "desc": "สั่ง Unreal ด้วยภาษาคน — spawn/วาง actor แก้ Blueprint คุม editor และรัน automation ต้องคอมไพล์ปลั๊กอิน C++ ที่มากับ repo เข้าโปรเจกต์ก่อน โปรเจกต์ Blueprint ล้วนต้องแปลงเป็น C++ ก่อน",
+        "needs": "คอมไพล์ปลั๊กอิน UE เข้าโปรเจกต์ C++ (UE 5.0–5.8)"
+      }
+    },
+    {
+      "id": "roblox",
+      "kind": "mcp",
+      "group": "create",
+      "icon": "🟥",
+      "name": "Roblox Studio",
+      "cmd": "npx -y @chrrxs/robloxstudio-mcp@latest --auto-install-plugin",
+      "repo": "https://github.com/Chrrxs/robloxstudio-mcp",
+      "en": {
+        "risk": "drives Studio",
+        "desc": "Read and edit scripts, run Luau, control playtests, take screenshots and debug multiplayer inside Roblox Studio. The flag installs the Studio plugin for you — then fully close and reopen Studio and wait for Connected.",
+        "needs": "restart Studio once so the plugin loads"
+      },
+      "th": {
+        "risk": "คุม Studio",
+        "desc": "อ่าน/แก้สคริปต์ รัน Luau คุม playtest ถ่ายสกรีนช็อต และดีบัก multiplayer ใน Roblox Studio แฟล็กท้ายคำสั่งจะติดตั้งปลั๊กอิน Studio ให้เอง — จากนั้นปิด Studio ให้สนิทแล้วเปิดใหม่ รอจนขึ้น Connected",
+        "needs": "ปิด-เปิด Studio หนึ่งรอบให้ปลั๊กอินโหลด"
+      }
+    },
+    {
+      "id": "figma",
+      "kind": "mcp",
+      "group": "create",
+      "icon": "🎨",
+      "name": "Figma",
+      "cmd": "npx -y figma-developer-mcp --stdio",
+      "repo": "https://github.com/GLips/Figma-Context-MCP",
+      "en": {
+        "risk": "needs an API key",
+        "desc": "Hand an agent a Figma link and it reads the real layout, spacing, colours and text — so the code it writes matches the design instead of approximating a screenshot.",
+        "needs": "a Figma API key in the FIGMA_API_KEY env var"
+      },
+      "th": {
+        "risk": "ต้องมี API key",
+        "desc": "ส่งลิงก์ Figma ให้น้อง แล้วมันอ่าน layout ระยะ สี และข้อความจริง — โค้ดที่ออกมาเลยตรงกับดีไซน์ ไม่ใช่กะเอาจากภาพหน้าจอ",
+        "needs": "ใส่ Figma API key ใน env FIGMA_API_KEY"
+      }
+    },
+    {
+      "id": "elevenlabs",
+      "kind": "mcp",
+      "group": "create",
+      "icon": "🔊",
+      "name": "ElevenLabs (voice)",
+      "cmd": "uvx elevenlabs-mcp",
+      "repo": "https://github.com/elevenlabs/elevenlabs-mcp",
+      "en": {
+        "risk": "needs an API key",
+        "desc": "Text to speech, voice cloning, sound effects and transcription — official ElevenLabs. Useful when the office is making a game or a trailer and needs lines read.",
+        "needs": "an ElevenLabs API key + uv"
+      },
+      "th": {
+        "risk": "ต้องมี API key",
+        "desc": "แปลงข้อความเป็นเสียง โคลนเสียง ทำ sound effect และถอดเสียง — ของ ElevenLabs เอง มีประโยชน์ตอนออฟฟิศทำเกมหรือทำ trailer แล้วต้องมีคนพากย์",
+        "needs": "ElevenLabs API key + uv"
+      }
+    },
+    {
+      "id": "exa",
+      "kind": "mcp",
+      "group": "know",
+      "icon": "🔮",
+      "name": "Exa Search",
+      "cmd": "npx -y exa-mcp-server",
+      "repo": "https://github.com/exa-labs/exa-mcp-server",
+      "en": {
+        "risk": "needs an API key",
+        "desc": "Neural web search built for agents — searches by meaning rather than keywords, and returns page contents, not just links.",
+        "needs": "an EXA_API_KEY"
+      },
+      "th": {
+        "risk": "ต้องมี API key",
+        "desc": "ค้นเว็บแบบ neural ที่ทำมาเพื่อ agent — ค้นด้วยความหมายไม่ใช่คีย์เวิร์ด และคืนเนื้อหาหน้าเว็บมาเลย ไม่ใช่แค่ลิงก์",
+        "needs": "EXA_API_KEY"
+      }
+    },
+    {
+      "id": "firecrawl",
+      "kind": "mcp",
+      "group": "know",
+      "icon": "🔥",
+      "name": "Firecrawl (scrape)",
+      "cmd": "npx -y firecrawl-mcp",
+      "repo": "https://github.com/firecrawl/firecrawl-mcp-server",
+      "en": {
+        "risk": "needs an API key",
+        "desc": "Crawl a whole site into clean markdown, or extract structured data from pages that fight back — JavaScript apps, pagination, rate limits and all.",
+        "needs": "a FIRECRAWL_API_KEY"
+      },
+      "th": {
+        "risk": "ต้องมี API key",
+        "desc": "ไล่เก็บทั้งเว็บออกมาเป็น markdown สะอาดๆ หรือดึงข้อมูลมีโครงสร้างจากหน้าที่ดื้อ — ทั้งเว็บ JavaScript, pagination, rate limit",
+        "needs": "FIRECRAWL_API_KEY"
+      }
+    },
+    {
+      "id": "bravesearch",
+      "kind": "mcp",
+      "group": "know",
+      "icon": "🦁",
+      "name": "Brave Search",
+      "cmd": "npx -y @brave/brave-search-mcp-server",
+      "repo": "https://github.com/brave/brave-search-mcp-server",
+      "en": {
+        "risk": "needs an API key",
+        "desc": "Private web, image, video, news and local search through Brave's own API — maintained by Brave.",
+        "needs": "a BRAVE_API_KEY"
+      },
+      "th": {
+        "risk": "ต้องมี API key",
+        "desc": "ค้นเว็บ รูป วิดีโอ ข่าว และสถานที่แบบไม่ถูกตามรอย ผ่าน API ของ Brave เอง — Brave ดูแลเอง",
+        "needs": "BRAVE_API_KEY"
+      }
+    },
+    {
+      "id": "github",
+      "kind": "mcp",
+      "group": "work",
+      "icon": "🐙",
+      "name": "GitHub",
+      "cmd": "docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server",
+      "repo": "https://github.com/github/github-mcp-server",
+      "en": {
+        "risk": "needs a token",
+        "desc": "Read and manage repos, issues, PRs, Actions and code — GitHub's own server. The token is read from the environment, so it never gets written into the office registry. There is also a hosted https://api.githubcopilot.com/mcp/ you can paste instead, which signs in with OAuth.",
+        "needs": "Docker + GITHUB_PERSONAL_ACCESS_TOKEN in the environment"
+      },
+      "th": {
+        "risk": "ต้องมี token",
+        "desc": "อ่านและจัดการ repo, issue, PR, Actions และโค้ด — เซิร์ฟเวอร์ของ GitHub เอง token อ่านจาก environment เลยไม่ถูกเขียนลง registry ของออฟฟิศ ถ้าไม่อยากใช้ Docker วาง https://api.githubcopilot.com/mcp/ แทนได้ ซึ่งล็อกอินแบบ OAuth",
+        "needs": "Docker + GITHUB_PERSONAL_ACCESS_TOKEN ใน environment"
+      }
+    },
+    {
+      "id": "google",
+      "kind": "mcp",
+      "group": "work",
+      "icon": "📧",
+      "name": "Google Workspace",
+      "cmd": "uvx workspace-mcp",
+      "repo": "https://github.com/taylorwilsdon/google_workspace_mcp",
+      "en": {
+        "risk": "needs OAuth",
+        "desc": "Gmail, Calendar, Drive, Docs, Sheets and Slides in one server — set up Google OAuth credentials first. Replaces the old separate Drive server, which npm has deprecated.",
+        "needs": "Google OAuth credentials + uv"
+      },
+      "th": {
+        "risk": "ต้องตั้ง OAuth",
+        "desc": "Gmail, Calendar, Drive, Docs, Sheets และ Slides ในเซิร์ฟเวอร์เดียว — ต้องตั้ง Google OAuth credentials ก่อน ใช้แทนตัว Drive แยกเดิมที่ npm เลิกดูแลแล้ว",
+        "needs": "Google OAuth credentials + uv"
+      }
+    },
+    {
+      "id": "notion",
+      "kind": "mcp",
+      "group": "work",
+      "icon": "📝",
+      "name": "Notion",
+      "cmd": "npx -y @notionhq/notion-mcp-server",
       "repo": "https://github.com/makenotion/notion-mcp-server",
-      "en": { "desc": "Read and update Notion pages and databases. See the repo for the connect command." },
-      "th": { "desc": "อ่าน/แก้หน้าและฐานข้อมูล Notion · ดูคำสั่งเชื่อมต่อที่ repo" } },
-    { "id": "linear", "kind": "mcp", "icon": "📐", "name": "Linear",
+      "en": {
+        "risk": "needs a token",
+        "desc": "Read and update Notion pages and databases — Notion's own server.",
+        "needs": "a Notion integration token"
+      },
+      "th": {
+        "risk": "ต้องมี token",
+        "desc": "อ่านและแก้หน้ากับฐานข้อมูล Notion — เซิร์ฟเวอร์ของ Notion เอง",
+        "needs": "Notion integration token"
+      }
+    },
+    {
+      "id": "linear",
+      "kind": "mcp",
+      "group": "work",
+      "icon": "📐",
+      "name": "Linear",
+      "cmd": "https://mcp.linear.app/mcp",
       "repo": "https://linear.app/docs/mcp",
-      "en": { "desc": "Manage Linear issues, projects and cycles from the office. See the docs for the connect URL." },
-      "th": { "desc": "จัดการ issue/project/cycle ของ Linear จากออฟฟิศ · ดู URL เชื่อมต่อในเอกสาร" } },
-    { "id": "sentry", "kind": "mcp", "icon": "🐛", "name": "Sentry",
+      "en": {
+        "risk": "hosted · sign-in",
+        "desc": "Manage Linear issues, projects and cycles. This one is a hosted URL rather than a program — paste it as-is and the office connects over HTTP.",
+        "needs": "sign in to Linear when prompted"
+      },
+      "th": {
+        "risk": "โฮสต์ · ต้องล็อกอิน",
+        "desc": "จัดการ issue / project / cycle ของ Linear ตัวนี้เป็น URL ที่เขาโฮสต์ให้ ไม่ใช่โปรแกรม — วางตามนี้ได้เลย ออฟฟิศจะต่อผ่าน HTTP",
+        "needs": "ล็อกอิน Linear ตอนที่ระบบถาม"
+      }
+    },
+    {
+      "id": "slack",
+      "kind": "mcp",
+      "group": "work",
+      "icon": "🔷",
+      "name": "Slack",
+      "cmd": "npx -y slack-mcp-server@latest --transport stdio",
+      "repo": "https://github.com/korotovsky/slack-mcp-server",
+      "en": {
+        "risk": "needs a token",
+        "desc": "Read and post in Slack channels and DMs, with search and thread history. Replaces the reference server npm has deprecated.",
+        "needs": "a Slack token in the environment"
+      },
+      "th": {
+        "risk": "ต้องมี token",
+        "desc": "อ่านและโพสต์ในช่อง Slack และ DM พร้อมค้นหาและอ่านประวัติเธรด ใช้แทน reference server ที่ npm เลิกดูแลแล้ว",
+        "needs": "Slack token ใน environment"
+      }
+    },
+    {
+      "id": "sentry",
+      "kind": "mcp",
+      "group": "work",
+      "icon": "🐛",
+      "name": "Sentry",
+      "cmd": "npx -y @sentry/mcp-server",
       "repo": "https://docs.sentry.io/product/sentry-mcp/",
-      "en": { "desc": "Pull error reports and issues from Sentry to debug with context. See the docs to connect." },
-      "th": { "desc": "ดึงรายงาน error/issue จาก Sentry มาช่วยดีบักพร้อมบริบท · ดูวิธีเชื่อมต่อในเอกสาร" } },
-    { "id": "any-mcp", "kind": "mcp", "icon": "➕", "name": "Any MCP server",
+      "en": {
+        "risk": "needs a token",
+        "desc": "Pull error reports and issues from Sentry to debug with the real stack trace and context in hand.",
+        "needs": "a Sentry auth token"
+      },
+      "th": {
+        "risk": "ต้องมี token",
+        "desc": "ดึงรายงาน error และ issue จาก Sentry มาดีบักพร้อม stack trace และบริบทจริง",
+        "needs": "Sentry auth token"
+      }
+    },
+    {
+      "id": "postgres",
+      "kind": "mcp",
+      "group": "work",
+      "icon": "🐘",
+      "name": "PostgreSQL",
+      "cmd": "npx -y @henkey/postgres-mcp-server --connection-string postgresql://USER:PASS@HOST/DB",
+      "repo": "https://github.com/HenkDz/postgresql-mcp-server",
+      "en": {
+        "risk": "database",
+        "desc": "Query and inspect a Postgres database in plain language — schemas, indexes, performance analysis. Replaces the reference server npm has deprecated.",
+        "needs": "edit the connection string first"
+      },
+      "th": {
+        "risk": "ฐานข้อมูล",
+        "desc": "คุยกับฐานข้อมูล Postgres ด้วยภาษาธรรมดา — ดู schema, index, วิเคราะห์ performance ใช้แทน reference server ที่ npm เลิกดูแลแล้ว",
+        "needs": "แก้ connection string ก่อน"
+      }
+    },
+    {
+      "id": "sqlite",
+      "kind": "mcp",
+      "group": "work",
+      "icon": "🗄️",
+      "name": "SQLite",
+      "cmd": "npx -y mcp-server-sqlite-npx <path-to-db-file>",
+      "repo": "https://github.com/johnnyoshika/mcp-server-sqlite-npx",
+      "en": {
+        "risk": "database",
+        "desc": "Query a local .db SQLite file — good for prototypes and local apps.",
+        "needs": "edit the .db file path first"
+      },
+      "th": {
+        "risk": "ฐานข้อมูล",
+        "desc": "คุยกับไฟล์ .db SQLite ในเครื่อง — เหมาะกับ prototype และแอปในเครื่อง",
+        "needs": "แก้ path ไฟล์ .db ก่อน"
+      }
+    },
+    {
+      "id": "any-mcp",
+      "kind": "mcp",
+      "group": "work",
+      "icon": "➕",
+      "name": "Any MCP server",
       "repo": "https://github.com/modelcontextprotocol/servers",
-      "en": { "desc": "The office speaks the open MCP standard — paste any server's launch command in ⚙ → MCP SERVERS and assign it to an agent. Browse the whole ecosystem." },
-      "th": { "desc": "ออฟฟิศรองรับมาตรฐาน MCP แบบเปิด — วางคำสั่งรัน server ตัวไหนก็ได้ใน ⚙ → MCP SERVERS แล้ว assign ให้ agent · ดูทั้ง ecosystem ได้" } }
+      "en": {
+        "risk": "your call",
+        "desc": "The office speaks the open MCP standard — paste any server's launch command (or a hosted https:// URL) in ⚙ → MCP SERVERS and assign it to an agent. Browse the whole ecosystem."
+      },
+      "th": {
+        "risk": "แล้วแต่คุณ",
+        "desc": "ออฟฟิศรองรับมาตรฐาน MCP แบบเปิด — วางคำสั่งรันเซิร์ฟเวอร์ตัวไหนก็ได้ (หรือ URL https:// ที่เขาโฮสต์) ใน ⚙ → MCP SERVERS แล้ว assign ให้ agent ดูทั้ง ecosystem ได้"
+      }
+    }
   ]
 }
