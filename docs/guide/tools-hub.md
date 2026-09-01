@@ -84,10 +84,17 @@ appears in a process listing.
 
 ## Read the risk line before you press Add
 
-Every card carries a plain-language **risk** line, because these are not equal.
-A search server reads public pages. A Postgres server can run statements against
-your database. A Slack server can post as you. The Hub says which is which
-instead of presenting 28 identical buttons.
+Every card carries a short plain-language **risk** tag, because these are not
+equal. Context7 is *reads the web*. Postgres and SQLite are *database*. The
+browser servers are *drives a browser*. GitHub is *needs a token*. It is one
+word or three, and it is there so the Hub is not 28 identical buttons.
+
+A **needs** line sits beside it and is the other half of the same honesty: it
+says what you must supply before the entry will work — `edit the connection
+string first`, `a Figma API key in the FIGMA_API_KEY env var`, `Docker +
+GITHUB_PERSONAL_ACCESS_TOKEN in the environment`. An entry that quietly needs
+something you don't have is a button that fails later, in an agent's session,
+where you are not watching.
 
 Two rules that survive every convenient exception:
 
@@ -134,10 +141,12 @@ inside a Japanese layout is not a supported language.
 
 **Every entry is verified before it merges** — the package must exist under
 exactly that name, and its `repository.url` and maintainers must match the
-project it claims to be. In the v1.0.0 rebuild seven entries were removed for
-pointing at packages npm had deprecated, and one for pointing at a package that
-had never existed at all. A one-click catalog is a supply chain; name-squatting
-on a popular project's obvious npm name is a known trick.
+project it claims to be. The v1.0.0 rebuild found **seven dead buttons**: six
+pointed at reference servers npm had deprecated — replaced with the maintained
+ones, GitHub's own, Brave's own, Notion's own — and one pointed at a package
+that **had never existed at all**, offered for one-click install, 404ing. A
+one-click catalog is a supply chain; name-squatting on a popular project's
+obvious npm name is a known trick.
 
 ---
 
