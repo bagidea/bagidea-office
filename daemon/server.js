@@ -31,6 +31,7 @@ const retrieval = require("./retrieval");
 const skillsSync = require("./skills");
 const providers = require("./providers");
 const execBackend = require("./exec-backend");
+const worktree = require("./worktree");
 const proxy = require("./proxy");
 const { RunWatchdog } = require("./watchdog");
 const { stripStatus, verdict: autoVerdict, readStatus } = require("./autopilot");
@@ -114,6 +115,7 @@ function loadReg() {
   // Named places a run can happen. Empty = everything runs on this machine,
   // which is how the office worked before backends existed.
   reg.execBackends = reg.execBackends || {};
+  reg.ghostWorktrees = reg.ghostWorktrees === true;   // opt-in, see runSub
   // One-time seed: a ready-to-use WEB capability (Playwright MCP, the Claude Code
   // browser standard). Tick "🔌 web" on an agent's tools and it can navigate,
   // click, type, submit forms and screenshot real pages. Runs --isolated (a fresh
@@ -266,6 +268,7 @@ function rosterEvt() {
     tools: reg.tools, builtinTools: BUILTIN_TOOLS, mcp: reg.mcpServers,
     backends: reg.execBackends || {}, backend: reg.execBackend || "local",
     skills: reg.skills, autoSkills: reg.autoSkills !== false,
+    ghostWorktrees: reg.ghostWorktrees === true,
     verifyDelegated: reg.verifyDelegated === true,
     ecoMode: reg.ecoMode === true,
     autoApprove: reg.autoApprove === true,
@@ -2933,7 +2936,28 @@ function runSub(parentId, subId, taskText, entry, onDone) {
     } catch {}
   }
   // Ghosts work where their parent works (project-bound threads included).
-  const subCwd = (entry.proj && projectDir(entry.proj)) || WORKSPACE;
+  const sharedCwd = (entry.proj && projectDir(entry.proj)) || WORKSPACE;
+  const projCwd = entry.proj ? projectDir(entry.proj) : null;
+  // ...except when the owner has asked for isolation. Ghosts are the one place
+  // the office runs several sessions at once in one directory, which is a race
+  // no amount of care wins. A worktree is the same repo, checked out separately,
+  // so two ghosts editing one file simply cannot see each other's edits.
+  //
+  // Off by default on purpose: it MOVES where a ghost's edits land. They arrive
+  // as a branch to merge instead of as changes already in the working tree, and
+  // that is not a thing to switch on under someone without asking.
+  // Only for PROJECT work. The plain workspace lives inside the office's own
+  // repository, so isolating there would put a ghost's notes on an office
+  // branch instead of in the workspace — surprising, and not what this is for.
+  const wt = (reg.ghostWorktrees === true && projCwd)
+    ? worktree.create(projCwd, subId) : null;
+  const subCwd = wt ? wt.dir : sharedCwd;
+  // The parent writes jobs the obvious way — "in C:\work\game, edit shared.txt" —
+  // and a ghost handed an absolute path uses it, walking straight out of its own
+  // checkout and back in with its siblings. Measured, not guessed: the first
+  // end-to-end run had two ghosts overwrite each other from inside perfectly
+  // good private checkouts.
+  const job = wt ? worktree.rewritePaths(taskText, projCwd, wt.dir) : taskText;
   // Ghosts run on the parent agent's backend (the swappable brain).
   const route = brainRoute(parentId);
   if (route.modelArgs.length) args.push(...route.modelArgs);
@@ -2948,13 +2972,30 @@ function runSub(parentId, subId, taskText, entry, onDone) {
     (a.prompt ? `\nParent persona:\n${a.prompt}\n` : "\n") +
     `You were split off for ONE focused job. Do it fast and directly; your final ` +
     `message must BE the result (data, findings, answer) — no meta talk, no asking ` +
-    `back. Reply in the language of the job. Never split further.\n\nJOB: ${taskText}`);
+    `back. Reply in the language of the job. Never split further.\n` +
+    // Isolation is only real if the INSTRUCTIONS agree with it. Saying which
+    // directory is home stops a ghost drifting back out to the shared one.
+    (wt
+      ? `\nYou have your OWN private checkout of this project at ${wt.dir}. Other ` +
+        `clones are working on the same project at the same time, each in their own ` +
+        `copy. Do every part of this job inside YOUR directory — never reach outside ` +
+        `it, even if some other path looks like the same project. Your changes are ` +
+        `collected from there when you finish.\n`
+      : "") +
+    `\nJOB: ${job}`);
   child.stdin.end();
   let buf = "", lastText = "", finished = false;
   const finish = (ok) => {
     if (finished) return;
     finished = true;
     clearTimeout(watchdog);
+    // Settle the worktree even when the run FAILED: a ghost that was killed
+    // half way through still wrote real files, and throwing them away is worse
+    // than leaving a branch nobody merges.
+    if (wt) {
+      try { lastText += worktree.settle(wt, taskText); }
+      catch (e) { console.error("[worktree] settle:", e.message); }
+    }
     onDone(lastText, ok);
   };
   // Ghosts are short-lived by contract — a stuck one is reaped, its slot
@@ -5989,6 +6030,23 @@ end tell`;
       }
     });
 
+  } else if (req.method === "POST" && req.url === "/registry/ghostworktrees") {
+    // Isolate parallel ghosts in their own git worktrees. Owner-only and
+    // off by default: it changes where a ghost's edits end up.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        reg.ghostWorktrees = !!JSON.parse(body).enabled;
+        saveReg();
+        pushRoster();
+        res.writeHead(200);
+        res.end("ok");
+      } catch {
+        res.writeHead(400);
+        res.end("bad json");
+      }
+    });
+
   } else if (req.method === "POST" && req.url === "/registry/autoskills") {
     readBody(req, (body) => {
       try {
@@ -6967,6 +7025,16 @@ server.listen(OEP_PORT, "127.0.0.1", () => {
   // next client connect and pin agents as "working" forever. Journal a reset so it
   // replays last and clears any stale working state on the wallpaper + overlay.
   broadcast({ type: "task.reset" });
+  // Same reasoning for worktrees: a ghost that was mid-run when the office was
+  // killed left a checkout behind. Nothing is running yet, so anything still
+  // there is abandoned. Its BRANCH survives — only the checkout is swept.
+  try {
+    // Nothing is live yet, so every checkout under the ghost home is abandoned
+    // — a ghost settles its own on the way out, success or failure alike, so
+    // the only way one survives is the office being killed mid-run.
+    const n = worktree.sweep(new Set());
+    if (n) console.log("[worktree] swept " + n + " abandoned ghost checkout(s)");
+  } catch (e) { console.error("[worktree] sweep:", e.message); }
 });
 
 // Parent-death watchdog: if the shell that spawned us (via OEP_SPAWNED=1) exits

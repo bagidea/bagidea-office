@@ -1375,6 +1375,7 @@
   let AUTOPILOT = false, AUTOPILOTMAX = 8;   // 🤖 keep-going mode + its round budget
   let BUILTIN_DESC = {}, REGMCP = {}, SOUND = true, HEARTBEAT = 0;
   let REGBACKENDS = {}, REGBACKEND = "local";
+  let GHOSTWT = false;
   let FEATURES = { openai: false, gemini: false, stt: false, tts: false, live: false, image: false };
   let TTSON = true, SOCIALMIN = 60, MAXSTAFF = 18, PROPOSALMIN = 120;
   let PROJECTS_CACHE = [];
@@ -3163,6 +3164,8 @@
         <div class="hint" style="margin:-4px 0 12px 46px;opacity:.7;font-size:11px">${tr("ทำต่อเองได้สูงสุด %n รอบต่องาน แล้วหยุดรอคุณ · เปิดคู่กับ 🔓 ข้างล่างเพื่อไม่ให้ค้างรอกด Allow").replace("%n", AUTOPILOTMAX)}</div>
         <div class="switch ${AUTOAPPROVE ? "on" : ""}" id="autoApproveSw">
           <div class="knob"></div> ${tr("🔓 อนุมัติอัตโนมัติ: ให้ทุกคำขอใช้เครื่องมือผ่านเองโดยไม่ต้องกด Allow — เหมาะตอนสั่งงานทิ้งไว้แล้วไม่ได้เฝ้า (ยังเห็นใน feed ว่าอนุมัติอะไรบ้าง · ปิดไว้ = ปลอดภัยกว่า)")}</div>
+        <div class="switch ${GHOSTWT ? "on" : ""}" id="ghostWtSw">
+          <div class="knob"></div> ${tr("👻 แยกที่ทำงานให้ร่างผี: ตอนแตกร่างทำงานขนาน ให้แต่ละตัวมี checkout ของ git เป็นของตัวเอง จะได้ไม่แก้ไฟล์ทับกัน — งานที่ทำเสร็จจะมาเป็น branch ให้ merge แทนที่จะแก้ลงในโฟลเดอร์ตรงๆ (ใช้ได้เฉพาะโปรเจกต์ที่เป็น git)")}</div>
         <input id="tFilter" class="filterbox" placeholder="🔍 ค้นหาเครื่องมือ / MCP server…">
         <div class="field"><label>⚡ SYSTEM TOOLS — ความสามารถกลางของออฟฟิศ (agents เรียกใช้เองได้)</label>
           <div id="systools"></div></div>
@@ -3462,6 +3465,12 @@
           });
         };
       }
+      const gsw = modalCard.querySelector("#ghostWtSw");
+      if (gsw) gsw.onclick = async (e) => {
+        await api("/registry/ghostworktrees", { enabled: !GHOSTWT });
+        GHOSTWT = !GHOSTWT;
+        e.currentTarget.classList.toggle("on", GHOSTWT);
+      };
       wireFilter(modalCard.querySelector("#tFilter"), list, ml);
     } else if (tab === "connect") {
       renderConnectTab();
@@ -5741,6 +5750,7 @@
       REGMCP = ev.mcp || {};
       REGBACKENDS = ev.backends || {};
       REGBACKEND = ev.backend || "local";
+      GHOSTWT = ev.ghostWorktrees === true;
       AUTOSKILLS = ev.autoSkills !== false;
       VERIFY = ev.verifyDelegated === true;
       AUTOAPPROVE = ev.autoApprove === true;

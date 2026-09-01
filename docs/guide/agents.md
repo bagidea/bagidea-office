@@ -173,6 +173,32 @@ Set it per agent in the agent editor (**📦 ที่ทำงาน**); leave 
 agent follows the office default. Ghost clones always run wherever their parent
 runs.
 
+### 👻 Ghosts that don't overwrite each other
+
+Ghost clones have always worked in the same directory as each other. Two of them
+editing one file is not a race careful prompting wins — it is a race the office
+should not have started. ⚙ → TOOLS → **แยกที่ทำงานให้ร่างผี** gives each ghost its
+own `git worktree`: the same repository, checked out separately, on its own
+branch.
+
+What changes when it is on:
+
+- Ghosts working on a **registered project that is a git repo** each get a
+  private checkout. Two ghosts writing the same file now both succeed.
+- Their work comes back as branches — `office/ghost-<id>` — with the branch name
+  in the ghost's result, for you to review and merge.
+- A ghost that changed nothing leaves nothing: no directory, no branch.
+- Your working copy is never touched. Not even to stash.
+
+It is **off by default**, and deliberately so: it moves where a ghost's edits
+land. With it off they appear in your working tree as they always have; with it
+on they arrive as branches. That is a good trade for parallel code work and a
+bad surprise if nobody told you, so the office asks first.
+
+It applies to project work only. The plain workspace lives inside the office's
+own repository, and isolating there would put a ghost's notes on an office
+branch instead of in the workspace.
+
 ## What agents do on their own, without being taught
 
 - **Forking** (sub-agents): work that can run in parallel is split into 2-4 clones running at once (see 👻 below)
