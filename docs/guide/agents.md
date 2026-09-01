@@ -138,6 +138,41 @@ else is run as a command with its arguments. Nothing extra to choose.
 > environment (⚙ → 🔗 CONNECT) over one that wants it inside the command. The
 > command string is stored in the office registry; the environment is not.
 
+## 📦 Where agents run
+
+By default every agent runs on the machine the office is on. That is fine while
+you are watching, and less fine when a team of them is working overnight on a
+repo you care about. ⚙ → TOOLS → **ที่ทำงานของน้องๆ / where agents run** lets you
+define somewhere else and point the whole office — or one agent — at it.
+
+| Kind | You give it | What you get |
+|---|---|---|
+| `local` | nothing | what the office always did |
+| `docker` | an image, e.g. `node:22-bookworm` | a throwaway container per run |
+| `ssh` | a host + the office path on it | the run happens on another machine |
+
+A container gets exactly two mounts: the office root at `/office` **read-only**,
+and the working directory at `/work`. Nothing else on the disk exists as far as
+that agent is concerned. API keys are passed by *name*, so the values travel in
+Docker's own environment and never appear in a process listing.
+
+Two things are worth knowing before you switch:
+
+- **The image must have the `claude` CLI on its PATH.** The office does not
+  install it for you; a bare `node:22` image will start and then fail to find it.
+- **A backend that cannot be built is refused, not downgraded.** If the arguments
+  for a run cannot be translated into paths that side would see — most often the
+  `--settings` file, which is what installs the permission broker — the run fails
+  and says so. An agent you put in a box does not quietly come back out of it.
+
+The `ssh` backend needs `officeDir`: the path to an office checkout **on that
+machine**. Without one there is no settings file to point at, so it is rejected
+when you define it rather than at 3am on somebody's task.
+
+Set it per agent in the agent editor (**📦 ที่ทำงาน**); leave that blank and the
+agent follows the office default. Ghost clones always run wherever their parent
+runs.
+
 ## What agents do on their own, without being taught
 
 - **Forking** (sub-agents): work that can run in parallel is split into 2-4 clones running at once (see 👻 below)

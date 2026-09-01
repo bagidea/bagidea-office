@@ -30,6 +30,7 @@ const maintenance = require("./maintenance");
 const retrieval = require("./retrieval");
 const skillsSync = require("./skills");
 const providers = require("./providers");
+const execBackend = require("./exec-backend");
 const proxy = require("./proxy");
 const { RunWatchdog } = require("./watchdog");
 const { stripStatus, verdict: autoVerdict, readStatus } = require("./autopilot");
@@ -110,6 +111,9 @@ function loadReg() {
   }
   reg.tools = Object.keys(BUILTIN_TOOLS);
   reg.mcpServers = reg.mcpServers || {};
+  // Named places a run can happen. Empty = everything runs on this machine,
+  // which is how the office worked before backends existed.
+  reg.execBackends = reg.execBackends || {};
   // One-time seed: a ready-to-use WEB capability (Playwright MCP, the Claude Code
   // browser standard). Tick "🔌 web" on an agent's tools and it can navigate,
   // click, type, submit forms and screenshot real pages. Runs --isolated (a fresh
@@ -260,6 +264,7 @@ function monitorCount() {
 function rosterEvt() {
   return { type: "roster.sync", agents: reg.agents, roles: reg.roles,
     tools: reg.tools, builtinTools: BUILTIN_TOOLS, mcp: reg.mcpServers,
+    backends: reg.execBackends || {}, backend: reg.execBackend || "local",
     skills: reg.skills, autoSkills: reg.autoSkills !== false,
     verifyDelegated: reg.verifyDelegated === true,
     ecoMode: reg.ecoMode === true,
@@ -1789,6 +1794,48 @@ SUB: <งานย่อยที่ชัดเจนครบถ้วนใ�
 ระบบจะส่งร่างโคลนไปทำขนานกัน แล้วรวมผลกลับมาให้คุณสรุปเป็นคำตอบสุดท้าย.
 </system-capability>`;
 
+// Where an agent's run actually happens. Everything above this line builds the
+// SAME claude arguments it always did; this decides whether they run here, in a
+// container, or on another machine, and translates the host paths inside them
+// for wherever that is.
+//
+// A backend that cannot be built correctly does NOT quietly fall back to
+// running locally — an owner who put an agent in a box expects it to stay in
+// the box. It comes back as a child that fails on its first tick, so the run
+// ends through the same error path as any other spawn failure and the reason
+// reaches the office feed instead of a log nobody reads.
+function spawnAgent(agentId, argv, options) {
+  const picked = execBackend.pick(reg, agentId);
+  if (picked.unknown)
+    console.error("[backend] agent " + agentId + " wants unknown backend \"" + picked.unknown + "\" — running local");
+  let planned;
+  try {
+    planned = execBackend.plan(picked.spec, {
+      argv, cwd: options.cwd, env: options.env,
+      officeRoot: path.join(__dirname, ".."),
+    });
+  } catch (e) {
+    return failedChild("backend \"" + picked.name + "\": " + e.message);
+  }
+  if (planned.describe !== "local")
+    console.log("[backend] " + agentId + " -> " + planned.describe);
+  return spawn(planned.file, planned.args, planned.options);
+}
+
+// A stand-in for a child process that could never be started. It satisfies the
+// same shape every caller uses (stdin to write the prompt into, stdout/stderr
+// to read) and then emits 'error', which is already handled everywhere.
+function failedChild(message) {
+  const { PassThrough } = require("stream");
+  const ch = new (require("events").EventEmitter)();
+  ch.stdin = new PassThrough(); ch.stdin.resume();
+  ch.stdout = new PassThrough(); ch.stdout.end();
+  ch.stderr = new PassThrough(); ch.stderr.end();
+  ch.kill = () => {};
+  ch.pid = null;
+  setImmediate(() => ch.emit("error", new Error(message)));
+  return ch;
+}
 function runClaude(agent, prompt, opts = {}) {
   const task = "t" + ++taskCounter;
 
@@ -1971,9 +2018,8 @@ function runClaude(agent, prompt, opts = {}) {
   // An opt-in failover override reroutes THIS run to the fallback brain instead.
   const route = brainRoute(agent, ov);
   if (route.modelArgs.length) args.push(...route.modelArgs);
-  const child = spawn("claude", args, {
+  const child = spawnAgent(agent, args, {
     cwd,
-    shell: true,
     env: { ...process.env, ...(reg.apiKeys || {}), ...route.env, OFFICE_ADAPTER: "1", OFFICE_AGENT: agent, OFFICE_TASK: task },
   });
   // Track the run per project so the owner can stop it and take the project over.
@@ -2891,8 +2937,9 @@ function runSub(parentId, subId, taskText, entry, onDone) {
   // Ghosts run on the parent agent's backend (the swappable brain).
   const route = brainRoute(parentId);
   if (route.modelArgs.length) args.push(...route.modelArgs);
-  const child = spawn("claude", args, {
-    cwd: subCwd, shell: true,
+  // A ghost runs where its parent runs — same backend, same box.
+  const child = spawnAgent(parentId, args, {
+    cwd: subCwd,
     env: { ...process.env, ...(reg.apiKeys || {}), ...route.env, OFFICE_ADAPTER: "1", OFFICE_AGENT: subId, OFFICE_TASK: entry.key },
   });
   child.stdin.write(
@@ -4473,6 +4520,9 @@ const server = http.createServer((req, res) => {
           provider: (providers.PROVIDERS[p.provider] || (reg.providerConfig && reg.providerConfig[p.provider]))
             ? p.provider : (cur.provider || "claude"),
           model: String(p.model !== undefined ? p.model : (cur.model || "")).slice(0, 60),
+          // 📦 where this agent RUNS (local / a configured container / another
+          // machine). Unset means the office default.
+          backend: String(p.backend !== undefined ? p.backend : (cur.backend || "")).slice(0, 40),
         };
         saveReg();
         pushRoster();
@@ -4555,6 +4605,61 @@ const server = http.createServer((req, res) => {
       }
     });
 
+  } else if (req.method === "POST" && req.url === "/registry/backend") {
+    // Execution backends — WHERE agents run. Owner-only: an agent that could
+    // edit this could move itself out of the container it was put in.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body);
+        if (p.default !== undefined) {         // pick the office-wide default
+          const d = String(p.default || "local");
+          if (d !== "local" && !reg.execBackends[d]) throw new Error("no such backend: " + d);
+          reg.execBackend = d;
+        } else {
+          const n = String(p.name || "").trim().toLowerCase()
+            .replace(/[^a-z0-9_-]/g, "-").slice(0, 40);
+          if (!n) throw new Error("no name");
+          if (n === "local") throw new Error("'local' is the built-in backend and cannot be redefined");
+          if (p.remove) {
+            delete reg.execBackends[n];
+            for (const a of Object.values(reg.agents)) if (a.backend === n) delete a.backend;
+            if (reg.execBackend === n) reg.execBackend = "local";
+          } else {
+            const kind = String(p.kind || "").trim();
+            if (!["docker", "ssh"].includes(kind)) throw new Error("kind must be docker or ssh");
+            const spec = { kind };
+            if (kind === "docker") {
+              spec.image = String(p.image || "").trim().slice(0, 200);
+              if (p.network) spec.network = String(p.network).trim().slice(0, 60);
+              if (Array.isArray(p.args)) spec.args = p.args.map((x) => String(x).slice(0, 120)).slice(0, 20);
+            } else {
+              spec.host = String(p.host || "").trim().slice(0, 200);
+              spec.officeDir = String(p.officeDir || "").trim().slice(0, 400);
+              if (p.dir) spec.dir = String(p.dir).trim().slice(0, 400);
+              if (p.identity) spec.identity = String(p.identity).trim().slice(0, 400);
+              if (p.port) spec.port = Math.max(1, Math.min(65535, Number(p.port) || 22));
+            }
+            // Build it once here so a broken definition is refused at the point
+            // the owner can still see why, not on the next agent run.
+            execBackend.plan(spec, {
+              argv: ["-p", "--settings", path.join(WORKSPACE, ".claude", "settings.json")],
+              cwd: WORKSPACE, env: {}, officeRoot: path.join(__dirname, ".."),
+            });
+            reg.execBackends[n] = spec;
+          }
+        }
+        saveReg();
+        pushRoster();
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        // JSON, because the Tools UI reads api() responses as JSON — a refusal
+        // the owner cannot see is the same as no refusal at all.
+        res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ error: String(e.message) }));
+      }
+    });
   } else if (req.method === "POST" && req.url === "/registry/mcp") {
     // Custom capability = MCP servers (the Claude Code plugin standard).
     // name + launch command; assignment per agent via "mcp:<name>" entries.

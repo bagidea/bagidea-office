@@ -1374,6 +1374,7 @@
   let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true, VERIFY = false, AUTOAPPROVE = false;
   let AUTOPILOT = false, AUTOPILOTMAX = 8;   // 🤖 keep-going mode + its round budget
   let BUILTIN_DESC = {}, REGMCP = {}, SOUND = true, HEARTBEAT = 0;
+  let REGBACKENDS = {}, REGBACKEND = "local";
   let FEATURES = { openai: false, gemini: false, stt: false, tts: false, live: false, image: false };
   let TTSON = true, SOCIALMIN = 60, MAXSTAFF = 18, PROPOSALMIN = 120;
   let PROJECTS_CACHE = [];
@@ -3169,16 +3170,33 @@
           <div id="tlist" class="biglist"></div></div>
         <div class="field"><label>🔌 MCP SERVERS — เพิ่มความสามารถใหม่ตามมาตรฐาน MCP</label>
           <div style="font-size:11px;color:var(--dim);margin-bottom:8px">
-            ใส่ชื่อ + คำสั่งรัน server แล้ว assign ให้ agent ในหน้าแก้ไข เช่น<br>
-            <b style="color:var(--text)">github</b> → <code>npx -y @modelcontextprotocol/server-github</code><br>
+            ใส่ชื่อ + คำสั่งรัน server (หรือ URL ของตัวที่เขาโฮสต์ให้) แล้ว assign ให้ agent ในหน้าแก้ไข เช่น<br>
             <b style="color:var(--text)">playwright</b> → <code>npx -y @playwright/mcp</code> (คุมเบราว์เซอร์)<br>
-            หาเพิ่มได้จาก github.com/modelcontextprotocol/servers</div>
+            <b style="color:var(--text)">blender</b> → <code>uvx blender-mcp</code> (ปั้นโมเดล/เรนเดอร์)<br>
+            <b style="color:var(--text)">linear</b> → <code>https://mcp.linear.app/mcp</code><br>
+            เลือกจากรายการพร้อมใช้ที่ 🧰 Tools Hub</div>
           <div id="mlist"></div>
           <div class="assistrow" style="margin-top:8px">
             <input id="mName" placeholder="ชื่อ เช่น github" style="flex:0 0 110px">
             <input id="mCmd" placeholder="คำสั่งรัน เช่น npx -y @modelcontextprotocol/server-github">
             <button class="sparkle" id="addMcp">＋</button>
-          </div></div>`;
+          </div></div>
+        <div class="field"><label>📦 ที่ทำงานของน้องๆ — งานของ agent รันที่ไหน</label>
+          <div style="font-size:11px;color:var(--dim);margin-bottom:8px">
+            ปกติน้องรันบนเครื่องนี้ · ตั้งกล่องปิด (Docker) หรือเครื่องอื่น (SSH) ได้
+            แล้วเลือกให้ทั้งออฟฟิศ หรือตั้งรายคนในหน้าแก้ไข agent<br>
+            <b style="color:var(--text)">docker</b> → ใส่ชื่อ image เช่น <code>node:22-bookworm</code> · ตัวออฟฟิศ mount แบบอ่านอย่างเดียว<br>
+            <b style="color:var(--text)">ssh</b> → ใส่ host + path ของออฟฟิศบนเครื่องนั้น</div>
+          <div id="blist"></div>
+          <div class="assistrow" style="margin-top:8px">
+            <select id="bKind" style="flex:0 0 92px"><option value="docker">docker</option><option value="ssh">ssh</option></select>
+            <input id="bName" placeholder="ชื่อ เช่น box" style="flex:0 0 96px">
+            <input id="bTarget" placeholder="image เช่น node:22-bookworm">
+            <input id="bDir" placeholder="path ออฟฟิศบนเครื่องนั้น" style="display:none">
+            <button class="sparkle" id="addBackend">＋</button>
+          </div>
+          <div id="bHint" style="font-size:10.5px;color:var(--dim);margin-top:6px"></div>
+        </div>`;
     } else if (tab === "connect") {
       bodyHtml = `
         <div class="field"><label>⭐ MAIN API KEYS — กุญแจหลักของโปรแกรม (ปลดล็อกฟีเจอร์เสียง · TTS · รูปภาพ · realtime)</label>
@@ -3392,6 +3410,58 @@
         const c = modalCard.querySelector("#mCmd").value.trim();
         if (n && c) api("/registry/mcp", { name: n, command: c }).then(() => openSettings("tools"));
       };
+      // Where agents run. 'local' is always offered and is never stored as a
+      // backend of its own — it is the absence of one.
+      const bl = modalCard.querySelector("#blist");
+      const bHint = modalCard.querySelector("#bHint");
+      if (bl) {
+        const mkRow = (name, label, on) => {
+          const row = document.createElement("div");
+          row.className = "arow";
+          row.style.cursor = "pointer";
+          row.innerHTML = `<div class="meta"><b>${on ? "✅" : "▫️"} ${name}</b><span>${label}</span></div>` +
+            (name === "local" ? "" : `<div class="winbtn hide" title="Remove">✕</div>`);
+          row.onclick = (e) => {
+            if (e.target.classList.contains("winbtn")) return;
+            api("/registry/backend", { default: name }).then(() => openSettings("tools"));
+          };
+          const rm = row.querySelector(".winbtn");
+          if (rm) rm.onclick = () =>
+            api("/registry/backend", { name, remove: true }).then(() => openSettings("tools"));
+          bl.appendChild(row);
+        };
+        mkRow("local", tr("เครื่องนี้ — เหมือนที่เป็นมา"), REGBACKEND === "local" || !REGBACKEND);
+        for (const [n, b] of Object.entries(REGBACKENDS))
+          mkRow(n, b.kind === "docker" ? "🐳 " + (b.image || "") : "🌐 " + (b.host || ""),
+            REGBACKEND === n);
+      }
+      const bKind = modalCard.querySelector("#bKind");
+      if (bKind) {
+        const syncFields = () => {
+          const ssh = bKind.value === "ssh";
+          modalCard.querySelector("#bTarget").placeholder =
+            ssh ? tr("host เช่น build01") : tr("image เช่น node:22-bookworm");
+          modalCard.querySelector("#bDir").style.display = ssh ? "" : "none";
+        };
+        bKind.onchange = syncFields; syncFields();
+        modalCard.querySelector("#addBackend").onclick = () => {
+          const kind = bKind.value;
+          const name = modalCard.querySelector("#bName").value.trim();
+          const target = modalCard.querySelector("#bTarget").value.trim();
+          const dir = modalCard.querySelector("#bDir").value.trim();
+          if (!name || !target) { bHint.textContent = tr("ใส่ชื่อและปลายทางให้ครบก่อน"); return; }
+          const body = kind === "docker" ? { name, kind, image: target }
+                                         : { name, kind, host: target, officeDir: dir };
+          bHint.textContent = "…";
+          api("/registry/backend", body).then((r) => {
+            // The daemon builds the command once before saving, so a definition
+            // that could never run is refused here with the reason, not silently
+            // at 3am on somebody's task.
+            if (r && r.error) { bHint.textContent = "⚠ " + r.error; return; }
+            openSettings("tools");
+          });
+        };
+      }
       wireFilter(modalCard.querySelector("#tFilter"), list, ml);
     } else if (tab === "connect") {
       renderConnectTab();
@@ -3528,6 +3598,10 @@
          <option value="2">หัวหน้าทีม (Lead)</option>
          <option value="3">ทีมงาน (Staff)</option>
        </select></div>
+       <div class="field"><label>📦 ที่ทำงาน — คนนี้รันที่ไหน</label>
+         <select id="eBackend"></select>
+         <div style="font-size:10.5px;color:var(--dim);margin-top:4px">เว้นไว้ = ใช้ค่าของทั้งออฟฟิศ (ตั้งใน ⚙ → TOOLS)</div>
+       </div>
        <div class="field"><label>🧠 สมอง (โมเดล/ผู้ให้บริการ) — ดีฟอลต์คือ Claude</label>
          <select id="eProvider"></select>
          <div id="eModelWrap" style="position:relative;margin-top:6px">
@@ -3908,6 +3982,17 @@
         } finally { btn.disabled = false; btn.textContent = "✨ Draft"; }
       };
     }
+    // Where this teammate runs. The blank option is not 'local' — it means
+    // 'whatever the office is set to', so changing the office default moves
+    // everyone who never made their own choice.
+    const eBk = modalCard.querySelector("#eBackend");
+    if (eBk) {
+      const opts = [["", tr("(ตามออฟฟิศ)")], ["local", tr("เครื่องนี้")]]
+        .concat(Object.entries(REGBACKENDS).map(([n, b]) =>
+          [n, n + " · " + (b.kind === "docker" ? "🐳 " + (b.image || "") : "🌐 " + (b.host || ""))]));
+      eBk.innerHTML = opts.map(([v, l]) =>
+        `<option value="${v}"${(a.backend || "") === v ? " selected" : ""}>${l}</option>`).join("");
+    }
     modalCard.querySelector("#eName").value = a.name;
     modalCard.querySelector("#eCancel").onclick = () => openSettings("agents");
     modalCard.querySelector("#eSave").onclick = async () => {
@@ -3921,6 +4006,7 @@
             voice: (modalCard.querySelector("#eVoice") || {}).value || "",
             provider: (modalCard.querySelector("#eProvider") || {}).value || "claude",
             model: (modalCard.querySelector("#eModel") || {}).value || "",
+            backend: (modalCard.querySelector("#eBackend") || {}).value || "",
             persona: {
               expertise: modalCard.querySelector("#eExpertise").value,
               personality: modalCard.querySelector("#ePersonality").value,
@@ -5653,6 +5739,8 @@
       REGTOOLS = ev.tools || [];
       BUILTIN_DESC = ev.builtinTools || {};
       REGMCP = ev.mcp || {};
+      REGBACKENDS = ev.backends || {};
+      REGBACKEND = ev.backend || "local";
       AUTOSKILLS = ev.autoSkills !== false;
       VERIFY = ev.verifyDelegated === true;
       AUTOAPPROVE = ev.autoApprove === true;
