@@ -154,3 +154,7 @@ When you pick a new monitor, the office **restarts itself briefly** to move to i
 - [Let agents open the web & click through tasks for you (web automation)](web-automation.md)
 - [Give orders by voice + feed mode](voice-feed.md)
 - [Connect Telegram to give orders from your phone](channels.md)
+- [Give an agent a new ability from the 🧰 Tools Hub](tools-hub.md) — Blender, Godot,
+  Unity, Unreal, Roblox Studio, GitHub, Postgres and 21 more, one click each
+- [Make and change pictures in the 🎨 Media Studio](ai-features.md#-media-studio)
+- [Run an agent in a container or on another machine](agents.md#-where-agents-run)
