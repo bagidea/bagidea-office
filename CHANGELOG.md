@@ -4,7 +4,12 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
-## [Unreleased]
+## [1.0.0] — 🏢 An office that can run anywhere, recall what you meant, and correct itself
+
+> **On the version number:** nothing here breaks. Every addition is opt-in and an
+> office that updates and changes no settings behaves exactly as it did on
+> 0.9.54. `1.0.0` is a statement about the product being ready, not the semver
+> rule about breaking changes — the one deliberate exception to the table below.
 
 **Added — the five things the field had and we didn't**
 
@@ -47,7 +52,7 @@ already closed were set aside. All five are here.
   selection, so the next instruction refines rather than restarts. Agents can
   make and edit pictures; video is owner-only and says its price on the button.
 
-**Added**
+**Added — the engines, and a tool catalog that resolves**
 - **The engines are in the office.** 🧰 Tools Hub gains a *Creative & game dev*
   tier — **Blender**, **Godot**, **Unity**, **Unreal Engine** and **Roblox
   Studio** — so an agent can model, light and render, run a scene and read the
@@ -68,7 +73,7 @@ already closed were set aside. All five are here.
   before changing it, change small and then *look* (render, run, screenshot,
   read the output), and never claim what you have not seen.
 
-**Fixed**
+**Fixed — a tool catalog half of which could only fail**
 - **Seven Tools Hub entries were dead buttons.** npm has deprecated the
   reference servers for GitHub, Brave Search, Postgres, Slack, Puppeteer and
   Google Drive, and `@google-workspace/mcp-server` — offered for one-click
@@ -96,7 +101,7 @@ already closed were set aside. All five are here.
   release. The hub also groups cards by what they are *for*, and prints the one
   setup step each server needs, in the office's language.
 
-**Fixed (quoting)**
+**Fixed — paths pasted into a language that reads them differently**
 - **`bagidea say` was broken on Windows for anyone whose account name has an
   apostrophe.** The WAV's path was interpolated into a single-quoted PowerShell
   string, and `os.tmpdir()` follows `%TEMP%` — which is
