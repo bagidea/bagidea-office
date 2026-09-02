@@ -26,6 +26,15 @@ param(
 $ErrorActionPreference = "Continue"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
+# PowerShell's DEFAULT execution policy is Restricted, and in PowerShell `npm`
+# resolves to npm.ps1 - a script - so on a stock machine `npm install -g` dies
+# with "running scripts is disabled on this system" and the install quietly ends
+# up with no Claude Code CLI. Process scope lasts only as long as THIS installer
+# run: it is not written to the registry and does not change the machine's
+# policy. (For the user's own terminal afterwards, see the check at the end -
+# their policy is theirs to set, and we ask rather than silently lower it.)
+try { Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force -ErrorAction Stop } catch {}
+
 $APPDIR = Join-Path $env:LOCALAPPDATA "BagIdeaOffice"
 $APP    = Join-Path $APPDIR "app"
 $GODOTV = "4.6.3"
@@ -48,6 +57,19 @@ function Get-File($url, $out, $label) {
   }
 }
 function Have($c) { return [bool](Get-Command $c -ErrorAction SilentlyContinue) }
+
+# npm ships THREE shims - npm (bash), npm.cmd and npm.ps1 - and PowerShell picks
+# the .ps1. Always call the .cmd: it runs under any execution policy, including
+# the Restricted default a fresh Windows install has.
+function Npm-Exe {
+  $c = Get-Command npm.cmd -ErrorAction SilentlyContinue
+  if ($c) { return $c.Source }
+  foreach ($d in @((Join-Path $env:ProgramFiles "nodejs"), (Join-Path $env:APPDATA "npm"))) {
+    $p = Join-Path $d "npm.cmd"
+    if (Test-Path $p) { return $p }
+  }
+  return $null
+}
 
 # "https://github.com/OWNER/REPO(.git)" -> "OWNER/REPO" (for release-asset URLs).
 function Repo-Slug($url) {
@@ -271,9 +293,24 @@ if (Test-Path $gexe) {
 }
 
 Step 6 "Claude Code CLI (the brain of every agent)"
+$npmExe = Npm-Exe
 if (Have "claude") { Skip "already installed" }
-elseif (Have "npm") { Write-Host "      installing via npm (about a minute)..." -ForegroundColor DarkGray; npm install -g @anthropic-ai/claude-code; Sync-Path; Ok "installed - Claude login is OPTIONAL: only if you run Claude models. GLM/DeepSeek/etc. need only their API key in Settings" }
-else { Warn "npm not on PATH yet - reopen a terminal and run: npm install -g @anthropic-ai/claude-code" }
+elseif ($npmExe) {
+  Write-Host "      installing via npm (about a minute)..." -ForegroundColor DarkGray
+  & $npmExe install -g @anthropic-ai/claude-code
+  Sync-Path
+  # VERIFY. Every agent in the office is a claude session, so if this did not
+  # land, nothing works - and saying "installed" anyway is how that turns into a
+  # mystery instead of a message.
+  if (Have "claude") {
+    Ok "installed - Claude login is OPTIONAL: only if you run Claude models. GLM/DeepSeek/etc. need only their API key in Settings"
+  } else {
+    Warn "npm finished but the 'claude' command is still not on PATH."
+    Warn "The office needs it: EVERY agent is a Claude Code session."
+    Write-Host "      Open a NEW terminal and run:  npm.cmd install -g @anthropic-ai/claude-code" -ForegroundColor Yellow
+  }
+}
+else { Warn "npm not on PATH yet - reopen a terminal and run: npm.cmd install -g @anthropic-ai/claude-code" }
 
 # ---- handy CLI tools the agents can use (optional, best-effort) ---------------
 # Each is installed via winget if missing; a failure is fine — agents just skip
@@ -517,6 +554,42 @@ if (Test-Path $exe) {
   reg add $uk /v NoRepair          /t REG_DWORD /d 1 /f | Out-Null
   Ok "listed in Windows Settings > Apps (uninstall from there, or: bagidea uninstall)"
 } else { Skip "shell exe not built - skipped" }
+
+# ---- execution policy, for the user's OWN terminal ---------------------------
+# We fixed our own session at the top, but the next thing we tell them to do is
+# open a terminal and type `claude` - and a claude installed by npm is
+# claude.ps1, which a Restricted policy refuses to run. Same for `npm`. So:
+# check, explain, and ASK. Lowering a machine's script policy behind someone's
+# back is not ours to do, and on a customer's machine it is not even theirs.
+$policyBlocks = $false
+try {
+  $eff = Get-ExecutionPolicy
+  if ($eff -eq "Restricted" -or $eff -eq "AllSigned") { $policyBlocks = $true }
+} catch {}
+if ($policyBlocks) {
+  Write-Host ""
+  Write-Host "  ! PowerShell script execution is $eff on this machine." -ForegroundColor Yellow
+  Write-Host "    The office itself is fine - it runs claude through cmd, not PowerShell." -ForegroundColor DarkGray
+  Write-Host '    But YOUR terminal will refuse claude and npm, because npm installs them' -ForegroundColor DarkGray
+  Write-Host '    as .ps1 scripts. Two ways out - either is fine:' -ForegroundColor DarkGray
+  Write-Host "      a) type claude.cmd / npm.cmd instead (no settings changed), or" -ForegroundColor Cyan
+  Write-Host "      b) allow local scripts for your user only:" -ForegroundColor Cyan
+  Write-Host "         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser" -ForegroundColor Cyan
+  if ($env:BAGIDEA_SET_EXECUTION_POLICY -eq "1") {
+    try {
+      Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -ErrorAction Stop
+      Ok "set to RemoteSigned for your user (BAGIDEA_SET_EXECUTION_POLICY=1)"
+    } catch { Warn "could not set it: $($_.Exception.Message)" }
+  } else {
+    $sp = Read-Host "  Do (b) now for your user? (y/n)"
+    if ($sp -eq "y") {
+      try {
+        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -ErrorAction Stop
+        Ok "done - RemoteSigned, current user only"
+      } catch { Warn "could not set it (a Group Policy may own this): $($_.Exception.Message)" }
+    } else { Skip "left as-is - use claude.cmd / npm.cmd" }
+  }
+}
 
 # ---- summary -----------------------------------------------------------------
 Write-Host ""

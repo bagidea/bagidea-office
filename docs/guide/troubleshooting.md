@@ -1,5 +1,43 @@
 # Common problems
 
+## Start here: `bagidea doctor`
+
+```
+bagidea doctor
+```
+
+It checks the things that actually stop an office working — can anything reach
+`127.0.0.1:8787`, is a proxy routing local addresses somewhere else, will your
+PowerShell run `claude` and `npm`, is the Claude Code CLI even installed — and
+prints the fix next to whatever it finds. It runs **without** the daemon, which
+is the case it was written for.
+
+---
+
+## The chat window is blank, or says “can't reach the office”
+
+The office serves its whole UI from `http://127.0.0.1:8787`. If the window can
+reach nothing, it is almost never the office — it is something on the machine
+standing between the two. Run `bagidea doctor` first; it names which one.
+
+**A proxy that doesn't exempt local addresses.** The window follows the system
+proxy, so a corporate proxy with no loopback exemption sends `127.0.0.1`
+somewhere that cannot answer. Settings › Network & internet › Proxy › Manual
+setup › Edit, then tick **“Don't use the proxy server for local addresses”** —
+or add `<local>;127.0.0.1;localhost` to the exception list. If an
+auto-configuration (PAC) script is set instead, test by turning it off: a PAC
+that returns a proxy for `127.0.0.1` breaks the same way.
+
+**A firewall or antivirus blocking loopback.** Some security products filter
+local HTTP as if it were web traffic (look for “web protection”, “HTTPS
+scanning”, “network shield”). Allow `node.exe`, or exempt `127.0.0.1`. This is
+rare, and it is the one that looks like nothing is wrong at all.
+
+**Terminal-only proxy variables.** If `HTTP_PROXY`/`HTTPS_PROXY` are set, add
+`NO_PROXY=127.0.0.1,localhost` so local calls skip the proxy.
+
+---
+
 ## Installation problems
 
 The installer is designed to "finish in one pass on a clean machine," but some
@@ -12,6 +50,20 @@ the installer** (re-running is safe; no data is lost).
   ```powershell
   powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/bagidea/bagidea-office/main/installer/install.ps1 | iex"
   ```
+
+**`claude` or `npm` says “running scripts is disabled on this system”**
+- Windows ships with the execution policy set to **Restricted**, and npm installs
+  `claude` and `npm` as `.ps1` scripts — which that policy refuses. The office
+  itself is unaffected (it runs `claude` through `cmd`), but your own terminal
+  will refuse both.
+- Either type `claude.cmd` / `npm.cmd`, which no policy can block, **or** allow
+  local scripts for your user only:
+  ```powershell
+  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+  ```
+- The installer detects this and offers to do it for you. It never changes the
+  setting without asking; for an unattended install, set
+  `BAGIDEA_SET_EXECUTION_POLICY=1`.
 
 **`winget not found`**
 - Older Windows doesn't have winget yet — install **App Installer** from the Microsoft Store

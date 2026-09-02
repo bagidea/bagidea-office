@@ -79,6 +79,9 @@ Cost control
                                 orders are never slowed.
 
 Maintenance
+  bagidea doctor                Diagnose why the office won't load — port, proxy,
+                                firewall, execution policy, missing claude CLI.
+                                Runs without the daemon; prints the fix it finds.
   bagidea fixmic                Reset a stuck Windows mic panel
 ```
 

@@ -274,6 +274,70 @@ fn daemon_running() -> bool {
     .is_ok()
 }
 
+// Give the daemon a fair chance to come up before deciding it is unreachable.
+// Node's boot is not instant on a cold or busy machine, and calling it dead too
+// early would be its own bug — so poll, and only give up after a long wait.
+fn wait_for_daemon(max: std::time::Duration) -> bool {
+    let start = std::time::Instant::now();
+    loop {
+        if daemon_running() {
+            return true;
+        }
+        if start.elapsed() >= max {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+}
+
+// What the chat window shows when it cannot reach the daemon at all.
+//
+// It used to show nothing: a blank window, no text, no error, no hint. On a
+// customer's machine where something was blocking loopback, that is exactly
+// what they got — and the person who installed it had to go through the
+// firewall and the proxy by hand to work out why, while the customer sat in
+// front of a window that told them nothing.
+//
+// Embedded, not fetched: the one thing we know in this state is that we cannot
+// fetch anything. It re-tries on its own, so a daemon that is merely slow heals
+// without anyone touching it.
+const OFFLINE_HTML: &str = r#"<!doctype html><html><head><meta charset="utf-8"><style>
+ html,body{margin:0;height:100%;font:13px/1.6 system-ui,Segoe UI,sans-serif;
+   background:linear-gradient(160deg,#15203a 0%,#0c1322 70%);color:#dbe6f5}
+ .w{height:100%;display:flex;flex-direction:column;justify-content:center;padding:0 26px;box-sizing:border-box}
+ h1{font-size:14px;letter-spacing:2px;color:#5ec8ff;margin:0 0 10px}
+ p{margin:0 0 10px;color:#9fb2cc}
+ code{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
+   border-radius:6px;padding:2px 7px;color:#ffd28a;font-size:12.5px}
+ ul{margin:0 0 12px 18px;padding:0;color:#9fb2cc} li{margin:3px 0}
+ .r{margin-top:4px;font-size:11.5px;color:#6b7a92}
+ button{font:inherit;font-weight:600;color:#ffd28a;background:rgba(255,210,138,.08);
+   border:1px solid rgba(255,210,138,.35);border-radius:10px;padding:7px 15px;cursor:pointer;
+   align-self:flex-start}
+</style></head><body><div class="w">
+ <h1>&#9888; CAN'T REACH THE OFFICE</h1>
+ <p>The office runs on <code>127.0.0.1:8787</code> and this window can't get to it.
+    That is almost never the office itself &mdash; it is something on this machine
+    standing between the two.</p>
+ <ul>
+   <li>a <b>proxy</b> that doesn't exempt local addresses</li>
+   <li>a <b>firewall</b> or antivirus blocking loopback</li>
+   <li>the daemon didn't start</li>
+ </ul>
+ <p>Run this in a terminal &mdash; it checks all three and prints the fix:</p>
+ <p><code>bagidea doctor</code></p>
+ <button onclick="go()">Try again</button>
+ <div class="r" id="r"></div>
+</div><script>
+ var n=0;
+ function go(){ location.href='http://127.0.0.1:8787/'; }
+ // Heal on its own if the daemon was merely slow, backing off so a genuinely
+ // blocked machine isn't hammered.
+ function tick(){ n++; document.getElementById('r').textContent='retrying automatically… ('+n+')';
+   go(); setTimeout(tick, Math.min(30000, 3000*n)); }
+ setTimeout(tick, 3000);
+</script></body></html>"#;
+
 fn spawn_daemon(root: &PathBuf) -> Option<Child> {
     if daemon_running() {
         return None;
@@ -2356,9 +2420,16 @@ fn main() {
     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
     let overlay_id = overlay.id();
     let p_overlay = proxy.clone();
+    // If the daemon cannot be reached, say so IN the window instead of showing an
+    // empty one. Waiting first, generously: a slow boot must not be reported as
+    // a blocked machine.
+    let daemon_reachable = wait_for_daemon(std::time::Duration::from_secs(25));
     let overlay_view = platform::webview_extras(
-        WebViewBuilder::new()
-            .with_url("http://127.0.0.1:8787/")
+        (if daemon_reachable {
+            WebViewBuilder::new().with_url("http://127.0.0.1:8787/")
+        } else {
+            WebViewBuilder::new().with_html(OFFLINE_HTML)
+        })
             .with_devtools(true)
             .with_ipc_handler(move |req| {
                 let _ = match req.body().as_str() {

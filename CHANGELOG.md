@@ -4,6 +4,63 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [1.0.4] — 🛠 A blank window that finally says what's wrong
+
+From a real deployment: a machine built for a customer to run local LLMs came up
+with a chat window that showed **nothing at all**. Two separate things were
+wrong, and neither of them said a word on screen. The engineer who set it up had
+installed on dozens of machines without ever hitting either, and had to go
+through the firewall and the proxy by hand while the customer sat in front of an
+empty window.
+
+**Fixed**
+- **The installer could finish “successfully” with no Claude Code CLI at all.**
+  PowerShell's *default* execution policy is `Restricted`, and in PowerShell
+  `npm` resolves to **`npm.ps1` — a script**, so `npm install -g
+  @anthropic-ai/claude-code` was refused outright:
+  *“npm.ps1 cannot be loaded because running scripts is disabled on this
+  system.”* The installer then printed **“+ installed”** regardless. Every agent
+  in the office is a claude session, so that is the entire product failing to
+  install and being reported as a success. It now calls **`npm.cmd`** (which no
+  policy can block), lifts the policy for its **own process only** (never
+  written to the registry, machine untouched), and **verifies `claude` is
+  actually on PATH** before saying anything — with the real fix printed if it
+  isn't.
+- **A window that could not reach the daemon showed an empty rectangle.** The
+  whole UI is served from `127.0.0.1:8787`; if something on the machine stands
+  between the two, the window painted nothing — no text, no error, no hint. It
+  now waits up to 25s for a slow daemon (a cold boot must never be reported as a
+  blocked machine) and otherwise shows an **embedded** page naming the three
+  causes — proxy, firewall, daemon not started — and pointing at `bagidea
+  doctor`. It retries on its own with a backoff, so a daemon that was merely
+  slow heals with nobody touching it.
+
+**Added**
+- **`bagidea doctor`** — the diagnostic that support call needed. It checks
+  whether anything answers on `127.0.0.1:8787` (and tells a *refused* connection
+  apart from a *hang* — they mean different things), whether a system proxy or
+  PAC script covers local addresses, whether `HTTP_PROXY` is set without
+  `NO_PROXY`, whether the execution policy will refuse `claude` and `npm`, and
+  whether the Claude Code CLI is installed at all. Each finding prints the fix
+  beside it. It runs **without the daemon** — that is the case it exists for.
+- **The installer asks about the persistent policy.** Your terminal still needs
+  it for `claude`/`npm` afterwards, so it explains the two ways out and offers
+  to set `RemoteSigned` for **your user only**. It never lowers a machine's
+  script policy silently — on a customer's machine that is not even the
+  installer's call to make. `BAGIDEA_SET_EXECUTION_POLICY=1` for unattended runs.
+- **`daemon/tests/unreachable-office.test.js`** — nine tests over the two
+  failures: no bare `npm` in the installer, the policy lifted at process scope
+  only, the success message guarded by a real check, the daemon given time
+  before being declared unreachable, the offline page naming the causes without
+  fetching anything, and doctor's bypass-list parsing (`<local>`, `127.0.0.1`,
+  `localhost` — but not a list that only covers the corporate network, which is
+  the configuration that breaks it). Run against the pre-fix code: **six of the
+  nine fail.**
+
+**Docs** — troubleshooting now opens with `bagidea doctor`, adds a section on the
+blank window (proxy, PAC, firewall, `NO_PROXY`), and documents the
+“running scripts is disabled” symptom for `claude`/`npm`.
+
 ## [1.0.3] — 🔎 The endpoint box you couldn't type in
 
 Reported from a real office, with a screenshot: the 🔎 SEMANTIC RECALL row in

@@ -134,6 +134,7 @@ function help() {
   row("import <file>", "Restore an exported office here (overwrites)");
 
   head("Maintenance");
+  row("doctor", "Diagnose why the office won't load (ports, proxy, firewall)");
   row("fixmic", "Reset Windows voice-typing if it's stuck");
   row("--version, -v", "Show version");
   row("--help, -h", "Show this screen");
@@ -314,6 +315,14 @@ async function main() {
       : ok("Eco mode OFF — full office rhythm restored");
   }
 
+  // Runs WITHOUT the daemon on purpose — an unreachable daemon is the thing it
+  // is meant to explain.
+  if (cmd === "doctor") {
+    banner();
+    const rc = await require("./doctor").run({ ok, bad, warn, info, head, rule });
+    process.exitCode = rc > 0 ? 1 : 0;
+    return;
+  }
   if (cmd === "fixmic") {
     if (process.platform !== "win32") return info("Voice-typing reset is only applicable on Windows");
     spawn("powershell", ["-NoProfile", "-Command",
