@@ -4,6 +4,38 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [1.0.3] — 🔎 The endpoint box you couldn't type in
+
+Reported from a real office, with a screenshot: the 🔎 SEMANTIC RECALL row in
+⚙ → SKILLS had an endpoint field squeezed to nothing and a Save button hanging
+off the edge of the panel. Both true, both measured.
+
+**Fixed**
+- **The SEMANTIC RECALL endpoint field rendered at 22px — and the row ran 26px
+  past the panel.** `.assistrow` is a flex row that cannot wrap; the model and
+  key inputs were pinned with `flex: 0 0 190px` and `0 0 150px`, so **340px of
+  that row could not give ground**. The panel is `min(470px, 92vw)` with 16px
+  padding — about 426px — so the one flexible child, the endpoint, absorbed the
+  entire shortfall and collapsed. At 22px it could not even show its own
+  placeholder (`http://localhost:11434/v1`), so nothing on screen said what to
+  type into the field the feature needs; and what was left over pushed
+  บันทึก outside the panel. The endpoint is a URL, so it now takes a line of
+  its own (392px), and the model, key and Save share the next one.
+- **📦 RUN LOCATION had the same bug one field along.** Choosing **ssh**
+  reveals a fourth input, and the host and the office path ended up at **77px
+  each** — too narrow to read either placeholder, let alone a real path. It did
+  not overflow, which is why nobody caught it. They are now 185px and 343px.
+
+**Added**
+- **`daemon/tests/overlay-layout.test.js`** — four tests that compute, from the
+  markup, whether a settings row pins more width than the panel can give it
+  while being unable to wrap. Checked against the broken markup first: it fails
+  three of the four, so it is a guard and not decoration.
+
+Nothing else changed. The daemon reads `overlay.html` from disk on every
+request, so **tray → Reload chat window** is enough to pick this up — no
+restart, no update.
+
 ## [1.0.2] — 📖 The documentation catches up with the product
 
 v1.0.0 shipped five real capabilities and v1.0.1 made the office speak fourteen

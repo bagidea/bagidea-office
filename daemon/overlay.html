@@ -3165,10 +3165,10 @@
             เปิดอันนี้แล้วจะค้นด้วย<b>ความหมาย</b>เพิ่มอีกทาง แล้วรวมสองอันดับเข้าด้วยกัน<br>
             ใส่ endpoint แบบ OpenAI — <code>http://localhost:11434/v1</code> (Ollama ในเครื่อง ฟรีและไม่ส่งข้อมูลออก)
             หรือของเจ้าอื่นก็ได้ · โมเดลแนะนำ <code>nomic-embed-text</code></div>
-          <div class="assistrow">
-            <input id="semUrl" placeholder="http://localhost:11434/v1">
-            <input id="semModel" placeholder="nomic-embed-text" style="flex:0 0 190px">
-            <input id="semKey" placeholder="ชื่อ key (ถ้าต้องใช้)" style="flex:0 0 150px">
+          <div class="assistrow" style="flex-wrap:wrap">
+            <input id="semUrl" placeholder="http://localhost:11434/v1" style="flex:1 1 100%">
+            <input id="semModel" placeholder="nomic-embed-text" style="flex:1 1 140px">
+            <input id="semKey" placeholder="ชื่อ key (ถ้าต้องใช้)" style="flex:1 1 120px">
             <button class="sparkle" id="semSave">บันทึก</button>
           </div>
           <div id="semHint" style="font-size:10.5px;color:var(--dim);margin-top:6px"></div>
@@ -3208,11 +3208,11 @@
             <b style="color:var(--text)">docker</b> → ใส่ชื่อ image เช่น <code>node:22-bookworm</code> · ตัวออฟฟิศ mount แบบอ่านอย่างเดียว<br>
             <b style="color:var(--text)">ssh</b> → ใส่ host + path ของออฟฟิศบนเครื่องนั้น</div>
           <div id="blist"></div>
-          <div class="assistrow" style="margin-top:8px">
+          <div class="assistrow" style="margin-top:8px;flex-wrap:wrap">
             <select id="bKind" style="flex:0 0 92px"><option value="docker">docker</option><option value="ssh">ssh</option></select>
-            <input id="bName" placeholder="ชื่อ เช่น box" style="flex:0 0 96px">
-            <input id="bTarget" placeholder="image เช่น node:22-bookworm">
-            <input id="bDir" placeholder="path ออฟฟิศบนเครื่องนั้น" style="display:none">
+            <input id="bName" placeholder="ชื่อ เช่น box" style="flex:1 1 96px">
+            <input id="bTarget" placeholder="image เช่น node:22-bookworm" style="flex:2 1 150px">
+            <input id="bDir" placeholder="path ออฟฟิศบนเครื่องนั้น" style="display:none;flex:2 1 150px">
             <button class="sparkle" id="addBackend">＋</button>
           </div>
           <div id="bHint" style="font-size:10.5px;color:var(--dim);margin-top:6px"></div>
