@@ -88,6 +88,11 @@ const PROVIDERS = {
     label: "OpenAI", format: "openai", needsProxy: true, baseUrl: null,
     models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],   // gpt-4.1 = 1M flagship, listed first
   },
+  atlascloud: {
+    label: "Atlas Cloud", format: "openai", needsProxy: true,
+    baseUrl: "https://api.atlascloud.ai/v1",
+    models: ["openai/gpt-4.1-mini"],
+  },
   gemini: {
     label: "Gemini", format: "openai", needsProxy: true, baseUrl: null,
     models: ["gemini-2.5-pro", "gemini-2.5-flash"],

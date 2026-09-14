@@ -118,6 +118,14 @@ test("upstreamFor: built-in openai uses default URL + main key", () => {
   assert.strictEqual(u.key, "sk");
 });
 
+test("upstreamFor: Atlas Cloud uses its API endpoint and provider token", () => {
+  const u = upstreamFor("atlascloud", { providerConfig: { atlascloud: { token: "atlas-key" } } });
+  assert.strictEqual(u.chat, "https://api.atlascloud.ai/v1/chat/completions");
+  assert.strictEqual(u.models, "https://api.atlascloud.ai/v1/models");
+  assert.strictEqual(u.key, "atlas-key");
+  assert.strictEqual(u.fallbackModel, "openai/gpt-4.1-mini");
+});
+
 test("upstreamFor: custom provider uses providerConfig baseUrl + token", () => {
   const u = upstreamFor("foo", { providerConfig: { foo: { baseUrl: "https://foo.ai/v1", token: "k" } } });
   assert.strictEqual(u.chat, "https://foo.ai/v1/chat/completions");

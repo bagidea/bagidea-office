@@ -3157,6 +3157,7 @@
       // ── OpenAI-compatible (via the built-in proxy)
       subhead("ผ่าน proxy (OpenAI-compatible)");
       [["openai", "OpenAI", "platform.openai.com/api-keys"], ["gemini", "Gemini", "aistudio.google.com/apikey"],
+       ["atlascloud", "Atlas Cloud", "www.atlascloud.ai/console/api-keys"],
        ["openrouter", "OpenRouter", "openrouter.ai/keys"], ["nvidia", "NVIDIA build", "build.nvidia.com"],
        ["groq", "Groq", "console.groq.com/keys"], ["cerebras", "Cerebras", "cloud.cerebras.ai"],
        ["xai", "xAI · Grok", "console.x.ai"], ["mistral", "Mistral", "console.mistral.ai/api-keys"],
@@ -3172,7 +3173,7 @@
       // ── Custom — add your own (anthropic- or openai-compatible)
       subhead("Custom — เพิ่ม provider เอง");
       const BUILTIN = new Set(["claude", "glm", "deepseek", "qwen", "minimax", "moonshot",
-        "kimicode", "openai", "gemini", "openrouter", "nvidia", "groq", "cerebras", "xai",
+        "kimicode", "openai", "atlascloud", "gemini", "openrouter", "nvidia", "groq", "cerebras", "xai",
         "mistral", "together", "fireworks", "ollama", "lmstudio", "litellm"]);
       Object.keys(pcAll).filter((id) => !BUILTIN.has(id) && pcAll[id] && pcAll[id].label)
         .forEach((id) => providerCard(id, pcAll[id].label + (pcAll[id].kind === "openai" ? " · OpenAI" : " · Anthropic"),
@@ -3206,7 +3207,7 @@
     if (fbProv && fbModel) {
       const LBL = { claude: "Claude · Anthropic", glm: "GLM · Z.AI", deepseek: "DeepSeek",
         qwen: "Qwen", minimax: "MiniMax", moonshot: "Kimi · Moonshot", kimicode: "Kimi Code",
-        openai: "OpenAI", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA",
+        openai: "OpenAI", atlascloud: "Atlas Cloud", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA",
         groq: "Groq", cerebras: "Cerebras", xai: "xAI · Grok", mistral: "Mistral",
         together: "Together AI", fireworks: "Fireworks AI", ollama: "Ollama · local",
         lmstudio: "LM Studio · local" };
@@ -4236,7 +4237,7 @@
       const BUILTIN = [["claude", "Claude · Anthropic"], ["glm", "GLM · Z.AI"],
         ["deepseek", "DeepSeek"], ["qwen", "Qwen · Alibaba"], ["minimax", "MiniMax"],
         ["moonshot", "Kimi · Moonshot"], ["kimicode", "Kimi Code · coding plan"],
-        ["openai", "OpenAI · proxy"], ["gemini", "Gemini · proxy"],
+        ["openai", "OpenAI · proxy"], ["atlascloud", "Atlas Cloud · proxy"], ["gemini", "Gemini · proxy"],
         ["openrouter", "OpenRouter · proxy"], ["nvidia", "NVIDIA · proxy"],
         ["groq", "Groq · proxy"], ["cerebras", "Cerebras · proxy"], ["xai", "xAI · Grok · proxy"],
         ["mistral", "Mistral · proxy"], ["together", "Together AI · proxy"], ["fireworks", "Fireworks AI · proxy"],
@@ -4250,6 +4251,7 @@
         minimax: ["MiniMax-M3"], moonshot: ["kimi-k2.6", "kimi-k2.5", "kimi-k2", "kimi-latest"],
         kimicode: ["kimi-for-coding"],
         openai: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
+        atlascloud: ["openai/gpt-4.1-mini"],
         gemini: ["gemini-2.5-pro", "gemini-2.5-flash"],
         openrouter: ["anthropic/claude-sonnet-4-6", "openai/gpt-4o"], nvidia: ["meta/llama-3.3-70b-instruct"],
         groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"], cerebras: ["llama-3.3-70b", "llama-3.1-8b"],
@@ -4263,7 +4265,7 @@
       const BEST_MODEL = {
         claude: "claude-opus-5", glm: "glm-4.6", deepseek: "deepseek-v4-pro",
         qwen: "qwen3-coder-plus", minimax: "MiniMax-M3", moonshot: "kimi-k2.6",
-        kimicode: "kimi-for-coding", openai: "gpt-4.1", gemini: "gemini-2.5-pro",
+        kimicode: "kimi-for-coding", openai: "gpt-4.1", atlascloud: "openai/gpt-4.1-mini", gemini: "gemini-2.5-pro",
         xai: "grok-4", mistral: "mistral-large-latest",
         openrouter: "anthropic/claude-sonnet-4-6", nvidia: "meta/llama-3.3-70b-instruct",
         groq: "llama-3.3-70b-versatile", cerebras: "llama-3.3-70b",

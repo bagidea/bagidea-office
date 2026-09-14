@@ -4984,7 +4984,7 @@ const server = http.createServer((req, res) => {
     // (provider/model) and latest context usage. Feeds the 🧠 BRAINS sidebar panel.
     const pc = reg.providerConfig || {};
     const KNOWN = ["claude", "glm", "deepseek", "qwen", "minimax", "moonshot",
-      "openai", "gemini", "openrouter", "nvidia", "groq", "cerebras", "xai", "mistral",
+      "openai", "atlascloud", "gemini", "openrouter", "nvidia", "groq", "cerebras", "xai", "mistral",
       "together", "fireworks", "ollama", "lmstudio"];
     const byProvider = {};
     const agents = [];

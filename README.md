@@ -158,7 +158,7 @@ until you opt an agent in.
 **Two ways agents reach a model:**
 
 - 🟢 **Direct (Anthropic-compatible)** — Claude, **GLM** (Z.AI), **DeepSeek**, **Qwen** (Alibaba), **MiniMax**, **Kimi** (Moonshot), and **Kimi Code** (the kimi.com coding plan). The CLI talks straight to them; nothing in between.
-- 🔵 **Via the built-in proxy (OpenAI-compatible)** — **OpenAI**, **Gemini**, **OpenRouter**, **NVIDIA build**, **Groq**, **Cerebras**, **xAI (Grok)**, **Mistral**, **Together AI**, **Fireworks**, and **your own custom providers**. A **zero-dependency proxy is baked into the daemon** and translates Anthropic ↔ OpenAI on the fly — **no LiteLLM, no Python** (already have a LiteLLM gateway? point a custom provider at it).
+- 🔵 **Via the built-in proxy (OpenAI-compatible)** — **OpenAI**, **Atlas Cloud**, **Gemini**, **OpenRouter**, **NVIDIA build**, **Groq**, **Cerebras**, **xAI (Grok)**, **Mistral**, **Together AI**, **Fireworks**, and **your own custom providers**. A **zero-dependency proxy is baked into the daemon** and translates Anthropic ↔ OpenAI on the fly — **no LiteLLM, no Python** (already have a LiteLLM gateway? point a custom provider at it).
 - 💻 **Local, no API key** — **Ollama** and **LM Studio**: just run the server and Connect; the office routes to `localhost`. Free, offline, private.
 
 The model pickers fetch each provider's **live model list** when you connect (and when you open an agent's brain), so brand-new models show up without an app update.
@@ -800,7 +800,7 @@ The full step-by-step guides, with screenshots:
 | [Agents & skills](docs/guide/agents.md) | hiring · persona · skills/tools · Security Center · 🤖 AUTO keep-going mode |
 | [Projects](docs/guide/projects.md) | places · create/open/watch/delete · 🛡 registering a folder someone else wrote |
 | [Office Ops](docs/guide/office-ops.md) | scheduled & recurring jobs · calendar · note board · org chart |
-| [Models & providers](docs/guide/models.md) | swappable brains · per-agent model · 19 providers · live model lists · fallback brain |
+| [Models & providers](docs/guide/models.md) | swappable brains · per-agent model · 20 providers · live model lists · fallback brain |
 | [Cost & vision](docs/guide/cost-and-vision.md) | spend less per token · route work to a cheap/free brain · give agents eyes |
 | [Local models (Ollama)](docs/guide/ollama-local.md) | run agents on your own machine, no API key |
 | [AI features](docs/guide/ai-features.md) | main keys · TTS/realtime voice · images · memory · social life |

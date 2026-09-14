@@ -27,6 +27,8 @@ function plog(line) {
 const UPSTREAM = {
   openai: { url: "https://api.openai.com/v1/chat/completions", key: "OPENAI_API_KEY",
             fallbackModel: "gpt-4o-mini" },
+  atlascloud: { url: "https://api.atlascloud.ai/v1/chat/completions",
+                fallbackModel: "openai/gpt-4.1-mini" },
   gemini: { url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
             key: "GEMINI_API_KEY", fallbackModel: "gemini-2.5-flash" },
   openrouter: { url: "https://openrouter.ai/api/v1/chat/completions", fallbackModel: "" },
