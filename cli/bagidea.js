@@ -8,7 +8,7 @@ const path = require("path");
 const { spawn, execFileSync } = require("child_process");
 
 const ROOT = path.join(__dirname, "..");
-const BASE = "http://127.0.0.1:8787";
+const BASE = "http://127.0.0.1:" + (process.env.OEP_PORT || 8787);   // OEP_PORT: talk to a daemon on another port (tests, a second office)
 
 // ---- palette (truecolor; degrades fine on basic terminals) -------------------
 const c = {
@@ -34,6 +34,15 @@ function banner() {
   console.log(`  ${c.gray}your wallpaper, at work${c.reset}`);
 }
 
+// ---- quoting a path into somebody else's language ----------------------------
+// A path handed to a shell or to AppleScript has to be quoted for THAT language,
+// not eyeballed. The install root and the temp dir both follow the user's account
+// name, and an account called O'Brien puts an apostrophe in the middle of every
+// path we build — which closes a single-quoted string and turns the rest of the
+// path into code to run.
+const shQuote  = (s) => "'" + String(s).replace(/'/g, "'\\''") + "'";
+const osaQuote = (s) => '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+
 // ---- tiny http ---------------------------------------------------------------
 function req(method, p, body, asBuffer) {
   return new Promise((resolve, reject) => {
@@ -54,7 +63,7 @@ function req(method, p, body, asBuffer) {
         catch { resolve(buf.toString("utf8")); }
       });
     });
-    r.setTimeout(method === "POST" && (p === "/chat" || p === "/tts" || p === "/gen/image")
+    r.setTimeout(method === "POST" && (p === "/chat" || p === "/tts" || p === "/gen/image" || p.startsWith("/codex/"))
       ? 11 * 60000 : 8000, () => r.destroy(new Error("timeout")));
     r.on("error", reject);
     if (data) r.write(data);
@@ -111,13 +120,36 @@ function help() {
 
   head("Configure");
   row("lang [code]", "Show / set the office language (14 languages)");
+  row("auto [on|off]", "🤖 Keep going without asking — decide and finish the job");
+  row("eco [on|off]", "🌱 Cut idle token burn (rhythms stretch, QA pass off)");
+  row("trust [allow|deny]", "🛡 Projects whose own hooks are waiting on your word");
   row("keys", "List configured API keys (values hidden)");
   row("key set <NAME> <value>", "Add a key · key rm <NAME> · key test [NAME]");
   row("channels", "Telegram / Discord / LINE status");
   row("plugins", "Installed plugins");
   row("plugin install <git-url>", "Add a plugin · plugin remove <id>");
 
+  head("Move to a new machine");
+  row("export [file]", "Pack agents · skills · memory · plugins → one .tgz");
+  row("import <file>", "Restore an exported office here (overwrites)");
+
+  head("Inbox");
+  row("inbox", "What's waiting for you, and what's unread");
+  row("approve <n|id> [note]", "Answer an item · deny <n|id> [note] · answer <n|id> <option> [note]");
+  row("notify [test]", "Unread notifications · `notify test` sends one through your rules");
+  row("budget", "Today's spend vs your caps (office · agent · project)");
+  row("budget set office 5", "Cap the office at $5/day · set agent <id> 2 · set project <id> 40 · off");
+  row("budget digest [on|off|HH:MM]", "Morning digest: yesterday's spend + what's waiting");
+  head("Work");
+  row("tasks [todo|doing|waiting|done]", "The task board — every open card, or one column");
+  row('task add "<title>" [--owner id] [--due YYYY-MM-DD] [--p 1-4]', "Add a card · task done <n|id> · task move <n|id> <status>");
+  row('cal [add "<title>" <YYYY-MM-DDTHH:MM> [--every day|week|month]]', "Upcoming events (30 days) · `cal ics > office.ics` exports");
+  row('codex ["<task>" --project <name>]', "Codex status + recent runs, or hand it a task · codex review [project]");
+  row("teams · hire --team <id>", "Pre-built teams (dev-shop · research-lab · content-studio · customer-support · solo-assistant)");
+  row("plugin library · plugin install <id>", "The official plugins that ship with the office — install by id");
+
   head("Maintenance");
+  row("doctor", "Diagnose why the office won't load (ports, proxy, firewall)");
   row("fixmic", "Reset Windows voice-typing if it's stuck");
   row("--version, -v", "Show version");
   row("--help, -h", "Show this screen");
@@ -232,10 +264,283 @@ async function main() {
 
   if (cmd === "editor") {
     if (!(await daemonUp())) return NOT_RUNNING();
-    await req("POST", "/editor/open", {});
+    const r = await req("POST", "/editor/open", {});
+    if (r && r.error) return bad(r.error);   // e.g. Godot engine missing on this machine
     return ok("Opening the 3D Office Editor (separate window) — save when you're done");
   }
 
+  if (cmd === "auto") {
+    // 🤖 Keep-going mode — the team decides for itself and opens its own next
+    // turn instead of stopping mid-job to ask you. Off by default.
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const arg = (rest[0] || "").toLowerCase();
+    if (!arg) {
+      const s = await req("GET", "/registry");
+      return info(`Keep-going mode is ${s && s.autoPilot ? c.ok + "ON" : c.gray + "OFF"}${c.reset} ${c.gray}— bagidea auto on|off${c.reset}`);
+    }
+    if (!["on", "off"].includes(arg)) return bad("usage: bagidea auto on|off");
+    const r = await req("POST", "/registry/autopilot", { on: arg === "on" });
+    return r && r.auto
+      ? ok(`Keep-going mode ON — the team decides and works on without asking (up to ${(r.max || 8)} rounds per job; it still stops for missing access and irreversible actions)`)
+      : ok("Keep-going mode OFF — they check with you before big calls");
+  }
+
+  if (cmd === "trust") {
+    // 🛡 Projects whose own .claude hooks are waiting on your word (issue #39).
+    // Work inside them is parked until you answer, so the terminal needs a way
+    // to answer too — not only the office window.
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const list = (await req("GET", "/project/trust")) || [];
+    const arg = (rest[0] || "").toLowerCase();
+    if (!arg) {
+      if (!list.length) return info("No project is waiting for a trust decision");
+      for (const t of list) {
+        console.log(`\n  ${c.bold}${t.project}${c.reset}  ${c.gray}${t.dir}${c.reset}`);
+        console.log(`  ${t.changed ? "hooks CHANGED after your approval" : "ships its own hooks — they run by themselves when work opens here"}`);
+        for (const h of t.hooks || []) console.log(`    ${c.gray}${h.event} →${c.reset} ${h.command}`);
+        for (const s of (t.scripts || []).filter((x) => x.outside))
+          console.log(`    ${c.warn || c.gray}⚠ ${s.rel} resolves outside the project${c.reset}`);
+        console.log(`  ${c.gray}bagidea trust allow "${t.project}"  |  bagidea trust deny "${t.project}"${c.reset}`);
+      }
+      return;
+    }
+    if (!["allow", "deny"].includes(arg)) return bad('usage: bagidea trust [allow|deny] "<project>"');
+    const name = (rest.slice(1).join(" ") || "").toLowerCase();
+    const hit = name ? list.find((t) => String(t.project).toLowerCase() === name) : list[0];
+    if (!hit) return bad(list.length ? "no pending project by that name" : "nothing is waiting for a trust decision");
+    await req("POST", "/project/trust", { id: hit.trust, decision: arg });
+    return ok(arg === "allow"
+      ? `Trusted “${hit.project}” — its hooks may run, and parked work resumes now (any edit to them asks again)`
+      : `Denied “${hit.project}” — its hooks stay blocked and the parked work is dropped`);
+  }
+
+  if (cmd === "eco") {
+    // 🌱 Eco mode — one switch that cuts idle token burn (rhythms stretch,
+    // QA double-pass off). Direct orders are never throttled.
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const arg = (rest[0] || "").toLowerCase();
+    if (!arg) {
+      const s = await req("GET", "/registry");
+      return info(`Eco mode is ${s && s.ecoMode ? c.ok + "ON" : c.gray + "OFF"}${c.reset} ${c.gray}— bagidea eco on|off${c.reset}`);
+    }
+    if (!["on", "off"].includes(arg)) return bad("usage: bagidea eco on|off");
+    const r = await req("POST", "/registry/eco", { on: arg === "on" });
+    return r && r.eco
+      ? ok("Eco mode ON — idle rhythms stretched, QA double-pass off (your direct orders are never slowed)")
+      : ok("Eco mode OFF — full office rhythm restored");
+  }
+
+  // ---- 📥 inbox --------------------------------------------------------------
+  if (cmd === "inbox") {
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const j = await req("GET", "/inbox");
+    banner();
+    head(`📥 Waiting for you (${j.pending.length})`);
+    if (!j.pending.length) ok("nothing — the office isn't waiting on you");
+    j.pending.forEach((it, n) => {
+      console.log(`  ${c.accent}${n + 1}${c.reset}. ${c.bold}${it.title}${c.reset}  ${c.gray}[${it.kind}${it.agent ? " · " + it.agent : ""}]${c.reset}`);
+      if (it.detail) console.log(`     ${c.gray}${String(it.detail).split("\n")[0].slice(0, 100)}${c.reset}`);
+      console.log(`     ${c.gray}${it.options.map((o) => o.value).join(" / ")}  →  bagidea answer ${n + 1} ${it.options[0].value}${c.reset}`);
+    });
+    head(`🔔 Notifications — ${j.unread} unread`);
+    (j.recent || []).slice(0, 8).forEach((it) => console.log(`  ${it.read ? c.gray + "·" : c.warn + "•"}${c.reset} ${it.title}${c.gray}${it.body ? " — " + String(it.body).split("\n")[0].slice(0, 70) : ""}${c.reset}`));
+    console.log("");
+    return;
+  }
+  if (cmd === "approve" || cmd === "deny" || cmd === "answer") {
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const target = rest[0];
+    if (!target) return bad(`usage: bagidea ${cmd} <n|id> ${cmd === "answer" ? "<option> " : ""}[note]`);
+    const pend = (await req("GET", "/approvals?pending=1")).items || [];
+    const item = /^\d+$/.test(target) ? pend[Number(target) - 1] : pend.find((i) => i.id === target);
+    if (!item) return bad(`nothing pending matches "${target}" — see: bagidea inbox`);
+    let decision, note;
+    if (cmd === "answer") { decision = rest[1]; note = rest.slice(2).join(" "); }
+    else { decision = cmd === "approve" ? item.options[0].value : item.options[item.options.length - 1].value; note = rest.slice(1).join(" "); }
+    if (!item.options.some((o) => o.value === decision))
+      return bad(`"${decision}" isn't an option here — one of: ${item.options.map((o) => o.value).join(", ")}`);
+    const r = await req("POST", "/approvals/respond", { id: item.id, decision, note });
+    if (r && r.ok) ok(`${decision} → ${item.title}${note ? `  (${note})` : ""}`);
+    else bad("that item is no longer waiting");
+    return;
+  }
+  if (cmd === "notify") {
+    if (!(await daemonUp())) return NOT_RUNNING();
+    if (rest[0] === "test") {
+      const r = await req("POST", "/notify/send", { kind: "system", title: "🔔 Test notification",
+        body: "Sent from the terminal — if you can see this in the sidebar (and on your phone, if a channel is on), the rules work." });
+      ok(`sent · routed: ${Object.entries(r.routed || {}).filter(([k, v]) => v === true && k !== "quietNow" && k !== "away").map(([k]) => k).join(", ") || "centre only"}` +
+         (r.routed && r.routed.quietNow ? "  (quiet hours)" : "") + (r.routed && r.routed.away ? "  (you're marked away)" : ""));
+      return;
+    }
+    const j = await req("GET", "/notify?unread=1&limit=30");
+    head(`🔔 ${j.unread} unread`);
+    (j.items || []).forEach((it) => console.log(`  ${c.warn}•${c.reset} ${it.title}${c.gray}${it.body ? " — " + String(it.body).split("\n")[0].slice(0, 80) : ""}${c.reset}`));
+    if (!j.unread) ok("nothing unread");
+    console.log("");
+    return;
+  }
+
+  // ---- 💸 budget -------------------------------------------------------------
+  if (cmd === "budget") {
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const usd = (n) => "$" + (Math.round(Number(n || 0) * 100) / 100).toFixed(2);
+    const sub = rest[0];
+    if (sub === "set") {
+      const [scope, a, b] = rest.slice(1);
+      let patch = null;
+      if (scope === "office") patch = { office: { daily: Number(a) } };
+      else if (scope === "agent" && a) patch = { agents: { [a]: { daily: Number(b) } } };
+      else if (scope === "project" && a) patch = { projects: { [a]: { total: Number(b) } } };
+      if (!patch) return bad("usage: bagidea budget set office <usd/day> | agent <id> <usd/day> | project <id> <usd total>");
+      await req("POST", "/budget", patch);
+      ok(`cap set — ${scope}${scope !== "office" ? " " + a : ""}: ${usd(scope === "office" ? a : b)}${scope === "project" ? " total" : " / day"}`);
+      return;
+    }
+    if (sub === "off") { await req("POST", "/budget", { office: { daily: 0 } }); return ok("office cap removed (per-agent and per-project caps untouched)"); }
+    if (sub === "digest") {
+      const v = rest[1];
+      if (v === "on" || v === "off") { await req("POST", "/budget", { digest: { enabled: v === "on" } }); return ok(`digest ${v}`); }
+      if (/^\d\d:\d\d$/.test(v || "")) { await req("POST", "/budget", { digest: { enabled: true, time: v } }); return ok(`digest at ${v} every morning`); }
+      const r = await req("POST", "/budget/digest", {});
+      console.log(""); console.log(r.text.split("\n").map((l) => "  " + l).join("\n")); console.log(""); return;
+    }
+    const j = await req("GET", "/budget");
+    banner();
+    head(`💸 Today (${j.day})`);
+    const bar = (spent, cap) => cap ? `${usd(spent)} / ${usd(cap)}  ${Math.round(spent / cap * 100)}%${spent >= cap ? c.err + "  STOPPED" + c.reset : spent >= cap * j.warnAt ? c.warn + "  warning" + c.reset : ""}` : `${usd(spent)}  ${c.gray}(no cap)${c.reset}`;
+    console.log(`  office   ${bar(j.office.spent, j.office.cap)}${j.office.estimated ? c.gray + "  ≈ includes estimates" + c.reset : ""}`);
+    const agents = Object.entries(j.agents || {}); if (agents.length) { head("agents"); for (const [id, a] of agents) console.log(`  ${id.padEnd(14)} ${bar(a.spent, a.cap)}`); }
+    const projects = Object.entries(j.projects || {}); if (projects.length) { head("projects (lifetime)"); for (const [id, p] of projects) console.log(`  ${id.padEnd(14)} ${bar(p.total, p.cap)}`); }
+    info(`digest: ${j.digest.enabled ? "on at " + j.digest.time : "off"}  ·  set caps: bagidea budget set office 5`);
+    console.log("");
+    return;
+  }
+
+  // ---- 👥 teams (v1.5) --------------------------------------------------------
+  if (cmd === "teams") {
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const j = await req("GET", "/teams");
+    banner(); head(`👥 Team templates (${j.staff}/${j.max} staff)`);
+    for (const t of j.teams || []) {
+      console.log(`  ${c.bold}${t.id.padEnd(18)}${c.reset} ${t.name}  ${c.gray}${t.tagline}${c.reset}`);
+      console.log(`  ${" ".repeat(18)} ${c.gray}${t.agents.map((a) => (a.present ? "✓ " : "") + a.name + " (" + a.role + ")").join(" · ")}${c.reset}`);
+    }
+    info("hire one: bagidea hire --team dev-shop");
+    console.log(""); return;
+  }
+  if (cmd === "hire") {
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const i = rest.indexOf("--team"); const id = i > -1 ? rest[i + 1] : rest[0];
+    if (!id) return bad("usage: bagidea hire --team <id>   (see: bagidea teams)");
+    const r = await req("POST", "/teams/hire", { id });
+    if (!r || typeof r === "string") return bad(String(r || "hire failed"));
+    if (r.hired.length) ok(`hired ${r.hired.join(", ")} (${r.staff}/${r.max} staff)`);
+    for (const s of r.skipped || []) warn(`skipped ${s.id}: ${s.why}`);
+    if (!r.hired.length && !(r.skipped || []).length) info("nothing to hire");
+    return;
+  }
+
+  // ---- 📋 tasks / 📅 calendar / 🧑‍💻 codex (v1.4) --------------------------------
+  const flag = (name) => { const i = rest.indexOf("--" + name); return i > -1 ? rest[i + 1] : undefined; };
+  const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1].startsWith("--")));
+  if (cmd === "tasks") {
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const j = await req("GET", "/tasks/board");
+    const cols = rest[0] && j.board[rest[0]] ? [rest[0]] : ["todo", "doing", "waiting", "done"];
+    banner();
+    const sm = j.summary || {};
+    info(`${sm.open || 0} open · ${sm.doing || 0} doing · ${sm.waiting || 0} waiting · ${sm.overdue || 0} overdue · ${sm.doneToday || 0} done today`);
+    let n = 0;
+    for (const col of cols) {
+      const items = col === "done" ? j.board.done.slice(0, 8) : j.board[col];
+      head(`${{ todo: "📝", doing: "🔨", waiting: "⏸", done: "✅" }[col]} ${col.toUpperCase()} (${j.board[col].length})`);
+      if (!items.length) console.log(`  ${c.gray}—${c.reset}`);
+      for (const t of items) {
+        n++;
+        const who = t.owner === "you" ? "you" : (j.agents[t.owner] || t.owner);
+        console.log(`  ${c.accent}${String(n).padStart(2)}${c.reset}. ${t.priority <= 2 ? c.warn : ""}P${t.priority}${c.reset} ${c.bold}${t.title}${c.reset}  ${c.gray}${who}${t.project ? " · " + t.project : ""}${t.due ? " · due " + new Date(t.due).toLocaleDateString() : ""}${t.blocked ? " · 🔒" : ""}${t.overdue ? c.err + " · OVERDUE" + c.reset : ""} [${t.id}]${c.reset}`);
+      }
+    }
+    console.log("");
+    return;
+  }
+  if (cmd === "task") {
+    if (!(await daemonUp())) return NOT_RUNNING();
+    const sub = rest[0];
+    if (sub === "add") {
+      const title = positional().slice(1).join(" ").trim();
+      if (!title) return bad('usage: bagidea task add "<title>" [--owner <id>] [--due YYYY-MM-DD] [--p 1-4] [--project <name>]');
+      const t = await req("POST", "/tasks", { title, owner: flag("owner") || "you", due: flag("due") || "", priority: Number(flag("p")) || 3, project: flag("project") || "" });
+      return t && t.id ? ok(`added [${t.id}] ${t.title}${t.status === "waiting" ? " (waiting)" : ""}`) : bad(String(t && t.error || t));
+    }
+    if (sub === "done" || sub === "move") {
+      const target = rest[1], status = sub === "done" ? "done" : rest[2];
+      if (!target || !status) return bad(`usage: bagidea task ${sub} <n|id>${sub === "move" ? " <todo|doing|waiting|done>" : ""}`);
+      const j = await req("GET", "/tasks/board");
+      const all = [].concat(j.board.todo, j.board.doing, j.board.waiting, j.board.done.slice(0, 8));
+      const item = /^\d+$/.test(target) ? all[Number(target) - 1] : all.find((t) => t.id === target) || (await req("GET", "/tasks")).tasks.find((t) => t.id === target);
+      if (!item) return bad(`no card matches "${target}" — see: bagidea tasks`);
+      const r = await req("POST", "/tasks/move", { id: item.id, status });
+      return r && r.id ? ok(`${status} → ${item.title}`) : bad(String(r));
+    }
+    return bad("usage: bagidea task add \"<title>\" | done <n|id> | move <n|id> <status>");
+  }
+  if (cmd === "cal") {
+    if (!(await daemonUp())) return NOT_RUNNING();
+    if (rest[0] === "ics") { process.stdout.write(String(await req("GET", "/calendar/ics"))); return; }
+    if (rest[0] === "add") {
+      const p = positional().slice(1);
+      const when = p[p.length - 1], title = p.slice(0, -1).join(" ").trim();
+      if (!title || !when || Number.isNaN(Date.parse(when))) return bad('usage: bagidea cal add "<title>" <YYYY-MM-DDTHH:MM> [--every day|week|month] [--remind <min>]');
+      const every = flag("every");
+      const rec = every ? { freq: { day: "daily", week: "weekly", month: "monthly" }[every] || every } : null;
+      const r = await req("POST", "/calendar", { title, at: when, remindMin: Number(flag("remind")) || 10, recurrence: rec });
+      return r && r.id ? ok(`booked ${r.title} — ${new Date(r.at).toLocaleString()}${rec ? " · every " + every : ""}`) : bad(String(r));
+    }
+    const j = await req("GET", "/calendar");
+    banner(); head(`📅 Next 30 days (${(j.upcoming || []).length})`);
+    if (!(j.upcoming || []).length) ok("nothing booked");
+    for (const o of (j.upcoming || []).slice(0, 40))
+      console.log(`  ${o.recurring ? "🔁" : "📅"} ${c.bold}${new Date(o.at).toLocaleString()}${c.reset}  ${o.title}${o.allDay ? c.gray + "  (all day)" + c.reset : ""}`);
+    console.log("");
+    return;
+  }
+  if (cmd === "codex") {
+    if (!(await daemonUp())) return NOT_RUNNING();
+    if (rest[0] === "review") {
+      info("asking Codex for a review… (this can take minutes)");
+      const r = await req("POST", "/codex/review", { project: rest[1] || flag("project") || "", instructions: flag("ask") || "" });
+      console.log(""); console.log((r.text || r.error || "").split("\n").map((l) => "  " + l).join("\n")); console.log("");
+      return r.ok ? ok("review done") : bad("review failed: " + (r.error || "unknown"));
+    }
+    const task = positional().join(" ").trim();
+    if (task) {
+      info("Codex is working… (the call returns when it finishes)");
+      const r = await req("POST", "/codex/exec", { task, project: flag("project") || "", sandbox: flag("sandbox") });
+      console.log(""); console.log((r.text || r.error || "").split("\n").map((l) => "  " + l).join("\n")); console.log("");
+      if (r.diff && r.diff.files) info(`changes: ${r.diff.files} file(s) ${r.diff.summary ? "— " + r.diff.summary : ""}`);
+      return r.ok ? ok("done") : bad("failed: " + (r.error || "unknown"));
+    }
+    const j = await req("GET", "/codex/status");
+    banner();
+    head("🧑‍💻 Codex");
+    if (j.installed) ok(`codex ${j.version} · sandbox ${j.settings.sandbox}${j.settings.model ? " · model " + j.settings.model : ""}${j.settings.oss ? " · local (" + j.settings.localProvider + ")" : ""}${j.settings.enabled ? "" : c.warn + " · switched OFF" + c.reset}`);
+    else bad("codex not found — npm i -g @openai/codex, then: codex login");
+    if ((j.runs || []).length) { head("recent runs"); for (const r of j.runs.slice(0, 10)) console.log(`  ${r.state === "done" ? "✅" : r.state === "running" ? "🔴" : "✗"} ${c.gray}${new Date(r.startedAt).toLocaleTimeString()}${c.reset} ${r.kind === "review" ? "review" : r.task.slice(0, 70)}${r.diff && r.diff.files ? c.gray + "  ✎ " + r.diff.files : ""}${c.reset}`); }
+    info('hand it a task: bagidea codex "add a --json flag to the exporter" --project my-app');
+    console.log("");
+    return;
+  }
+
+  // Runs WITHOUT the daemon on purpose — an unreachable daemon is the thing it
+  // is meant to explain.
+  if (cmd === "doctor") {
+    banner();
+    const rc = await require("./doctor").run({ ok, bad, warn, info, head, rule });
+    process.exitCode = rc > 0 ? 1 : 0;
+    return;
+  }
   if (cmd === "fixmic") {
     if (process.platform !== "win32") return info("Voice-typing reset is only applicable on Windows");
     spawn("powershell", ["-NoProfile", "-Command",
@@ -270,6 +575,92 @@ async function main() {
     return;
   }
 
+  // --- migrate: pack the whole office → move it to another machine ------------
+  // Everything that makes an office YOURS lives in three places: daemon/*.json
+  // state (registry = agents/skills/keys/brains, plus jobs/notes/calendar/…),
+  // workspace/ (agent memory, meetings, projects, uploads) and plugins/.
+  // We tar those relative to ROOT with the system tar — it ships with
+  // Windows 10+, macOS and Linux, so the CLI stays zero-dependency.
+  const exportPaths = () => {
+    const daemonState = ["registry.json", "jobs.json", "notes.json", "calendar.json",
+      "layout.json", "projects.json", "proposals.json", "paused.json", "assets.json",
+      "mcp_main.json"].map((f) => "daemon/" + f);
+    return [...daemonState, "daemon/i18n", "workspace", "plugins"]
+      .filter((p) => fs.existsSync(path.join(ROOT, p)));
+  };
+  // node_modules are reinstallable, _trash/temp/staging are scratch — real
+  // offices carry 100+ MB of them for nothing. Both pattern shapes so any tar
+  // flavor (bsdtar on Win/mac, GNU on Linux) drops them at every depth.
+  const TAR_SKIP = ["--exclude=node_modules", "--exclude=*/node_modules",
+    "--exclude=_trash", "--exclude=*/_trash", "--exclude=.DS_Store",
+    "--exclude=workspace/temp", "--exclude=workspace/staging"];
+  // Run tar from the archive's own folder and pass -f a bare basename: GNU tar
+  // reads "C:\…" as a REMOTE host:path (bsdtar doesn't take --force-local, so
+  // the flag can't fix it portably) — a colon-free -f dodges it on every tar.
+  const tarRun = (dir, args) =>
+    execFileSync("tar", args, { cwd: dir, stdio: ["ignore", "inherit", "inherit"] });
+
+  if (cmd === "export") {
+    const out = path.resolve(rest.find((a) => !a.startsWith("-")) ||
+      `bagidea-office-backup-${new Date().toISOString().slice(0, 10)}.tgz`);
+    const paths = exportPaths();
+    if (!paths.includes("daemon/registry.json"))
+      return bad("nothing to export — daemon/registry.json not found (has the office ever run?)");
+    info("Packing: " + paths.join(" · "));
+    try {
+      tarRun(path.dirname(out), [...TAR_SKIP, "-czf", path.basename(out), "-C", ROOT, ...paths]);
+    } catch (e) { return bad("tar failed: " + (e && e.message)); }
+    const mb = (fs.statSync(out).size / 1048576).toFixed(1);
+    ok(`Exported → ${c.accent}${out}${c.reset} ${c.gray}(${mb} MB)${c.reset}`);
+    warn("This file contains your API keys and agent data — keep it private, delete it after importing.");
+    info(`On the new machine: install BagIdea Office, then run ${c.accent}bagidea import "${path.basename(out)}"${c.reset}`);
+    return;
+  }
+
+  if (cmd === "import") {
+    const file = rest.find((a) => !a.startsWith("-"));
+    if (!file) return bad("usage: bagidea import <backup.tgz>");
+    const abs = path.resolve(file);
+    if (!fs.existsSync(abs)) return bad("not found: " + abs);
+    let names = [];
+    try {
+      names = execFileSync("tar", ["-tzf", path.basename(abs)],
+        { cwd: path.dirname(abs), encoding: "utf8", maxBuffer: 64 * 1048576 })
+        .split("\n").map((n) => n.trim()).filter(Boolean);
+    } catch (e) { return bad("not a readable backup: " + (e && e.message)); }
+    if (!names.includes("daemon/registry.json"))
+      return bad("this archive has no daemon/registry.json — not a bagidea export");
+    // Only our three roots, only relative paths — refuse anything a crafted
+    // archive could use to write outside the install (absolute, .., drive:).
+    const stray = names.find((n) =>
+      !/^(daemon|workspace|plugins)(\/|$)/.test(n) || n.split("/").includes("..") || n.includes(":"));
+    if (stray) return bad("archive contains an unexpected path: " + stray);
+    const doImport = async () => {
+      info("Stopping the office…");
+      await killAll();
+      await new Promise((r) => setTimeout(r, 2500));
+      const regNow = path.join(ROOT, "daemon", "registry.json");
+      if (fs.existsSync(regNow)) {
+        const bak = regNow + ".pre-import-" + new Date().toISOString().slice(0, 10);
+        fs.copyFileSync(regNow, bak);
+        info(`Current team backed up → ${c.accent}${path.basename(bak)}${c.reset}`);
+      }
+      try { tarRun(path.dirname(abs), ["-xzf", path.basename(abs), "-C", ROOT]); }
+      catch (e) { return bad("extract failed: " + (e && e.message)); }
+      ok(`Imported ${names.length} files`);
+      if (await startOffice("starting the office")) ok("The office is back — same team, new machine 🏢");
+    };
+    if (rest.includes("-y") || rest.includes("--yes")) return doImport();
+    warn(`This OVERWRITES this machine's office — agents, skills, memory, keys, plugins (${names.length} files).`);
+    const rl = require("readline").createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(`  ${c.warn}Type 'yes' to import:${c.reset} `, (ans) => {
+      rl.close();
+      if (String(ans).trim().toLowerCase() === "yes") doImport();
+      else info("Cancelled — nothing was changed.");
+    });
+    return;
+  }
+
   if (cmd === "uninstall") {
     if (process.platform === "darwin") {
       const sh = path.join(ROOT, "installer", "uninstall-mac.sh");
@@ -279,9 +670,11 @@ async function main() {
       if (keepData) shArgs.push("--keep-data");
       const go = () => {
         info("Uninstalling… a new Terminal window finishes up.");
-        const escapedArgs = shArgs.map(a => a.replace(/'/g, "'\\''"));
+        // Two languages, two quotings: the command is built for the shell, then
+        // the whole thing is quoted again as an AppleScript string literal.
+        const inner = "bash " + shArgs.map(shQuote).join(" ");
         spawn("osascript", ["-e",
-          `tell application "Terminal" to do script "bash '${escapedArgs.join("' '")}'"`,
+          `tell application "Terminal" to do script ${osaQuote(inner)}`,
         ], { detached: true, stdio: "ignore" }).unref();
         process.exit(0);
       };
@@ -495,8 +888,12 @@ async function main() {
     const wav = path.join(require("os").tmpdir(), "bagidea_say.wav");
     fs.writeFileSync(wav, r.buf);
     if (process.platform === "win32") {
+      // The path travels in the ENVIRONMENT, never in the command text — so there
+      // is no string for an apostrophe in it to close. Interpolated here, one
+      // statement became three on any account whose name has one.
       spawn("powershell", ["-NoProfile", "-Command",
-        `(New-Object Media.SoundPlayer '${wav}').PlaySync()`], { stdio: "ignore" })
+        "(New-Object Media.SoundPlayer $env:BAGIDEA_SAY_WAV).PlaySync()"],
+        { stdio: "ignore", env: { ...process.env, BAGIDEA_SAY_WAV: wav } })
         .on("close", () => ok("Done speaking"));
     } else if (process.platform === "darwin") {
       spawn("afplay", [wav], { stdio: "ignore" })
@@ -609,11 +1006,24 @@ async function main() {
     const sub = rest[0];
     const arg = rest.slice(1).join(" ").trim();
     if (sub === "install") {
-      if (!arg) return info("Usage: bagidea plugin install <git-url>");
+      if (!arg) return info("Usage: bagidea plugin install <git-url | library id>   (bagidea plugin library lists the ids)");
+      // A bare id installs from the library that ships with the office.
+      if (!/^https?:\/\//.test(arg)) {
+        const r = await req("POST", "/plugins/library/install", { id: arg });
+        if (r && r.ok) return ok(`Installed ${c.bold}${r.name}${c.reset} from the library`);
+        return bad(typeof r === "string" ? r : (r && r.error) || "install failed");
+      }
       info("📦 cloning + installing…");
       const r = await req("POST", "/plugins/install", { url: arg });
       if (r && r.ok) return ok(`Installed plugin ${c.bold}${r.name}${c.reset}`);
       return bad(typeof r === "string" ? r : "install failed");
+    }
+    if (sub === "library" || sub === "lib") {
+      const j = await req("GET", "/plugins/library");
+      banner(); head("📦 Official plugin library");
+      for (const p of j.library || []) console.log(`  ${p.installed ? c.gray + "✓" : c.accent + "·"}${c.reset} ${c.bold}${p.id.padEnd(18)}${c.reset} ${p.name}${c.gray} — ${String(p.description || "").slice(0, 90)}${c.reset}`);
+      info("install one: bagidea plugin install <id>");
+      console.log(""); return;
     }
     if (sub === "remove" || sub === "rm") {
       if (!arg) return info("Usage: bagidea plugin remove <id>");
@@ -621,7 +1031,7 @@ async function main() {
       if (typeof r === "string" && r && !/^ok$/i.test(r)) return bad(r);
       return ok(`Removed plugin ${c.bold}${arg}${c.reset}`);
     }
-    return info("Usage: bagidea plugin <install <git-url> | remove <id>>");
+    return info("Usage: bagidea plugin <install <git-url | library id> | library | remove <id>>");
   }
 
   if (cmd === "proposals") {

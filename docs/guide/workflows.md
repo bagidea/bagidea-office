@@ -1,120 +1,144 @@
-# 🔀 Workflow Builder — Plan work in plain language, let the AI take it from there
+# 🔀 Workflow Builder — plan it, run it, let it run itself
 
-The Workflow Builder is a canvas for sketching out work that lets you **drag and drop
-nodes and type instructions in plain, everyday language** — for example, "Every
-morning, summarize AI news and send it to Telegram" — then press **Analyze**, and the
-**Director (Shino) reads your plan and tells you which skills/tools it needs, which
-permissions to grant, and who to assign it to**. It's perfect for anyone who "wants
-the office to do something but doesn't know how to ask for it."
+*Rewritten for v1.3.0 — the release where a workflow stopped being a drawing.*
 
-> 💡 The difference from n8n is that **you don't have to wire up the logic precisely** —
-> a node is an "intention," while the details and decisions are left to the AI team to
-> figure out.
+Open it from **⋯ → 🔀 Workflow Builder**.
 
-> 📌 **What it can do right now** — the Workflow Builder has 3 real buttons in the right panel:
-> - **🔍 Analyze** — the Director reads the workflow and tells you which skills/tools/permissions are needed and who to assign it to (planning, no action taken)
-> - **▶️ Run now** — tells the team to carry out this workflow **right now** and report back (nodes that branch into several paths run in parallel as ghost clones)
-> - **🧠 Build as a Skill** — compiles the workflow into a skill you can tick on for an agent in the settings page, to reuse anytime (or just tell an agent "run &lt;workflow name&gt;")
->
-> Recommended approach: **Analyze first → get everything ready (skill/permission/agent) → press Run now**, or **Build as a Skill** if you'll use it repeatedly.
+Until v1.3, pressing **Run** serialized your diagram to text and handed the
+whole thing to the Director as one big order. Nothing on the canvas ran on its
+own, nothing could wait for you, a restart forgot everything, and there was no
+record of what happened. Now the office **executes the graph**: every node runs
+on its own, in parallel where the arrows allow, with a persisted record per run
+that survives a restart — and a workflow can start **without you**.
 
 ---
 
-## How to open it
+## 1 · Draw it
 
-1. Click the **⋯** button (more menu) on the chat header → choose **🔀 Workflow Builder**
-2. The canvas window pops up (drag to move/resize it like a normal window)
+Right-click the canvas (or press **＋ Node**) and pick a type. Type what the
+step should do in plain language. Drag from a node's bottom port to another
+node's top port to connect them.
 
-Rough layout:
-
-```
-┌─ 🔀 Workflow Builder ───────────────────────────────────────────┐
-│ [workflow name…]  ＋Node   📂Open…            💾Save   🔍Analyze  │
-├──────────────────────────────────────┬──────────────────────────┤
-│  ┌──────────────────────────┐        │  🤖 Plan from Director     │
-│  │ 1  ⚡ Start when        ✕ │        │  ───────────────────────  │
-│  │ "Every morning 9:00"     │        │  • this workflow does…     │
-│  └────────────┬─────────────┘        │  • uses skill: …           │
-│  ┌────────────┴─────────────┐        │  • needs to enable tool: … │
-│  │ 2  ⚙ Action            ✕ │        │  • assign to: …            │
-│  │ "Summarize 5 top topics" │        │  • questions to answer: …  │
-│  └────────────┬─────────────┘        │                          │
-│  ┌────────────┴─────────────┐        │                          │
-│  │ 3  📤 Output            ✕ │        │                          │
-│  │ "Send to Telegram"       │        │                          │
-│  └──────────────────────────┘        │                          │
-└──────────────────────────────────────┴──────────────────────────┘
-        ↑ drag cards top→bottom = order of execution
-```
-
----
-
-## Node types
-
-| Type | Use when | Example |
+| Node | What it does | Put in the box |
 |---|---|---|
-| ⚡ **Start when** (trigger) | A starting point / time condition | "Every morning 9:00", "When told to start" |
-| ⬇ **Fetch** (fetch) | Pulling data in | "Search AI news", "Read file X", "Open URL" |
-| ⚙ **Action** (action) | Process/create | "Summarize", "Write code", "Generate an image" |
-| ◆ **Decision** (decision) | A branching condition | "If the site is down", "If the total exceeds 100" |
-| 📤 **Output** (output) | Where the result goes | "Send to Telegram", "Write to a file", "Report to CEO" |
-| 📝 **Note** (note) | Just a description | "Note: use the team's key" |
+| ⚡ **Trigger** | where a run starts; its output is the trigger's payload | anything — triggers are set in the ⚡ panel |
+| ⚙ **Action** | a real agent turn; the reply is the step's output | the task · start with `@marcus:` to pick who (default: the Director, with DELEGATE power) |
+| ⬇ **Fetch** | an HTTP request | the URL · output is `{ status, body }` (JSON parsed when it is JSON) |
+| ◆ **Decision** | pick a branch | an expression like `{{n2.output.status}} == 200`, or a question the Director answers YES/NO |
+| ✋ **Approval** | stop and wait for you | what you're approving — it lands in 📥 APPROVALS and on your phone |
+| 🔔 **Notify** | tell you, through your rules | the message |
+| ⏳ **Delay** | wait | `10m` · `2h 30m` · `30s` · `until 09:00` |
+| 📤 **Output** | record, write or send the result | plain text · `file:C:/path/out.md` · `channel: <text>` |
+| 🧑‍💻 **Codex** | hand a coding task to [Codex](codex.md) | the task · `cfg.project` picks the project (default: the workspace) · output `{ text, diff }` |
+| 📝 **Note** | a comment on the canvas | not run |
 
-**Order of execution = top to bottom** (by the card's Y position) — drag cards up/down to reorder.
+Plugins can add node types of their own (they appear in the palette as soon
+as the plugin loads) and trigger kinds (in the ⚡ panel as `🧩 …`) — see
+[plugins → hooks](plugins.md#hooks). Every run is also a 🔀 card on the
+[task board](tasks.md).
 
----
+**Branches and joins.** A node with several outgoing arrows fans out and those
+branches run **at the same time**. A node with several incoming arrows **waits
+for all of them**. A decision opens only the branch it chose: label the arrows
+`yes` / `no` (right-click an arrow), or leave them unlabelled — the first is
+*yes*, the second *no*. The branch not taken is *skipped*, which is not a
+failure.
 
-## How to use it (4 steps)
+**Data.** Any box may use `{{…}}`:
 
-1. **Add nodes** — press **＋ Node** and drag them into place from top to bottom
-2. **Type instructions** — double-click inside a card, type what you want it to do (plain language) + pick the node type
-3. **Press 🔍 Analyze** — the Director reads the whole workflow and replies in the right panel:
-   - what this workflow does (short summary)
-   - which **skill/tool** each step uses (if there's no suitable skill yet, it tells you what to build)
-   - which extra **permission/tool** needs to be enabled
-   - which **agent** to assign it to, or whether to hire more
-   - questions/gaps you need to decide on before actually running it
-4. **💾 Save** — keep it to edit/reopen later (stored at `workspace/workflows/<id>.json`)
-5. **▶️ Run now / 🧠 Build as a Skill** — when ready, tell the team to carry out the workflow immediately, or save it as a skill for reuse
+| | |
+|---|---|
+| `{{trigger.data.issue.title}}` | a field from whatever started the run |
+| `{{n3.output}}` | another node's output, by its id |
+| `{{prev}}` | every upstream output, joined — the usual choice for an action |
 
-> ℹ️ **"Analyze" is planning, not acting** — use it to see what skills/permissions/agents
-> you need to prepare. When ready, press **▶️ Run now** (act for real) or **🧠 Build as a
-> Skill** (keep it for reuse).
+Small and explicit, on purpose: no scripting language in a text box.
 
----
+## 2 · Run it, and watch it
 
-## 3 ready-to-use examples (open them to learn)
+**▶️ Run now** starts a run and the canvas lights up as it goes — blue running,
+green done, red failed, amber waiting for you or for a delay, faded skipped —
+with each step's output in the panel on the right. A run's record is kept
+(the **▶ RUNS** list, newest first; click one to see it again).
 
-The first time you open the program, the system adds these examples for you — press
-**📂 Open…** to browse them:
+Every agent step is a real turn: the same permission broker, the same
+[budget](budget.md), the same Security Center. A step the office refuses (a
+cap reached, a tool denied) fails the run and says why.
 
-### 1) Daily AI news summary
+**Restart-safe.** A delay that was waiting re-arms; an approval that was
+waiting is still in your inbox; an agent step that was mid-flight when the
+office stopped is marked failed rather than pretended.
+
+**Analyze** and **🪄 Draft with Director** are unchanged: the Director reads
+your plan and says what skills, tools, permissions and people it needs — or
+drafts the whole thing from a sentence.
+
+## 3 · Let it start itself — ⚡ TRIGGERS
+
+Save the workflow, then add triggers in the ⚡ panel. A trigger is a source of
+runs:
+
+| Kind | Fires when | Payload |
+|---|---|---|
+| ⏰ **Schedule** | every N minutes, or daily at HH:MM | `{ event: "schedule" }` |
+| 🌐 **Webhook** | anything POSTs to `http://127.0.0.1:8787/hook/<token>` | the JSON body; the `X-GitHub-Event` header becomes `event` |
+| 📡 **Event** | an office event of that type — `task.completed`, `work.created` (a new card), `proposal.created`, a plugin's own | the event |
+| 📁 **File** | a file matching the pattern appears or changes in a folder | `{ path, name, change, size }` |
+| 💬 **Channel** | a message on Telegram / Discord / LINE / … starts with the keyword | `{ channel, from, text, rest }` |
+
+Each row can be paused (⏸), fired by hand (🔥 — the fastest way to test), or
+removed.
+
+**Webhooks and the internet.** The office listens on `127.0.0.1` only, on
+purpose. To let GitHub, Stripe, Zapier or a script on another machine reach a
+hook, run a tunnel — the same way the LINE and Meta channels are set up:
+
 ```
-⚡ Every morning 9:00  →  ⬇ Search latest AI news  →  ⚙ Summarize 5 top topics+links  →  📤 Send to chat/Telegram
+cloudflared tunnel --url http://127.0.0.1:8787     # or: ngrok http 8787
 ```
-Teaches: a time-based trigger + web data fetching (skill `deep-research`, tool `WebSearch/WebFetch`) + sending to a channel
 
-### 2) Watch for a website going down
+then use `https://<your-tunnel>/hook/<token>` as the webhook URL. Set a
+**secret** on the trigger and the office verifies an HMAC-SHA256 signature on
+every call — GitHub's `X-Hub-Signature-256` works as-is; anything else can send
+`X-Signature-256`.
+
+**No loops.** The engine's own events never trigger workflows, and a keyword
+message that starts one is consumed — it never reaches the Director as an
+order.
+
+## 4 · Two workflows worth building first
+
+**GitHub triage** — trigger: webhook (secret set, repo → Settings → Webhooks,
+event *Issues*). Decision: `{{trigger.data.action}} == opened`. Action:
+`@marcus: read the issue {{trigger.data.issue.title}} — {{trigger.data.issue.body}}. Label it bug / question / feature and draft a reply.`
+Approval: *post this reply?* Action: `@marcus: post the reply with gh.`
+
+**Client folder** — trigger: file (`D:/clients/acme`, `*.pdf`). Action:
+`@priya: summarize {{trigger.data.path}} in one page and save it beside the original.`
+Notify: `Summary ready for {{trigger.data.name}}`.
+
+## 5 · Save as a skill · the legacy path
+
+**🧠 Save as Skill** still compiles the workflow into a skill any agent can be
+given, for "run *X*" in chat. And `POST /workflows/run` with `legacy: true`
+still does what v1.2 did — the whole drawing as one Director order — if you
+relied on that.
+
+## For scripts and plugins
+
 ```
-⚡ Every 30 minutes  →  ⬇ Open the site's URL  →  ◆ If not 200 OK  →  📤 Alert immediately
+POST /workflows/run       { id }  or  { name, nodes, edges }  (+ data)  → { run }
+GET  /workflows/run?id=   the full run record
+GET  /workflows/runs?id=<workflowId>&limit=
+POST /workflows/cancel    { id }                       human UI only
+GET  /triggers            · POST /triggers { kind, workflowId, cfg } · POST /triggers/delete · POST /triggers/fire { id, data }
+POST /hook/<token>        the inbound webhook (no UI header — that is the point)
 ```
-Teaches: an interval trigger + a decision node + alerting
 
-### 3) Summarize meeting notes
-```
-⚡ On demand (attach transcript)  →  ⬇ Read the file  →  ⚙ Summarize+action items+owners  →  📤 Write to notes.md
-```
-Teaches: accepting a file + processing text (tool `Read/Write`) + saving the result to an office file
+Events on the office stream: `workflow.run`, `workflow.node`.
 
----
+## See also
 
-## Tips
-
-- **Write the intent, not the exact steps** — "Summarize the news for me" is better than "GET /api then parse JSON…"; let the Director figure out how
-- 1 node = 1 easy-to-understand step; don't cram several things into one node
-- Press **Analyze** often while building — you'll learn what skills/permissions are still missing
-- If the Director says "you should have skill X" → go build that skill (see the [skills guide](ai-features.md)) and analyze again
-
-> 🚧 Coming up next: freely connecting nodes with lines on the canvas, scheduling
-> workflows to run automatically on a trigger, and a Workflow Hub for sharing
-> ready-made workflows (right now ▶️ Run now is a one-off, manual run).
+- [The inbox](inbox.md) — where approval nodes wait and notify nodes land
+- [Budgets](budget.md) — every agent step is gated
+- [Channels](channels.md) — the tunnel, and keyword triggers

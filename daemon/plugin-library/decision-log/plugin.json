@@ -1,0 +1,16 @@
+{
+  "id": "decision-log",
+  "name": "🧠 Decision Log",
+  "version": "1.0.0",
+  "description": "\"We decided X because Y.\" A log of the office's decisions with supersede chains — and a memory provider that puts the active ones in front of the agents you choose, on every turn.",
+  "panel": "panel.html",
+  "window": { "w": 560, "h": 640, "resizable": true },
+  "commands": [
+    { "name": "add", "args": "<what> :: <why>", "desc": "Record a decision and its reason" },
+    { "name": "supersede", "args": "<id> :: <what> :: <why>", "desc": "Replace an earlier decision with a new one (the chain is kept)" },
+    { "name": "retire", "args": "<id>", "desc": "Retire a decision without replacing it" },
+    { "name": "list", "args": "[all]", "desc": "The active decisions (or every one, with the chain)" }
+  ],
+  "needsKeys": [],
+  "library": { "for": "planning · every team", "hooks": ["memory.provider", "workflow.node"] }
+}

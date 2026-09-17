@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🐙 GitHub Triage</title>
+<style>
+  :root { --bg:#0c1322; --fg:#dbe7ff; --dim:#7e8db0; --accent:#5ec8ff; --card:#13203a; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI','Leelawadee UI',Tahoma,'Noto Sans Thai',system-ui,sans-serif; }
+  body { background:var(--bg); color:var(--fg); padding:14px; font-size:12.5px; }
+  h1 { font-size:15px; margin-bottom:8px; }
+  .add { display:flex; gap:6px; flex-wrap:wrap; background:var(--card); border-radius:10px; padding:10px; margin-bottom:12px; }
+  input { background:#0a1020; color:var(--fg); border:1px solid rgba(255,255,255,.12); border-radius:7px; padding:7px 9px; font:inherit; flex:1 1 160px; }
+  button { background:rgba(94,200,255,.12); border:1px solid rgba(94,200,255,.4); color:var(--fg); border-radius:8px; padding:6px 10px; cursor:pointer; font:inherit; }
+  .r { background:var(--card); border-radius:10px; padding:10px; margin-bottom:8px; }
+  .dim { color:var(--dim); font-size:11px; }
+  code { background:#0a1020; padding:2px 5px; border-radius:5px; font-size:11px; user-select:all; }
+  .run { font-size:11px; color:var(--dim); margin-top:4px; }
+  #out { white-space:pre-wrap; margin-top:8px; }
+</style></head><body>
+<h1>🐙 GitHub Triage</h1>
+<div class="add">
+  <input id="repo" placeholder="owner/repo">
+  <input id="secret" placeholder="webhook secret (recommended)">
+  <button id="setup">＋ Wire it up</button>
+  <input id="issue" placeholder="owner/repo#123" style="flex:1 1 120px">
+  <button id="triage">▶ Triage one now</button>
+  <div id="out" class="dim" style="flex:1 1 100%"></div>
+</div>
+<div id="list"></div>
+<script>
+  const BASE = "/plugin/github-triage";
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const cmd = (name, args) => fetch(BASE + "/cmd", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cmd: name, args }) }).then((r) => r.json());
+  async function load() {
+    const j = await fetch(BASE + "/status").then((r) => r.json());
+    const box = document.getElementById("list"); box.innerHTML = j.repos.length ? "" : '<div class="dim">No repository yet. Wire one up above: the office installs a triage workflow and a webhook trigger, and shows the URL to paste into GitHub. Every reply waits for your approval in 📥 APPROVALS.</div>';
+    for (const r of j.repos) {
+      const el = document.createElement("div"); el.className = "r";
+      const tok = r.trigger && r.trigger.cfg && r.trigger.cfg.token;
+      el.innerHTML = `<div><b>${esc(r.repo)}</b> <span class="dim">· ${r.hasSecret ? "🔐 secret set" : "⚠ no secret"} · ${r.trigger && r.trigger.enabled ? "listening" : "paused"}</span></div>
+        <div class="dim" style="margin-top:4px">hook: <code>http://127.0.0.1:${j.port}/hook/${esc(tok || "?")}</code> — reach it through a tunnel: <code>cloudflared tunnel --url http://127.0.0.1:${j.port}</code></div>
+        <div class="run">${(r.runs || []).length ? r.runs.map((x) => `${x.state === "done" ? "✓" : x.state === "failed" ? "✗" : "…"} ${new Date(x.startedAt).toLocaleString()} · ${esc(x.state)}`).join("<br>") : "no runs yet"}</div>`;
+      box.appendChild(el);
+    }
+  }
+  document.getElementById("setup").onclick = () => cmd("setup", document.getElementById("repo").value.trim() + " :: " + document.getElementById("secret").value.trim()).then((r) => { document.getElementById("out").textContent = r.error ? r.error : (r.url + "\n" + r.next); load(); });
+  document.getElementById("triage").onclick = () => cmd("triage", document.getElementById("issue").value.trim()).then((r) => { document.getElementById("out").textContent = r.error ? r.error : "triage started — run " + (r.run && r.run.id) + "; the reply will wait in 📥 APPROVALS"; setTimeout(load, 1500); });
+  load();
+  try { const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"); ws.onmessage = (m) => { try { const e = JSON.parse(m.data); if (e.type === "workflow.run" && /^github-triage-/.test(e.run && e.run.workflowId || "")) load(); } catch {} }; } catch {}
+</script></body></html>

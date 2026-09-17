@@ -1,0 +1,16 @@
+{
+  "id": "skill-regression",
+  "name": "🧪 Skill Regression",
+  "version": "1.0.0",
+  "description": "Test cases per skill. When the office tries to correct one of its own skills, every case is run against the new text first — a correction that breaks a case is refused. The panel is where you write the cases and see the last runs.",
+  "panel": "panel.html",
+  "window": { "w": 700, "h": 700, "resizable": true },
+  "commands": [
+    { "name": "add", "args": "<skill id> :: <task prompt> :: <expect regex | !regex>", "desc": "Add a test case to a skill" },
+    { "name": "run", "args": "<skill id>", "desc": "Run a skill's cases against its current text" },
+    { "name": "list", "args": "[skill id]", "desc": "Skills with cases, and the last results" },
+    { "name": "clear", "args": "<skill id>", "desc": "Remove every case from a skill" }
+  ],
+  "needsKeys": [],
+  "library": { "for": "every office that lets skills self-correct", "hooks": ["skillTests"] }
+}

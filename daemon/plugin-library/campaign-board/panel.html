@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📣 Campaign Board</title>
+<style>
+  :root { --bg:#0c1322; --fg:#dbe7ff; --dim:#7e8db0; --accent:#5ec8ff; --card:#13203a; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI','Leelawadee UI',Tahoma,'Noto Sans Thai',system-ui,sans-serif; }
+  body { background:var(--bg); color:var(--fg); padding:14px; font-size:12.5px; }
+  h1 { font-size:15px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+  .add { display:flex; gap:6px; flex-wrap:wrap; background:var(--card); border-radius:10px; padding:10px; margin-bottom:12px; }
+  input, textarea, select { background:#0a1020; color:var(--fg); border:1px solid rgba(255,255,255,.12); border-radius:7px; padding:7px 9px; font:inherit; }
+  button { background:rgba(94,200,255,.12); border:1px solid rgba(94,200,255,.4); color:var(--fg); border-radius:8px; padding:5px 9px; cursor:pointer; font:inherit; font-size:11.5px; }
+  button:disabled { opacity:.4; cursor:default; }
+  .day { color:var(--dim); font-size:11px; margin:10px 0 4px; letter-spacing:.3px; }
+  .p { background:var(--card); border-radius:10px; padding:10px; margin-bottom:6px; border-left:3px solid #6b7280; }
+  .p.drafted { border-left-color:#ffcf5e; } .p.approved { border-left-color:#5ec8ff; } .p.published { border-left-color:#4ade80; } .p.failed { border-left-color:#ff6b6b; }
+  .p .m { color:var(--dim); font-size:11px; margin-top:3px; }
+  .p textarea { width:100%; min-height:70px; margin-top:6px; font-size:11.5px; }
+  .p .acts { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
+  .pill { font-size:10px; padding:2px 7px; border-radius:999px; background:rgba(255,255,255,.08); }
+  .dim { color:var(--dim); font-size:11px; }
+</style></head><body>
+<h1>📣 Campaign Board <span class="dim" id="range"><button data-r="week">week</button> <button data-r="month">month</button> <button data-r="all">all</button></span></h1>
+<div class="add">
+  <input id="date" type="date" style="flex:0 0 140px">
+  <input id="channel" placeholder="channel (x, bluesky, linkedin, blog, newsletter…)" style="flex:1 1 160px">
+  <input id="title" placeholder="title / angle" style="flex:2 1 220px">
+  <button id="add">＋ Plan</button>
+  <input id="brief" placeholder="brief (optional): the point to make, links, a hook" style="flex:1 1 100%">
+  <input id="voice" placeholder="brand voice — how every draft should sound" style="flex:1 1 70%"><button id="voiceSave">save voice</button>
+  <div class="dim" style="flex:1 1 100%">plan → <b>draft</b> (an agent writes it) → <b>approve</b> (📥 APPROVALS / your phone) → <b>publish</b> (through the agent's tools) · every post is a card on the office board</div>
+</div>
+<div id="list"></div>
+<script>
+  const BASE = "/plugin/campaign-board";
+  let RANGE = "week";
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const cmd = (name, args) => fetch(BASE + "/cmd", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cmd: name, args }) }).then((r) => r.json());
+  const post = (route, body) => fetch(BASE + "/" + route, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  async function load() {
+    const j = await fetch(BASE + "/posts").then((r) => r.json());
+    document.getElementById("voice").value = j.voice || "";
+    const today = new Date().toISOString().slice(0, 10);
+    const lim = RANGE === "week" ? 8 : RANGE === "month" ? 31 : 100000;
+    const posts = j.posts.filter((p) => RANGE === "all" || (p.date >= new Date(Date.now() - 86400000).toISOString().slice(0, 10) && p.date <= new Date(Date.now() + lim * 86400000).toISOString().slice(0, 10)));
+    const box = document.getElementById("list"); box.innerHTML = posts.length ? "" : '<div class="dim">Nothing planned in this range.</div>';
+    let last = "";
+    for (const p of posts) {
+      if (p.date !== last) { last = p.date; const d = document.createElement("div"); d.className = "day"; d.textContent = new Date(p.date + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) + (p.date === today ? " · today" : ""); box.appendChild(d); }
+      const el = document.createElement("div"); el.className = "p " + p.state;
+      el.innerHTML = `<div><b>${esc(p.title)}</b> <span class="pill">${esc(p.channel)}</span> <span class="pill">${p.state}</span> <button data-x="${p.id}" style="float:right">✕</button></div>
+        ${p.brief ? `<div class="m">${esc(p.brief)}</div>` : ""}
+        <textarea data-c="${p.id}" placeholder="copy — press Draft, or write it here">${esc(p.copy || "")}</textarea>
+        <div class="acts">
+          <button data-d="${p.id}">✍ Draft</button>
+          <button data-a="${p.id}" ${p.copy ? "" : "disabled"}>✅ Ask approval</button>
+          <button data-p="${p.id}" ${p.state === "approved" ? "" : "disabled"}>🚀 Publish</button>
+          ${p.result ? `<span class="dim">${esc(p.result.slice(0, 120))}</span>` : ""}
+        </div>`;
+      box.appendChild(el);
+    }
+    box.querySelectorAll("[data-d]").forEach((b) => b.onclick = () => { b.textContent = "…"; cmd("draft", b.dataset.d).then(load); });
+    box.querySelectorAll("[data-a]").forEach((b) => b.onclick = () => { b.textContent = "waiting…"; cmd("approve", b.dataset.a).then(load); });
+    box.querySelectorAll("[data-p]").forEach((b) => b.onclick = () => { b.textContent = "…"; cmd("publish", b.dataset.p).then((r) => { if (r.error) alert(r.error); load(); }); });
+    box.querySelectorAll("[data-x]").forEach((b) => b.onclick = () => post("remove", { id: b.dataset.x }).then(load));
+    box.querySelectorAll("[data-c]").forEach((t) => t.onchange = () => post("copy", { id: t.dataset.c, copy: t.value }).then(load));
+  }
+  document.getElementById("add").onclick = () => {
+    const date = document.getElementById("date").value, ch = document.getElementById("channel").value.trim(), t = document.getElementById("title").value.trim(); if (!date || !ch || !t) return;
+    cmd("add", `${date} :: ${ch} :: ${t} :: ${document.getElementById("brief").value.trim()}`).then((r) => { if (r.error) alert(r.error); document.getElementById("title").value = ""; document.getElementById("brief").value = ""; load(); });
+  };
+  document.getElementById("voiceSave").onclick = () => cmd("voice", document.getElementById("voice").value.trim()).then(load);
+  document.querySelectorAll("#range button").forEach((b) => b.onclick = () => { RANGE = b.dataset.r; load(); });
+  load();
+  try { const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"); ws.onmessage = (m) => { try { const e = JSON.parse(m.data); if (e.type === "plugin.event" && e.plugin === "campaign-board") load(); } catch {} }; } catch {}
+</script></body></html>

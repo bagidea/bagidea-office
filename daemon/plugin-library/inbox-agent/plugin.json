@@ -1,0 +1,16 @@
+{
+  "id": "inbox-agent",
+  "name": "📬 Inbox Agent",
+  "version": "1.0.0",
+  "description": "Email in → classified → replies drafted → you approve → sent. A schedule trigger and a workflow that uses whatever mail tool the agent has (Gmail from the Tools Hub, or any MCP mail server). Nothing leaves without your yes.",
+  "panel": "panel.html",
+  "window": { "w": 600, "h": 600, "resizable": true },
+  "commands": [
+    { "name": "setup", "args": "[every N min] [:: agent id] [:: rules]", "desc": "Install the inbox workflow and check the mailbox on a schedule (default every 30 min, the Director)" },
+    { "name": "run", "args": "", "desc": "Check the inbox now" },
+    { "name": "off", "args": "", "desc": "Stop checking" },
+    { "name": "status", "args": "", "desc": "Schedule and the last runs" }
+  ],
+  "needsKeys": [],
+  "library": { "for": "support · sales · anyone drowning in mail", "hooks": ["triggers.add", "workflow.save"], "needs": "a mail tool granted to the agent in the Tools Hub (e.g. Gmail)" }
+}

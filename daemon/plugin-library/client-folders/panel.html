@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🗂 Client Folders</title>
+<style>
+  :root { --bg:#0c1322; --fg:#dbe7ff; --dim:#7e8db0; --accent:#5ec8ff; --card:#13203a; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI','Leelawadee UI',Tahoma,'Noto Sans Thai',system-ui,sans-serif; }
+  body { background:var(--bg); color:var(--fg); padding:14px; font-size:12.5px; }
+  h1 { font-size:15px; margin-bottom:8px; }
+  .add { display:grid; grid-template-columns:1fr 1fr; gap:6px; background:var(--card); border-radius:10px; padding:10px; margin-bottom:12px; }
+  .add .wide { grid-column:1 / -1; }
+  input, select, textarea { background:#0a1020; color:var(--fg); border:1px solid rgba(255,255,255,.12); border-radius:7px; padding:7px 9px; font:inherit; width:100%; }
+  button { background:rgba(94,200,255,.12); border:1px solid rgba(94,200,255,.4); color:var(--fg); border-radius:8px; padding:6px 10px; cursor:pointer; font:inherit; }
+  .c { background:var(--card); border-radius:10px; padding:10px; margin-bottom:8px; }
+  .c .m { color:var(--dim); font-size:11px; margin-top:3px; }
+  .f { font-size:11px; color:var(--dim); margin-top:6px; }
+  .dim { color:var(--dim); font-size:11px; }
+</style></head><body>
+<h1>🗂 Client Folders</h1>
+<div class="add">
+  <input id="name" placeholder="Client name (e.g. Acme)">
+  <select id="agent"></select>
+  <input id="dir" class="wide" placeholder="Folder to watch (full path) — the client's briefs, contracts, invoices land here">
+  <textarea id="instr" class="wide" rows="2" placeholder="What to do with each new file (optional — default: read it, write a one-page summary beside it, reply with action items)"></textarea>
+  <div class="wide" style="display:flex;gap:8px;align-items:center"><button id="add">＋ Watch this folder</button><span class="dim">Each file becomes a card on the board, owned by the agent, and you are told when it is handled.</span></div>
+</div>
+<div id="list"></div>
+<script>
+  const BASE = "/plugin/client-folders";
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const cmd = (name, args) => fetch(BASE + "/cmd", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cmd: name, args }) }).then((r) => r.json());
+  async function load() {
+    const j = await fetch(BASE + "/list").then((r) => r.json());
+    const sel = document.getElementById("agent"); if (!sel.options.length) sel.innerHTML = Object.entries(j.agents).map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join("");
+    const box = document.getElementById("list"); box.innerHTML = j.clients.length ? "" : '<div class="dim">No clients yet.</div>';
+    for (const c of j.clients) {
+      const el = document.createElement("div"); el.className = "c";
+      el.innerHTML = `<div><b>${esc(c.name)}</b> <span class="dim">· ${esc(j.agents[c.agent] || c.agent)}</span> <button data-r="${esc(c.name)}" style="float:right;font-size:11px">✕ stop</button></div>
+        <div class="m">${esc(c.dir)}</div>${c.instructions ? `<div class="m">↳ ${esc(c.instructions)}</div>` : ""}
+        <div class="f">${c.files.length ? c.files.slice(0, 6).map((f) => `${f.state === "done" ? "✓" : f.state === "running" ? "…" : "✗"} ${esc(f.name)} · ${new Date(f.at).toLocaleString()}`).join("<br>") : "no files yet — drop one in the folder"}</div>`;
+      box.appendChild(el);
+    }
+    box.querySelectorAll("[data-r]").forEach((b) => b.onclick = () => cmd("remove", b.dataset.r).then(load));
+  }
+  document.getElementById("add").onclick = () => {
+    const name = document.getElementById("name").value.trim(), dir = document.getElementById("dir").value.trim(); if (!name || !dir) return;
+    cmd("add", `${name} :: ${dir} :: ${document.getElementById("agent").value} :: ${document.getElementById("instr").value.trim()}`).then((r) => { if (r.error) alert(r.error); else { document.getElementById("name").value = ""; document.getElementById("dir").value = ""; } load(); });
+  };
+  load();
+  try { const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"); ws.onmessage = (m) => { try { const e = JSON.parse(m.data); if (e.type === "plugin.event" && e.plugin === "client-folders") load(); } catch {} }; } catch {}
+</script></body></html>

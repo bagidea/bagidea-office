@@ -102,7 +102,7 @@ model self-manage all the way to its window.
 Totally supported. Set your office-wide **default provider** (and/or each agent's brain) to
 GLM or DeepSeek and everything works — the Director delegates, agents run real tasks in
 projects, sub-agents split, skills are learned — all on those models. For coding and
-research, GLM-4.6 and DeepSeek are very capable, so the agents stay genuinely useful.
+research, GLM-5.2 and DeepSeek V4 are very capable, so the agents stay genuinely useful.
 
 **The one thing to know: vision.** GLM and DeepSeek (and most cheap/fast chat models) are
 **text-only**. On their own they can't look at a screenshot. BagIdea Office has a built-in

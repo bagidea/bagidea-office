@@ -24,9 +24,16 @@
 // `models` is a hint list for the settings UI — any string is accepted.
 const PROVIDERS = {
   claude: {
+    // Anthropic DOES list models — but not with a per-provider key like everyone
+    // else: the office runs on the machine's own Claude auth. server.js
+    // (fetchClaudeModels) pulls this URL with ANTHROPIC_API_KEY, or failing that
+    // the Claude Code CLI's local subscription token. The list below is only the
+    // offline fallback for when neither is available.
     label: "Claude · Anthropic", format: "anthropic", direct: true, baseUrl: null,
+    modelsUrl: "https://api.anthropic.com/v1/models?limit=100",
     models: ["", "opus", "sonnet", "haiku",
-             "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
+             "claude-opus-5", "claude-sonnet-5", "claude-fable-5", "claude-opus-4-8",
+             "claude-sonnet-4-6", "claude-haiku-4-5"],
   },
   glm: {
     label: "GLM · Z.AI", format: "anthropic", direct: true,
@@ -80,6 +87,11 @@ const PROVIDERS = {
   openai: {
     label: "OpenAI", format: "openai", needsProxy: true, baseUrl: null,
     models: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],   // gpt-4.1 = 1M flagship, listed first
+  },
+  atlascloud: {
+    label: "Atlas Cloud", format: "openai", needsProxy: true,
+    baseUrl: "https://api.atlascloud.ai/v1",
+    models: ["openai/gpt-4.1-mini"],
   },
   gemini: {
     label: "Gemini", format: "openai", needsProxy: true, baseUrl: null,

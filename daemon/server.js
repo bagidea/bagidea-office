@@ -30,8 +30,15 @@ const maintenance = require("./maintenance");
 const retrieval = require("./retrieval");
 const skillsSync = require("./skills");
 const providers = require("./providers");
+const execBackend = require("./exec-backend");
+const worktree = require("./worktree");
+const semantic = require("./semantic");
+const media = require("./media");
 const proxy = require("./proxy");
 const { RunWatchdog } = require("./watchdog");
+const { stripStatus, verdict: autoVerdict, readStatus } = require("./autopilot");
+const projtrust = require("./projecttrust");
+const joborder = require("./joborder");
 const { wireWorkspaceSettings } = require("./wire-hooks-runtime");
 const { killTree } = require("./kill-tree");   // cross-platform child reap (issue #15 review)
 
@@ -59,6 +66,17 @@ let taskCounter = 0;
 
 const REGISTRY = path.join(__dirname, "registry.json");
 let reg;
+
+// An MCP server is either a local program to launch (command + args) or a hosted
+// HTTP endpoint. Both arrive through the same one-line box, because a URL tells
+// them apart on its own — nothing extra for the owner to pick. Shared by every
+// place that writes an --mcp-config, so the two never drift.
+function mcpEntry(spec) {
+  const s = String((spec && spec.command) || "").trim();
+  if (/^https?:[/][/]/i.test(s)) return { type: "http", url: s.split(/\s+/)[0] };
+  const parts = s.split(/\s+/);
+  return { command: parts[0], args: parts.slice(1) };
+}
 
 // Starter skill library — the capability pack every office ships with, in the
 // spirit of the curated skills other agent stacks bundle. Each entry is plain
@@ -96,6 +114,14 @@ function loadReg() {
   }
   reg.tools = Object.keys(BUILTIN_TOOLS);
   reg.mcpServers = reg.mcpServers || {};
+  // Named places a run can happen. Empty = everything runs on this machine,
+  // which is how the office worked before backends existed.
+  reg.execBackends = reg.execBackends || {};
+  reg.ghostWorktrees = reg.ghostWorktrees === true;   // opt-in, see runSub
+  // Meaning-based recall on top of the word index. Off unless the owner points
+  // it at an embeddings endpoint — a local Ollama costs nothing and never
+  // leaves the machine, which is the shape this office prefers.
+  reg.semantic = reg.semantic || { enabled: false, baseUrl: "", model: "", key: "" };
   // One-time seed: a ready-to-use WEB capability (Playwright MCP, the Claude Code
   // browser standard). Tick "🔌 web" on an agent's tools and it can navigate,
   // click, type, submit forms and screenshot real pages. Runs --isolated (a fresh
@@ -130,10 +156,21 @@ function loadReg() {
   if (reg.heartbeatMin === undefined) reg.heartbeatMin = 60; // Director check-in
   if (reg.socialMin === undefined) reg.socialMin = 120;      // agents socialize (economical default)
   if (reg.proposalMin === undefined) reg.proposalMin = 120;  // min gap between CEO pitches
+  if (reg.channelNotify === undefined) reg.channelNotify = true; // work milestones → Telegram/Discord/…
+  if (reg.autoApprove === undefined) reg.autoApprove = false; // auto-allow every tool prompt (unattended runs)
+  if (reg.autoPilot === undefined) reg.autoPilot = false;     // 🤖 keep working without asking the owner
+  if (!reg.projectTrust) reg.projectTrust = {};               // project dir → approved hook fingerprint (#39)
   saveReg();
 }
 function saveReg() { fs.writeFileSync(REGISTRY, JSON.stringify(reg, null, 2)); }
 loadReg();
+
+// 🌱 Eco mode (reg.ecoMode): ONE switch that cuts the office's idle token burn —
+// self-driven rhythms stretch to gentle floors (heartbeat ≥3h, social ≥6h,
+// pitches ≥6h) and the delegated-work QA double-pass is skipped. Direct orders
+// are never throttled: eco only slows what the office does BY ITSELF.
+// 0 still means "off entirely" for any rhythm the owner disabled.
+function ecoFloor(v, floor) { return reg.ecoMode && v !== 0 ? Math.max(v, floor) : v; }
 
 // Live (not journaled): registry.json is the persistence; every WS client
 // also gets a fresh snapshot on connect.
@@ -148,6 +185,27 @@ function staffCount() {
 // Nodes form a graph via edges (A → B = do B after A). A node with several
 // outgoing edges = parallel branches; several incoming = wait for all, then
 // continue. Falls back to top→bottom by Y when no edges are drawn.
+// Pre-1.3 behaviour, kept for `legacy:true`: the whole drawing as one order to
+// the Director. The engine is the default now.
+function runWorkflowViaDirector(w, res) {
+  queueDirectorTurn((release) => {
+    ceoFlow(
+      "Execute this workflow now. Do each step in order. When a node has SEVERAL " +
+      "OUTGOING arrows, those branches run in PARALLEL — and you must REALLY run " +
+      "them in parallel by ending your reply with one `SUB: <branch task>` line per " +
+      "branch (they become real ghost clones the owner can watch split off). Do NOT " +
+      "just say you split — emit the SUB: lines. A node with several incoming arrows " +
+      "waits for all branches, then continues from their merged results. Report the " +
+      "final result.\n\n" + workflowToText(w),
+      undefined, undefined,
+      { logPrompt: "🔀▶ workflow (legacy): " + (w.name || ""),
+        onDone: (out, ok) => {
+          release();
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: !!ok, result: ok && out ? out : "the run did not complete — try again" }));
+        } });
+  });
+}
 function workflowToText(w) {
   const nodes = w.nodes || [];
   const edges = w.edges || [];
@@ -235,8 +293,14 @@ function monitorCount() {
 function rosterEvt() {
   return { type: "roster.sync", agents: reg.agents, roles: reg.roles,
     tools: reg.tools, builtinTools: BUILTIN_TOOLS, mcp: reg.mcpServers,
+    backends: reg.execBackends || {}, backend: reg.execBackend || "local",
     skills: reg.skills, autoSkills: reg.autoSkills !== false,
+    ghostWorktrees: reg.ghostWorktrees === true,
+    semantic: semantic.stats(),
     verifyDelegated: reg.verifyDelegated === true,
+    ecoMode: reg.ecoMode === true,
+    autoApprove: reg.autoApprove === true,
+    autoPilot: reg.autoPilot === true, autoPilotMax: AUTOPILOT_MAX,
     sound: reg.sound !== false, heartbeatMin: Number(reg.heartbeatMin || 0),
     features: featuresMap(), tts: reg.tts !== false,
     socialMin: Number(reg.socialMin !== undefined ? reg.socialMin : 60),
@@ -273,21 +337,51 @@ function triggerRestart() {
 function personaText(a) {
   let p = a.prompt || "";
   const px = a.persona || {};
-  if (px.expertise) p += `\n\nความเชี่ยวชาญ/ขอบเขตงาน:\n${px.expertise}`;
-  if (px.personality) p += `\n\nบุคลิกและน้ำเสียง:\n${px.personality}`;
-  if (px.language) p += `\n\nภาษาหลักที่ใช้ตอบ: ${px.language}`;
-  if (px.rules) p += `\n\nกฎการทำงาน (ต้องเคารพเสมอ):\n${px.rules}`;
+  if (px.expertise) p += `\n\nExpertise / scope of work:\n${px.expertise}`;
+  if (px.personality) p += `\n\nPersonality and tone:\n${px.personality}`;
+  if (px.language) p += `\n\nPrimary language to reply in: ${px.language}`;
+  if (px.rules) p += `\n\nWorking rules (always respect these):\n${px.rules}`;
   // The assigned voice fixes the agent's gender (♀/♂ on the preset) — state it so
   // the agent refers to itself consistently in any language (Thai ครับ/ผม vs ค่ะ/ฉัน,
   // pronouns, honorifics) and never contradicts the voice the CEO actually hears.
   if (a.voice && VOICE_PRESETS[a.voice]) {
+    // The Thai particles stay as an EXAMPLE inside an English instruction: they
+    // are content, not scaffolding, and a Thai-speaking office still needs them.
     p += voiceGender(a.voice) === "m"
-      ? "\n\nเพศของคุณ: ผู้ชาย — อ้างถึงตัวเองและพูดแบบผู้ชายเสมอในทุกภาษาที่ตอบ " +
-        "(ภาษาไทยใช้ ครับ/ผม) ให้ตรงกับเสียงพูดของคุณ ห้ามพูดแบบผู้หญิง"
-      : "\n\nเพศของคุณ: ผู้หญิง — อ้างถึงตัวเองและพูดแบบผู้หญิงเสมอในทุกภาษาที่ตอบ " +
-        "(ภาษาไทยใช้ ค่ะ/ฉัน/ดิฉัน) ให้ตรงกับเสียงพูดของคุณ ห้ามพูดแบบผู้ชาย";
+      ? "\n\nYour gender: male — always refer to yourself and speak as a man, in " +
+        "whatever language you reply in (in Thai use ครับ/ผม), matching the voice the " +
+        "owner actually hears. Never speak as a woman."
+      : "\n\nYour gender: female — always refer to yourself and speak as a woman, in " +
+        "whatever language you reply in (in Thai use ค่ะ/ฉัน/ดิฉัน), matching the voice the " +
+        "owner actually hears. Never speak as a man.";
   }
   return p;
+}
+// The office's language, named in English so the instruction survives whatever
+// language the rest of the turn is in. Agents used to infer the reply language
+// from the scaffolding around them, which is why an English office could get Thai
+// answers (issue #49) — the scaffolding was Thai.
+//
+// A persona's own `language` field still wins: someone who set an agent to answer
+// in German meant it. This is the default for everyone who never set one.
+const LANG_NAMES = {
+  en: "English", th: "Thai", zh: "Chinese", es: "Spanish", hi: "Hindi",
+  ar: "Arabic", pt: "Portuguese", ru: "Russian", ja: "Japanese", de: "German",
+  fr: "French", ko: "Korean", id: "Indonesian", vi: "Vietnamese",
+};
+function officeLangNote(a) {
+  if (a && a.persona && a.persona.language) return "";   // the owner was explicit
+  const code = String((reg && reg.lang) || "en").slice(0, 2).toLowerCase();
+  const name = LANG_NAMES[code];
+  if (!name) return "";
+  return `\nThis office is set to ${name}. Reply in ${name} unless the owner writes ` +
+    `to you in another language, in which case match theirs.\n`;
+}
+// Same rule as officeLangNote, phrased for a spoken call.
+function liveLangLine() {
+  const code = String((reg && reg.lang) || "en").slice(0, 2).toLowerCase();
+  const name = LANG_NAMES[code] || "English";
+  return `Speak ${name} unless the owner speaks another language, in which case match theirs.`;
 }
 function pushRoster() { broadcast(rosterEvt(), false); }
 
@@ -303,7 +397,10 @@ function slugId(name) {
 // them, and the office hears about it (skill.created).
 let _lastSkillLearn = 0;
 const SKILL_COOLDOWN_MS = 15 * 60 * 1000;
-async function maybeLearnSkill(agent, task, prompt, acts, finalText, projId) {
+// `failed` = the task ended badly. That is the single most informative moment
+// a skill ever gets: whatever it told the agent to do did not work. A failed
+// run reflects for REVISION only — it has no success to generalise from.
+async function maybeLearnSkill(agent, task, prompt, acts, finalText, projId, failed) {
   if (reg.autoSkills === false) return;
   // Adaptive: reflection is a full Claude run, so on a MATURE office (already has a
   // healthy auto-learned library) firing it after every task ~doubled the bill — throttle
@@ -312,8 +409,18 @@ async function maybeLearnSkill(agent, task, prompt, acts, finalText, projId) {
   // the whole point of the feature. ("auto" marks a self-learned skill; builtins don't count.)
   const learned = Object.values(reg.skills).filter((s) => s.auto).length;
   const young = learned < 8;
-  if (acts.length < (young ? 3 : 5)) return;
-  if (!young && Date.now() - _lastSkillLearn < SKILL_COOLDOWN_MS) return;
+  // A failure carrying a skill that might have caused it is worth a reflection
+  // every time: they are rare, and it is the one moment the office can learn
+  // that its own written instructions are wrong.
+  const ownSkills = ((reg.agents[agent] || {}).skills || [])
+    .map((id) => ({ id, sk: reg.skills[id] }))
+    .filter((x) => x.sk && x.sk.auto)
+    .slice(0, 6);
+  if (failed && !ownSkills.length) return;
+  if (!failed) {
+    if (acts.length < (young ? 3 : 5)) return;
+    if (!young && Date.now() - _lastSkillLearn < SKILL_COOLDOWN_MS) return;
+  }
   _lastSkillLearn = Date.now();
   const existing = Object.values(reg.skills).map((s) => s.name).join(", ") || "(none)";
   // ONE reflection call distills both: a reusable skill AND durable memory
@@ -332,6 +439,17 @@ async function maybeLearnSkill(agent, task, prompt, acts, finalText, projId) {
     `worth remembering across conversations (Thai)", ...max 2] | null,\n` +
     (projId ? ` "projectMemory": ["short durable fact specific to THIS project ` +
       `worth remembering (Thai)", ...max 2] | null}\n` : ` "projectMemory": null}\n`) +
+    (ownSkills.length
+      ? `\nThis agent's own auto-learned skills, which you MAY revise:\n` +
+        ownSkills.map((x) => `[${x.id}] ${x.sk.name}: ${String(x.sk.content).slice(0, 400)}`).join("\n") +
+        `\n\nAlso output: "refine": {"id":"<one id from the list above>",` +
+        `"content":"the FULL corrected instructions","why":"one line: what was wrong"} | null\n` +
+        (failed
+          ? `This task FAILED. If one of those skills gave advice that led it wrong, ` +
+            `revise that skill. Output null for "skill" — there is no success here to generalise.\n`
+          : `refine = null unless a skill above is actually WRONG or missing a step ` +
+            `this task proved necessary. Rewriting it to say the same thing differently is not an improvement.\n`)
+      : "") +
     `skill = null unless this contains a REUSABLE, GENERALIZABLE procedure ` +
     `not covered by an existing skill. memory/projectMemory = null unless ` +
     `genuinely worth remembering forever. Be strict; most tasks yield nulls.`,
@@ -342,6 +460,41 @@ async function maybeLearnSkill(agent, task, prompt, acts, finalText, projId) {
     const j = JSON.parse(m[0]);
     if (Array.isArray(j.memory)) memAppend(agent, j.memory.slice(0, 2));
     if (projId && Array.isArray(j.projectMemory)) projMemAppend(projId, j.projectMemory.slice(0, 2));
+    // Revise before creating: if this run proved an existing skill wrong, that
+    // matters more than adding another one beside it.
+    const rf = j.refine;
+    if (rf && rf.id && rf.content && ownSkills.some((x) => x.id === rf.id)) {
+      const cur = reg.skills[rf.id];
+      // Only ever a skill the office wrote itself. A builtin is part of the
+      // office's contract and a hand-edited skill is the owner's writing —
+      // neither is the model's to rewrite.
+      if (skillsSync.canRefine(cur) && String(rf.content).trim() !== String(cur.content).trim()) {
+        // 🧪 The regression gate: with test cases on file, the candidate text must
+        // pass every one before it replaces what works. A refusal is visible —
+        // the owner sees why the office declined to "improve" itself.
+        let verdict = { ok: true, skipped: true };
+        try { verdict = await skillTests.gate(rf.id, rf.content); } catch (e) { console.error("[skills] gate:", e && e.message); }
+        if (!verdict.ok) {
+          const failed = verdict.results.filter((x) => !x.pass);
+          broadcast({ type: "skill.refine.blocked", agent, task, skill: cur.name, why: String(rf.why || "").slice(0, 200), failed: failed.length, total: verdict.results.length });
+          try { notify.send({ kind: "system", title: `🧪 Kept "${cur.name}" as it was`, body: `${agent} proposed a correction (${String(rf.why || "").slice(0, 120)}) but ${failed.length}/${verdict.results.length} test case(s) fail with the new text.` }); } catch {}
+          return finishLearn();
+        }
+        cur.prev = cur.content;            // one step back is always available
+        cur.content = String(rf.content).slice(0, 4000);
+        cur.revs = (cur.revs || 0) + 1;
+        cur.refinedBy = agent;
+        cur.refinedWhy = String(rf.why || "").slice(0, 200);
+        saveReg();
+        pushRoster();
+        if (retrievalOk) try { retrieval.reindexSkill(rf.id, cur); retrieval.persist(); } catch {}
+        try { if (reg.nativeSkills !== false) skillsSync.syncAgent(AGENTS_DIR, agent, (reg.agents[agent] || {}).skills || [], reg.skills); } catch {}
+        broadcast({ type: "skill.refined", agent, task, skill: cur.name, why: cur.refinedWhy });
+      }
+    }
+    return finishLearn();
+    // A refused refinement still lets this run's NEW skill (if any) be learned.
+    function finishLearn() {
     const sk = j.skill;
     if (!sk || !sk.name || !sk.content) return;
     const id = slugId(sk.name);
@@ -359,6 +512,7 @@ async function maybeLearnSkill(agent, task, prompt, acts, finalText, projId) {
     if (retrievalOk) try { retrieval.reindexSkill(id, reg.skills[id]); retrieval.persist(); } catch {}
     try { if (reg.nativeSkills !== false) skillsSync.syncAgent(AGENTS_DIR, agent, (reg.agents[agent] || {}).skills || [], reg.skills); } catch {}
     broadcast({ type: "skill.created", agent, task, skill: reg.skills[id].name });
+    }
   } catch {}
 }
 
@@ -390,11 +544,34 @@ function latestSession(agent) {
 // The swappable brain: which backend an agent's `claude` spawn talks to. Returns
 // env overrides (ANTHROPIC_BASE_URL/_AUTH_TOKEN) + --model args; "claude"/unset/
 // unconfigured → empties, so the spawn is unchanged (fail-open). See providers.js.
-function brainRoute(agentId) {
+// `override` (the opt-in failover brain) wins over the agent's own provider/model.
+function brainRoute(agentId, override) {
   const a = agentId && reg.agents ? reg.agents[agentId] : null;
-  const provider = (a && a.provider) || reg.defaultProvider || "claude";
-  const model = (a && a.model) || "";
+  const provider = (override && override.provider) || (a && a.provider) || reg.defaultProvider || "claude";
+  const model = (override && override.model) || (a && a.model) || "";
   return providers.resolve(provider, model, reg, { proxyBase: "http://127.0.0.1:" + OEP_PORT });
+}
+
+// How many sustained api_retry hits (all 5xx) before the OPT-IN failover kicks in.
+// The claude CLI itself retries ~10× over ~2 min; we cut in earlier so a dead brain
+// doesn't burn the whole window before switching. 0 disables the early cut entirely.
+const FAILOVER_AFTER = 3;
+
+// OPT-IN office-wide emergency fallback brain. When the owner has set one
+// (reg.fallbackProvider), an agent whose own brain is SUSTAINEDLY overloaded (repeated
+// 5xx) is re-run on this brain instead of dying on the retry loop. Unset → null → the
+// office behaves exactly as before (fail-open; the same brain just retries hard). Never
+// falls back onto the same provider, and only onto one that's actually configured
+// (Claude via login/plan, or a hosted key / local endpoint), so it can't route a task
+// into a second dead brain.
+function officeFallback(curProvider) {
+  const p = reg.fallbackProvider;
+  if (!p || p === curProvider) return null;
+  if (p !== "claude") {
+    const pc = (reg.providerConfig || {})[p];
+    if (!pc || (!pc.token && !pc.baseUrl)) return null;   // not connected / no credential
+  }
+  return { provider: p, model: reg.fallbackModel || "" };
 }
 
 // A failure that means "the request was too big for this backend" — either a real
@@ -445,11 +622,27 @@ function provBudget(agent) {
   if (w > 0) return Math.round(w * 0.8);
   return (p in CTX_BUDGET ? CTX_BUDGET[p] : 100000);
 }
-// Estimate a resumed thread's size from the REAL claude session file (full tool
-// outputs live there, not in our trimmed log). bytes/4 ≈ tokens; + office overhead.
+// Is this thread too big to keep resuming?
+//
+// This used to guess, from the byte size of the claude transcript at bytes/4.
+// That estimate can drift arbitrarily far from the truth — a tool-heavy thread
+// (file dumps, JSON tool-call/tool-result envelopes, repeated keys) does not
+// tokenize at ~4 chars/token the way prose does — and it is statted by `sid`, so
+// a session id that moves leaves it measuring an old, small file forever. Either
+// way the safety net silently stops existing: an office in the field ran a
+// thread to 9,557,283 input tokens against a 200,000 budget without one
+// compaction (issue #46).
+//
+// We do not have to estimate. The API reports the real input-token count after
+// every turn and we already stamp it on the thread as `lastUsage.in` — it is the
+// exact number the context meter displays. Use it, and keep the file-size guess
+// only for a thread that has not completed a turn yet.
 function overBudget(agent, entry, cwd) {
   const budget = provBudget(agent);
-  if (!budget || !entry || !entry.sid) return false;  // 0 = claude self-compacts
+  if (!budget || !entry) return false;  // 0 = claude self-compacts
+  const real = Number(entry.lastUsage && entry.lastUsage.in) || 0;
+  if (real > 0) return real > budget;
+  if (!entry.sid) return false;
   try {
     const enc = String(cwd).replace(/[^a-zA-Z0-9]/g, "-");
     const f = path.join(require("os").homedir(), ".claude", "projects", enc, entry.sid + ".jsonl");
@@ -561,6 +754,120 @@ function captureModelCtx(provider, data) {
     saveReg();
   } catch {}
 }
+
+// ------------------------------------------------------------ LIVE model lists
+// Every provider's picker should show what the vendor serves TODAY, not what was
+// hardcoded on release day. Everyone but Anthropic exposes an OpenAI-style
+// /models that takes their own key. Anthropic's needs the machine's Claude auth:
+//   1) ANTHROPIC_API_KEY (registry or env) — the documented way, and
+//   2) the Claude Code CLI's own local token, since most offices run on a
+//      subscription login and have no API key at all. It is the same credential
+//      `claude` already uses on this machine, read-only, and it is sent nowhere
+//      but api.anthropic.com.
+// Failure NEVER breaks anything — the curated fallback list in providers.js stays.
+function claudeCliToken() {
+  const pick = (raw) => {
+    try {
+      const j = JSON.parse(raw);
+      const o = j.claudeAiOauth || j;
+      if (!o || !o.accessToken) return null;
+      // Expired: let the CLI refresh it on its next run rather than using a dead one.
+      if (o.expiresAt && Number(o.expiresAt) < Date.now()) return null;
+      return String(o.accessToken);
+    } catch { return null; }
+  };
+  try {
+    const f = path.join(require("os").homedir(), ".claude", ".credentials.json");
+    if (fs.existsSync(f)) { const t = pick(fs.readFileSync(f, "utf8")); if (t) return t; }
+  } catch {}
+  if (process.platform === "darwin") {
+    // macOS stores them in the Keychain instead of a file.
+    try {
+      const out = require("child_process").execFileSync("security",
+        ["find-generic-password", "-s", "Claude Code-credentials", "-w"],
+        { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "ignore"] });
+      const t = pick(out); if (t) return t;
+    } catch {}
+  }
+  return null;
+}
+function claudeAuthHeaders() {
+  const key = (reg.apiKeys || {}).ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+  if (key) return { "x-api-key": key, "anthropic-version": "2023-06-01" };
+  const tok = claudeCliToken();
+  if (tok) return { authorization: "Bearer " + tok, "anthropic-version": "2023-06-01",
+                    "anthropic-beta": "oauth-2025-04-20" };
+  return null;
+}
+async function fetchClaudeModels(signal) {
+  const h = claudeAuthHeaders();
+  if (!h) return { ok: false, msg: "ยังไม่มี Claude API key / login ให้ดึงรายชื่อโมเดล" };
+  const url = (providers.PROVIDERS.claude || {}).modelsUrl || "https://api.anthropic.com/v1/models?limit=100";
+  const r = await fetch(url, { headers: h, signal });
+  if (!r.ok) return { ok: false, msg: "Anthropic ตอบ HTTP " + r.status };
+  const j = await r.json();
+  // The API returns newest-first, which is exactly the picker order we want.
+  const models = proxy.cleanModels((j.data || []).map((m) => m.id));
+  return models.length ? { ok: true, models } : { ok: false, msg: "รายชื่อว่าง" };
+}
+// Pull ONE provider's live list and cache it on reg.providerConfig[id].models.
+// Used by the ↻ buttons and by the boot + 12h sweep, so a model that shipped
+// today shows up without waiting for an office release.
+async function refreshProviderModels(id) {
+  const spec = providers.PROVIDERS[id];
+  reg.providerConfig = reg.providerConfig || {};
+  const pc = reg.providerConfig[id] || {};
+  const kind = spec ? spec.format : pc.kind;
+  const signal = AbortSignal.timeout ? AbortSignal.timeout(12000) : undefined;
+  const store = (models) => {
+    reg.providerConfig[id] = reg.providerConfig[id] || {};
+    reg.providerConfig[id].models = models;
+    reg.providerConfig[id].modelsAt = Date.now();
+    try { saveReg(); } catch {}
+    broadcast({ type: "models.refreshed", provider: id, models, at: Date.now() }, false);
+    return { ok: true, n: models.length, models };
+  };
+  const fail = (msg) => ({ ok: false, n: 0, msg });
+  try {
+    if (id === "claude") {
+      const r = await fetchClaudeModels(signal);
+      return r.ok ? store(r.models) : fail(r.msg);
+    }
+    if (!kind) return fail("ไม่รู้จัก provider นี้");
+    let murl, headers;
+    if (kind === "openai") {
+      const up = proxy.upstreamFor(id, reg);
+      murl = up && up.models;
+      if (!murl) return fail("ไม่พบ endpoint");
+      if (!up.key && !(spec && spec.local)) return fail("ยังไม่ได้วาง key");
+      headers = up.key ? { authorization: "Bearer " + up.key } : {};
+    } else {
+      murl = pc.modelsUrl || (spec && spec.modelsUrl);
+      if (!murl) return fail("provider นี้ไม่มี /models ให้ดึง");
+      if (!pc.token) return fail("ยังไม่ได้วาง key");
+      headers = { authorization: "Bearer " + pc.token };
+    }
+    const r = await fetch(murl, { headers, signal });
+    if (!r.ok) return fail("HTTP " + r.status);
+    const j = await r.json();
+    captureModelCtx(id, j.data);
+    const models = proxy.cleanModels((j.data || []).map((m) => m.id)).slice(0, 300);
+    return models.length ? store(models) : fail("รายชื่อว่าง");
+  } catch (e) { return fail(String((e && e.message) || e)); }
+}
+// Claude + every connected provider. Serial on purpose: a handful of GETs, no rush.
+async function refreshAllModels(reason) {
+  const out = {};
+  const ids = ["claude"].concat(Object.keys(reg.providerConfig || {}).filter(
+    (id) => id !== "claude" && reg.providerConfig[id] && reg.providerConfig[id].connected));
+  for (const id of ids) out[id] = await refreshProviderModels(id);
+  const ok = Object.values(out).filter((r) => r && r.ok).length;
+  console.log(`[models] refreshed ${ok}/${ids.length} provider(s)${reason ? " (" + reason + ")" : ""}`);
+  return out;
+}
+setTimeout(() => { refreshAllModels("boot").catch(() => {}); }, 20000);
+setInterval(() => { refreshAllModels("12h").catch(() => {}); }, 12 * 3600000);
+
 function ctxWindow(agent) {
   const a = reg.agents && reg.agents[agent];
   const p = (a && a.provider) || reg.defaultProvider || "claude";
@@ -597,13 +904,27 @@ function claudeText(prompt, opts = {}) {
       env: { ...process.env, ...(reg.apiKeys || {}), ...route.env, OFFICE_ADAPTER: "1",
         ...(opts.env || {}) },
     });
+    // opts.track {agent, title}: surface this headless run (a meeting turn, a
+    // break-room chat) as a REAL task row so the owner sees WHO is working, not a
+    // silent background process. Best-effort — the terminal event always fires.
+    let tid = null;
+    if (opts.track && opts.track.agent) {
+      tid = "t" + ++taskCounter;
+      broadcast({ type: "task.started", agent: opts.track.agent, task: tid,
+        title: String(opts.track.title || "งาน").replace(/\s+/g, " ").slice(0, 90) });
+    }
+    const endTask = (ok) => {
+      if (!tid) return;
+      broadcast({ type: ok ? "task.completed" : "task.failed", agent: opts.track.agent, task: tid });
+      tid = null;
+    };
     child.stdin.write(prompt);
     child.stdin.end();
     let out = "";
     child.stdout.setEncoding("utf8");   // multibyte-safe across chunk boundaries (Thai etc.)
     child.stdout.on("data", (c) => (out += c));
-    child.on("close", () => resolve(out.trim()));
-    child.on("error", () => resolve(""));
+    child.on("close", () => { endTask(true); resolve(out.trim()); });
+    child.on("error", () => { endTask(false); resolve(""); });
   });
 }
 
@@ -646,6 +967,7 @@ function journalTail(n) {
 
 // ---------------------------------------------------------------- bus
 
+let onBroadcastHook = null;   // set once triggers exist (event triggers listen here)
 function broadcast(evt, journal = true) {
   evt.ts = Date.now();
   const json = JSON.stringify(evt);
@@ -653,6 +975,7 @@ function broadcast(evt, journal = true) {
   const frame = wsFrame(json);
   for (const s of wsClients) s.write(frame);
   if (evt.type !== "world.pos") console.log("[oep] →", json);
+  if (onBroadcastHook) { try { onBroadcastHook(evt); } catch (e) { console.error("[trigger] event hook", e && e.message); } }
 }
 
 // ---------------------------------------------------------------- office ops
@@ -769,6 +1092,19 @@ try {
   } catch {}
 })();
 
+// Is a process with this image name running? Sync (~100ms) — used only on the
+// rare editor-open fallback path, to grace OLD shells whose alive-flag was
+// written once at boot and never refreshed.
+function procAlive(name) {
+  try {
+    const { execFileSync } = require("child_process");
+    if (process.platform === "win32")
+      return execFileSync("tasklist", ["/FI", `IMAGENAME eq ${name}.exe`, "/NH"],
+        { encoding: "utf8", timeout: 4000 }).toLowerCase().includes(name.toLowerCase());
+    return execFileSync("pgrep", ["-f", name], { encoding: "utf8", timeout: 4000 }).trim().length > 0;
+  } catch { return false; }
+}
+
 function memFile(agent) {
   return path.join(MEM_DIR, String(agent).replace(/[^\w-]/g, "_") + ".md");
 }
@@ -814,6 +1150,39 @@ try {
   retrievalOk = true;
   console.log("[retrieval]", JSON.stringify(retrieval.stats()));
 } catch (e) { console.error("[retrieval] init:", e.message); }
+
+// The semantic tier rides alongside the word index: same documents, a vector
+// each. Everything about it is best-effort — if the endpoint is missing or
+// down, retrieval keeps working exactly as it did before it existed.
+const SEMANTIC_CACHE = path.join(WORKSPACE, "index", "semantic.json");
+function semanticConfigure() {
+  const spec = reg.semantic || {};
+  // The key is named, not stored twice: it comes from 🔗 CONNECT like every
+  // other credential, so it is never duplicated into the retrieval settings.
+  const key = spec.keyName ? (reg.apiKeys || {})[spec.keyName] || "" : "";
+  const ok = semantic.configure({ ...spec, key }, SEMANTIC_CACHE);
+  if (ok) semantic.load();
+  return ok;
+}
+// Re-embed whatever changed. Debounced, because a burst of note edits should
+// cost one pass, not one per line.
+let semanticTimer = null;
+function semanticSync(delay = 4000) {
+  if (!retrievalOk || !semantic.ready()) return;
+  clearTimeout(semanticTimer);
+  semanticTimer = setTimeout(() => {
+    semantic.indexDocs(retrieval.allDocs())
+      .then((n) => { if (n) console.log("[semantic] embedded " + n + " document(s)"); })
+      .catch((e) => console.error("[semantic]", e.message));
+  }, delay);
+  if (semanticTimer.unref) semanticTimer.unref();
+}
+try {
+  if (semanticConfigure()) {
+    console.log("[semantic]", JSON.stringify(semantic.stats()));
+    semanticSync(8000);   // after boot settles, not during it
+  }
+} catch (e) { console.error("[semantic] init:", e.message); }
 // Self-heal when the owner edits OFFICE.md outside the daemon.
 try {
   fs.watchFile(OFFICE_MD, { interval: 5000 }, () => {
@@ -866,7 +1235,9 @@ function cleanForQuery(text) {
 // the agent's own memory, this project's memory, and owner facts) instead of
 // dumping the last 8 bullets. Pointers stay so full recall is one Read/​/recall
 // away. Fail-open: no index / flag off / no match → exactly the old last-8 dump.
-function memoryNote(agent, taskText, projId) {
+// qvec: an already-embedded query, when the caller was somewhere it could
+// await one. Absent, this is plain BM25 — which is what it always was.
+function memoryNote(agent, taskText, projId, qvec) {
   const memRef = path.basename(memFile(agent), ".md");
   const header = `\n<office-memory>\n` +
     `ข้อมูลกลางออฟฟิศ: workspace/OFFICE.md (เปิดอ่านเฉพาะเมื่อเกี่ยวกับงาน)\n` +
@@ -881,7 +1252,8 @@ function memoryNote(agent, taskText, projId) {
       const tiers = projId ? ["mem", "proj", "user"] : ["mem", "user"];
       const refs = { mem: memRef, user: true };
       if (projId) refs.proj = projId;
-      const hits = retrieval.search(q, { tiers, refs, k: 6, boost: { proj: 1.3, mem: 1.2, user: 1.0 } });
+      const hits = retrieval.search(q, { tiers, refs, k: 6, qvec,
+        boost: { proj: 1.3, mem: 1.2, user: 1.0 } });
       const lines = []; let used = 0;
       for (const h of hits) {
         const t = h.text.replace(/\s+/g, " ").trim();
@@ -922,6 +1294,9 @@ const COST_RATES = {
   gemini_transcribe_each: 0.002,     // Gemini STT fallback, per clip (~30s)
   openai_whisper_each:    0.003,     // OpenAI Whisper, per clip (~30s @ $0.006/min)
   openai_image_each:      0.04,      // OpenAI image, per image
+  gemini_video_each:      2.00,      // Veo, per clip — an order of magnitude
+                                     // above everything else here, which is why
+                                     // the Studio says the price before you press
 };
 // Add an ESTIMATED secondary-tool spend under stats[day].aux[provider].
 function auxCost(provider, usd) {
@@ -940,10 +1315,16 @@ function auxCost(provider, usd) {
 const BRAIN_PRICES = {
   glm: [0.6, 2.2], deepseek: [0.28, 1.1], qwen: [0.4, 1.2], minimax: [0.3, 1.2],
   openai: [2.5, 10], gemini: [0.15, 0.6], openrouter: [1, 3], nvidia: [0, 0],
+  codex: [1.25, 10],   // 🧑‍💻 Codex runs on the owner's OpenAI plan or key — an estimate, labelled as one
 };
 // Accumulate a swapped-in brain's token spend under stats[day].brains[provider].
-function brainBump(provider, inTok, outTok) {
+function brainBump(provider, inTok, outTok, agent, projId) {
   if (!provider || provider === "claude") return;
+  {
+    const pr0 = BRAIN_PRICES[provider] || [0, 0];
+    const est = (inTok || 0) / 1e6 * pr0[0] + (outTok || 0) / 1e6 * pr0[1];
+    if (est > 0 && typeof budget !== "undefined") budget.attribute(agent, projId, est);
+  }
   const day = new Date().toISOString().slice(0, 10);
   const d = (stats[day] = stats[day] || { runs: 0, done: 0, failed: 0, cost: 0, agents: {} });
   d.brains = d.brains || {};
@@ -957,8 +1338,42 @@ function brainBump(provider, inTok, outTok) {
 }
 
 let jobs = loadJson(JOBS, []);    // {id, agent, prompt, mode, at, time, daily, everyMin, enabled, lastRun, lastDay, done, sessionKey, running}
+// Job ids used to be "j" + Date.now(), which is only unique if nothing ever
+// creates two jobs in the same millisecond. A plugin queueing a meeting's action
+// items did exactly that and got DUPLICATE ids — and since /jobs/update finds a
+// job with jobs.find(), each "create it, then disable it" disabled the first
+// twin and left the second enabled. Two of those fired work that was explicitly
+// meant to sit and wait for a human (issue #50).
+//
+// The counter starts above the largest id already on disk, so an id that
+// jobs.json still holds can never be handed out again after a restart.
+let jobSeqMs = 0, jobSeq = 0;
+function nextJobId() {
+  const now = Date.now();
+  if (now !== jobSeqMs) { jobSeqMs = now; jobSeq = 0; }  // fresh ms, fresh run
+  // Keep the millisecond in the id (readable, and it still sorts), but never
+  // hand back one that already exists — from this run or a previous one.
+  let id;
+  do { id = "j" + now + (jobSeq ? "-" + jobSeq : ""); jobSeq++; }
+  while (jobs.some((j) => j && j.id === id));
+  return id;
+}
 let notes = loadJson(NOTES, []);  // {id, who, text, ts}
-let cal = loadJson(CAL, []);      // {id, title, at, remindMin, notified}
+// 📅 The calendar is a module now (v1.4): recurrence, all-day events, ICS in/out,
+// reminders per occurrence. calendar.json on disk is the same file it always was.
+const calendar = require("./calendar")({
+  file: CAL, broadcast, log: (m) => console.log(m),
+  remind: (ev, occ) => {
+    broadcast({ type: "reminder", agent: "main", text: ev.title, at: occ.at });
+    try { notify.send({ kind: "reminder", title: "📅 " + ev.title, body: new Date(occ.at).toLocaleString() + (occ.minutes ? ` · in ${occ.minutes} min` : ""), link: "calendar:" + ev.id, agent: ev.agent || undefined }); } catch {}
+    runClaude("main",
+      `Remind the CEO right now about this appointment: "${ev.title}" at ` +
+      `${new Date(occ.at).toLocaleString()} (in about ${Math.max(1, occ.minutes)} minutes)` +
+      (ev.notes ? `. Notes: ${String(ev.notes).slice(0, 300)}` : "") +
+      `. Write a short, friendly reminder of 1–2 sentences, in the office language.` + officeLangNote(),
+      { noSub: true, logPrompt: `🔔 เตือนนัด: ${ev.title}` });
+  },
+});
 // Clean up one-shot jobs that already fired (no `running` survives a restart) —
 // run-now or one-time scheduled orders have nothing left to do, so they should
 // not linger as dead, uneditable rows.
@@ -971,7 +1386,6 @@ let cal = loadJson(CAL, []);      // {id, title, at, remindMin, notified}
   if (jobs.length !== _n) fs.writeFileSync(JOBS, JSON.stringify(jobs, null, 2));
 }
 const saveJobs = () => fs.writeFileSync(JOBS, JSON.stringify(jobs, null, 2));
-const saveCal = () => fs.writeFileSync(CAL, JSON.stringify(cal, null, 2));
 
 // The note board lives twice: notes.json for the UI, notes.md inside the
 // agents' workspace so they can READ it and APPEND bullets themselves.
@@ -1114,21 +1528,130 @@ function projectDir(id) {
   return p ? p.dir : null;
 }
 
+// ~/.claude.json is where the Claude Code CLI keeps its first-run state. We read
+// it in two places (onboarding + per-project trust); a never-logged-in user has
+// no such file at all, so tolerate a missing/corrupt file by starting fresh
+// instead of throwing (the old JSON.parse-inside-try silently no-op'd, leaving
+// the very stalls these helpers exist to prevent).
+function claudeJsonPath() { return path.join(require("os").homedir(), ".claude.json"); }
+function readClaudeJson() {
+  try { return JSON.parse(fs.readFileSync(claudeJsonPath(), "utf8")) || {}; }
+  catch { return {}; }
+}
+
+// The CLI is our agent runtime for EVERY brain — GLM/DeepSeek/Qwen included; only
+// the model behind it changes (providers.js). But it stalls on its interactive
+// first-run wizard until ~/.claude.json marks onboarding done. A user who never
+// logged into Claude has no such file, so every headless `claude -p` spawn — even
+// one routed to GLM via ANTHROPIC_AUTH_TOKEN — hangs on a prompt it can't show,
+// dying BEFORE it ever reaches the third-party model. Seeding this one flag lets a
+// pure third-party-brain user (zero Anthropic account) run agents. It's exactly the
+// flag the wizard sets on completion; we never downgrade an existing value.
+function ensureOnboarded() {
+  try {
+    const j = readClaudeJson();
+    if (j.hasCompletedOnboarding === true) return;
+    j.hasCompletedOnboarding = true;
+    fs.writeFileSync(claudeJsonPath(), JSON.stringify(j, null, 2));
+    console.log("[claude] seeded hasCompletedOnboarding — skip first-run wizard");
+  } catch (e) { console.error("[claude] onboarding seed failed:", e && e.message); }
+}
+
 // Headless claude in an untrusted folder stalls on the trust dialog it can
 // never show. Pre-trust project dirs in ~/.claude.json (same flag the
-// interactive "Yes, I trust this folder" sets).
-function ensureTrusted(dir) {
+// interactive "Yes, I trust this folder" sets). Creates the file if absent.
+//
+// Issue #39 — but NOT unconditionally: a folder that ships its own command hooks
+// would execute them at session start, outside the Security Center. Those need the
+// owner's word first, once per exact setup (see projecttrust.js). Returns TRUE when
+// the folder is trusted and a session may open in it, FALSE while it waits on the
+// owner. A folder with no hooks is trusted silently, exactly as before.
+const trustKey = (dir) =>
+  String(dir).replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+const pendingTrust = new Map();   // trustKey → { id, dir, hash, hooks, scripts, queue[] }
+
+function ensureTrusted(dir, ctx) {
+  const fp = projtrust.fingerprint(dir);
+  if (fp.hash && (reg.projectTrust || {})[trustKey(dir)] !== fp.hash) {
+    askTrust(dir, fp, ctx);
+    return false;
+  }
   try {
-    const file = path.join(require("os").homedir(), ".claude.json");
-    const j = JSON.parse(fs.readFileSync(file, "utf8"));
+    const file = claudeJsonPath();
+    const j = readClaudeJson();
     j.projects = j.projects || {};
     const key = String(dir).replace(/\\/g, "/").replace(/\/+$/, "");
     const cur = j.projects[key] || {};
-    if (cur.hasTrustDialogAccepted === true) return;
+    if (cur.hasTrustDialogAccepted === true) return true;
     j.projects[key] = { ...cur, hasTrustDialogAccepted: true };
     fs.writeFileSync(file, JSON.stringify(j, null, 2));
     console.log("[proj] pre-trusted", key);
   } catch (e) { console.error("[proj] trust", e.message); }
+  return true;
+}
+
+// Put the exact commands in front of the owner and hold the work. One card per
+// folder+fingerprint — a second run into the same project joins the same card
+// instead of stacking another. The card stays until it's answered (unlike a tool
+// prompt, nothing is mid-flight waiting on a 50s timer).
+function askTrust(dir, fp, ctx) {
+  const key = trustKey(dir);
+  const pend = pendingTrust.get(key);
+  if (pend && pend.hash === fp.hash) return pend;
+  // Name it the way the owner knows it. At REGISTRATION time the project isn't in
+  // the list yet, so the caller's name is the only one there is.
+  const proj = projects.find((p) => trustKey(p.dir) === key) ||
+    (ctx && ctx.project && projects.find((p) => p.id === ctx.project)) || null;
+  const known = !!(reg.projectTrust || {})[key];   // approved before → this is a CHANGE
+  const rec = { id: "tr" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    dir, hash: fp.hash, hooks: fp.hooks, scripts: fp.scripts,
+    project: (proj && proj.name) || (ctx && ctx.name) || path.basename(dir), changed: known,
+    // The folder changed while a card was already up: the old card is void, but
+    // the work parked on it must move to the new one, not be stranded.
+    queue: pend ? pend.queue : [] };
+  if (pend) broadcast({ type: "trust.withdrawn", trust: pend.id, project: pend.project });
+  pendingTrust.set(key, rec);
+  broadcast({ type: "trust.requested", trust: rec.id, dir, project: rec.project,
+    changed: known, agent: (ctx && ctx.agent) || undefined,
+    hooks: fp.hooks, scripts: fp.scripts.map((s) => ({ rel: s.rel, outside: s.outside })) });
+  approvals.ask({ kind: "project-trust", ref: rec.id, agent: (ctx && ctx.agent) || "",
+    title: (known ? `Project “${rec.project}” changed its own hooks` : `Project “${rec.project}” ships its own hooks`),
+    detail: "Commands that would run the moment a session opens there:" + N_LITERAL +
+      fp.hooks.map((h) => "  " + h).join(N_LITERAL) + N_LITERAL + "Work in that project is parked until you answer.",
+    meta: { dir, project: rec.project } });
+  console.log("[proj] trust HELD", key, fp.hooks.length, "hook(s)");
+  return rec;
+}
+
+// Owner's answer. allow → remember THIS fingerprint (a later edit re-asks) and
+// release everything that was waiting on the folder; deny → drop the waiting work
+// and say so, rather than leaving it queued forever.
+function resolveTrust(id, allow) {
+  let key = null;
+  for (const [k, v] of pendingTrust) if (v.id === id) { key = k; break; }
+  if (key === null) return false;
+  const rec = pendingTrust.get(key);
+  pendingTrust.delete(key);
+  { const ap = approvals.byRef("project-trust", id); if (ap) approvals.respond(ap.id, allow ? "allow" : "deny", { by: "ui" }); }
+  if (allow) {
+    reg.projectTrust = reg.projectTrust || {};
+    reg.projectTrust[key] = rec.hash;
+    saveReg();
+    ensureTrusted(rec.dir);
+    broadcast({ type: "trust.approved", trust: id, project: rec.project, dir: rec.dir });
+    for (const fn of rec.queue) { try { fn(); } catch (e) { console.error("[proj] trust resume", e.message); } }
+  } else {
+    broadcast({ type: "trust.denied", trust: id, project: rec.project, dir: rec.dir });
+    for (const fn of rec.queue) { try { fn(null); } catch {} }
+  }
+  return true;
+}
+
+// Park a run until the folder is trusted. `fn(ok)` is called with no argument on
+// approval (re-run it) and with null on denial (tell whoever was waiting).
+function waitForTrust(dir, fn) {
+  const rec = pendingTrust.get(trustKey(dir));
+  if (rec) rec.queue.push(fn);
 }
 
 // Mentioning a registered project by name in chat binds the thread to it:
@@ -1191,7 +1714,11 @@ function createProject(name, place, pathArg) {
     throw new Error("path นี้คือโฟลเดอร์ของ place — โปรเจคต้องเป็นโฟลเดอร์ย่อยข้างใน");
   const existed = fs.existsSync(dir);
   fs.mkdirSync(dir, { recursive: true });
-  ensureTrusted(dir);
+  // Registering an EXISTING folder is the moment consent is really being asked for
+  // (a folder we just created can't ship hooks). If it carries any, the card goes up
+  // now, while the owner is looking at the screen — registration itself still
+  // succeeds; it's the first session inside it that waits.
+  ensureTrusted(dir, { name });
   // Only folders WE created may ever be disk-deleted from the UI.
   const proj = { id: "p" + Date.now(), name, dir, ts: Date.now(), created: !existed };
   projects.push(proj);
@@ -1249,39 +1776,45 @@ function sweepProjects() {
 // Every agent knows the project map — say a project's name in chat and
 // they work its real directory, full authority, summary on finish.
 function projectNote() {
+  const codexNote = typeof codex !== "undefined" ? codex.agentNote() : "";
   if (!projects.length && !Object.keys(reg.places).length &&
-      !Object.keys(reg.apiKeys || {}).length && !featuresMap().image) return "";
+      !Object.keys(reg.apiKeys || {}).length && !featuresMap().image && !codexNote) return "";
   const keysLine = Object.keys(reg.apiKeys || {}).length
-    ? `\nAPI keys ที่ตั้งค่าไว้ใน env ของคุณแล้ว (เรียกใช้ได้ทันที): ${Object.keys(reg.apiKeys).join(", ")}`
+    ? `\nAPI keys already set in your environment (usable right away): ${Object.keys(reg.apiKeys).join(", ")}`
     : "";
-  const sysTools = featuresMap().image ? `
-เครื่องมือกลางของออฟฟิศ (เรียกผ่าน Bash ได้เลย):
-- 🖼 สร้างภาพ AI: curl -s -X POST http://127.0.0.1:8787/gen/image -H "content-type: application/json" -d "{\\"prompt\\":\\"<english prompt>\\"}"
-  → ได้ {"path": "..."} — ใส่ path นั้นในคำตอบ แชทของเจ้าของจะแสดงรูปอัตโนมัติ` : "";
+  const sysTools = (featuresMap().image || codexNote) ? `
+Office-wide tools (call them from Bash):` + (featuresMap().image ? `
+- 🖼 Generate an image: curl -s -X POST http://127.0.0.1:8787/gen/image -H "content-type: application/json" -d "{\\"prompt\\":\\"<english prompt>\\"}"
+  → returns {"path": "..."} — put that path in your reply and the owner's chat shows the picture.
+- ✏️ Edit an existing image: curl -s -X POST http://127.0.0.1:8787/gen/image/edit -H "content-type: application/json" -d "{\\"url\\":\\"/uploads/<file>.png\\",\\"prompt\\":\\"<english instruction>\\"}"
+  → a new file; the original is kept, so you can iterate.
+  (🎬 video lives in the Media Studio — the owner runs it there; it is billed per clip)` : "") + codexNote : "";
   // Cap to the 12 most-recent projects so the note stays bounded as they pile up
   // (the full list is always one GET /registry away).
   const recent = projects.slice(-12);
-  const more = projects.length > recent.length ? `\n(…อีก ${projects.length - recent.length} โปรเจค — ดูทั้งหมดที่ GET /registry)` : "";
-  const list = (recent.map((p) => `- ${p.name} → ${p.dir}`).join("\n") || "(ยังไม่มี)") + more;
+  const more = projects.length > recent.length ? `\n(…${projects.length - recent.length} more — see them all at GET /registry)` : "";
+  const list = (recent.map((p) => `- ${p.name} → ${p.dir}`).join("\n") || "(none)") + more;
   const places = Object.entries(reg.places)
-    .map(([n, f]) => `- "${n}" → ${f}`).join("\n") || "(ไม่มี)";
+    .map(([n, f]) => `- "${n}" → ${f}`).join("\n") || "(none)";
   return `
 
 <office-projects>
-โปรเจคที่ลงทะเบียนในออฟฟิศ:
+Projects registered in the office:
 ${list}
-สถานที่เก็บโปรเจค (ชื่อย่อ):
+Places where projects live (short names):
 ${places}
-เมื่อผู้ใช้อ้างถึงโปรเจคเหล่านี้ ให้ทำงานกับไฟล์ใน path ของมันโดยตรงทันที —
-คุณมีอำนาจตัดสินใจเต็มที่ในงานที่ได้รับมอบ ทำเสร็จแล้วต้องสรุปผลให้ผู้สั่งงานชัดเจน.
-สำคัญ: เช็ครายการข้างบนก่อนเสมอ — โปรเจคที่มีอยู่แล้ว "ห้ามลงทะเบียนซ้ำ" และห้ามใช้
-โฟลเดอร์ของ place เป็น path โปรเจคโดยตรง (ระบบจะปฏิเสธ).
-ห้ามเด็ดขาด: ลบ/ถอดโปรเจคออกจากรายการ (API remove/removeDisk) เว้นแต่ผู้ใช้สั่งเองชัดๆ.
-การทดสอบใดๆ (เช่น เว็บ) ให้ใช้วิธีเบื้องหลังก่อนเสมอ (curl / headless / สคริปต์)
-อย่าเปิดหน้าต่างรบกวนผู้ใช้; ถ้าจำเป็นต้องเปิดจริงๆ จนไม่มีทางอื่น ให้รันคำสั่งเปิดตรงๆ
-แล้วระบบ Security จะขอ allow จากผู้ใช้ให้เอง.
-กฎเหล็ก: server/process ทุกตัวที่คุณเปิดเพื่อทดสอบ (dev server, next start, ฯลฯ)
-ต้องปิดให้หมดก่อนจบงาน — ห้ามทิ้งโปรเซสค้างไว้ในเครื่องผู้ใช้เด็ดขาด.${keysLine}${sysTools}${
+When the owner refers to one of these projects, work directly on the files at its path, right away —
+you have full authority over the work you were given; when done, summarize the result clearly for
+whoever ordered it.
+Important: always check the list above first — an existing project must NOT be registered again, and a
+place's folder must not be used directly as a project path (the office refuses it).
+Absolutely never: remove or unregister a project (the API's remove/removeDisk) unless the owner
+explicitly asks.
+Any testing (a website, say) goes through a background method first (curl / headless / a script);
+do not open windows that disturb the owner. If opening one is truly unavoidable, run the command
+plainly and the Security Center will ask the owner to allow it.
+Iron rule: every server or process you start for testing (dev server, next start, …) must be shut
+down before you finish — never leave a process running on the owner's machine.${keysLine}${sysTools}${
   (typeof plugins !== "undefined" && plugins.agentNote()) || ""}
 </office-projects>`;
 }
@@ -1300,7 +1833,11 @@ setInterval(sweepProjects, 5000);
 const agentBusy = new Set();
 const jobQueue = [];
 function dispatchJob(job) {
-  if (agentBusy.has(job.agent) || agentBusy.size >= 2) {
+  // Office-wide concurrency for SCHEDULED jobs so the machine breathes. One agent's
+  // limit shouldn't wedge the whole queue behind a cap of two — bump the default and
+  // let it be tuned (reg.maxJobs); eco mode keeps it to a single lane.
+  const jobCap = reg.ecoMode ? 1 : Math.max(1, reg.maxJobs || 3);
+  if (agentBusy.has(job.agent) || agentBusy.size >= jobCap) {
     if (!jobQueue.includes(job)) jobQueue.push(job);
     return;
   }
@@ -1310,24 +1847,142 @@ function dispatchJob(job) {
   saveJobs();
   broadcast({ type: "job.started", agent: job.agent, title: job.prompt.slice(0, 60), job: job.id });
   broadcast({ type: "jobs.changed" }, false);
+  // 📋 The board shows a fired job as a card in "doing" (one card per job; a
+  // repeating job's card comes back to doing on every run).
+  let jobCard = null;
+  try {
+    jobCard = tasks.bySource("job", job.id);
+    if (jobCard) tasks.move(jobCard.id, "doing");
+    else jobCard = tasks.create({ title: "🔁 " + job.prompt.slice(0, 120), detail: job.prompt, kind: "job", owner: job.agent, status: "doing", source: { kind: "job", ref: job.id } });
+  } catch (e) { console.error("[tasks] job card", e && e.message); }
   // A repeating order (every-N, or a daily time) stays; a one-shot (run-now or a
   // one-time scheduled time) has nothing left to do once it finishes — so it's
   // removed instead of lingering as a dead, uneditable row.
   const oneShot = job.mode === "now" || (job.mode === "at" && !job.daily);
-  runClaude(job.agent, job.prompt, {
+  // A fired job is an ORDER, run exactly like one the owner just typed: the
+  // Director gets the DELEGATE protocol AND a parser on the way out (without it
+  // his DELEGATE lines were printed as prose and nothing was ever dispatched —
+  // the office answered the schedule and went quiet), and 🤖 AUTO rides the turn
+  // so work that isn't finished opens its own next turn. See daemon/joborder.js.
+  const director = joborder.isDirectorJob(job.agent);
+  const keyRef = { key: job.sessionKey || "" }, dele = { hit: false };
+  const text = joborder.jobPrompt(job.prompt, {
+    director, directorNote: director ? directorNote() : "", autoNote: autoNote() });
+  runClaude(job.agent, text, {
     session: job.sessionKey || "new",
     logPrompt: "📋 [งานที่สั่งไว้] " + job.prompt,
-    onEntry: (key) => { job.sessionKey = key; saveJobs(); },
-    onDone: () => {
+    // Built at filter time, not now: a first firing has no thread yet, and the
+    // report-back must resume the thread this job actually ran on (onEntry has
+    // filled keyRef by then) so the Director answers with his own order in view.
+    filterText: (t) => stripStatus(
+      director ? makeDelegateFilter(0, keyRef.key || undefined,
+        () => { dele.hit = true; })(t) : t),
+    onEntry: (key) => {
+      job.sessionKey = key; keyRef.key = key;
+      autoRounds.delete(key);   // each firing is a fresh chain, not a continuation
+      saveJobs();
+    },
+    // The lane frees when this turn ends — a hand-off or an AUTO chain can outlive
+    // it, and holding the slot open would wedge every other scheduled job behind it.
+    onDone: autoContinue(job.agent, undefined, keyRef, (out, ok) => {
       agentBusy.delete(job.agent);
       job.running = false;
+      if (jobCard) { try { if (oneShot || ok) tasks.move(jobCard.id, "done"); else tasks.move(jobCard.id, "waiting"); if (oneShot) tasks.remove(jobCard.id); } catch {} }
       if (oneShot) jobs = jobs.filter((j) => j.id !== job.id);
       saveJobs();
       broadcast({ type: "jobs.changed" }, false);
       const next = jobQueue.shift();
       if (next) dispatchJob(next);
-    },
+    }, director, dele),
   });
+}
+
+// One place a standing order is born — the route and ctx.schedule() for plugins.
+function createJob(p) {
+  if (!p.agent || !reg.agents[p.agent] || p.agent === "ceo") throw new Error("bad agent");
+  if (!p.prompt) throw new Error("no prompt");
+  const job = {
+    id: nextJobId(),
+    agent: p.agent,
+    prompt: String(p.prompt).slice(0, 4000),
+    mode: ["now", "at", "every"].includes(p.mode) ? p.mode : "now",
+    at: Number(p.at) || 0,
+    time: String(p.time || "").slice(0, 5),
+    daily: !!p.daily,
+    everyMin: Math.max(5, Number(p.everyMin) || 10),  // floor: 5 min
+    // Honour a caller that asks for a job to land switched OFF. This is the
+    // only way to queue work that waits for a human to approve it, and it
+    // used to be impossible: the field was hardcoded true.
+    enabled: p.enabled === false ? false : true,
+    created: Date.now(),
+  };
+  jobs.push(job);
+  saveJobs();
+  if (!job.enabled) approvals.ask({ kind: "job", ref: job.id, agent: job.agent,
+    title: `Job for ${(reg.agents[job.agent] || {}).name || job.agent}: ${job.prompt.slice(0, 80)}`,
+    detail: job.prompt });
+  // ...and don't fire a "now" job that was created disabled. dispatchJob()
+  // itself never consults .enabled — only the scheduler's jobDue() does,
+  // and that never looks at mode:"now" — so this is the only gate there is.
+  if (job.mode === "now" && job.enabled) dispatchJob(job);
+  return job;
+}
+
+// 📦 The plugin library on disk (daemon/plugin-library/<id>/plugin.json).
+function pluginLibrary() {
+  const root = path.join(__dirname, "plugin-library");
+  const out = [];
+  let entries = [];
+  try { entries = fs.readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory()); } catch { return out; }
+  const installed = new Set(plugins.list().map((p) => p.id));
+  for (const e of entries) {
+    try {
+      const man = JSON.parse(fs.readFileSync(path.join(root, e.name, "plugin.json"), "utf8"));
+      out.push({ id: man.id || e.name, name: man.name, version: man.version, description: man.description, commands: (man.commands || []).length,
+        panel: !!man.panel, library: man.library || {}, installed: installed.has(man.id || e.name) || fs.existsSync(path.join(__dirname, "..", "plugins", man.id || e.name)), dir: path.join(root, e.name) });
+    } catch (err) { console.error("[library] bad manifest " + e.name + ": " + err.message); }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+// 👥 Team templates on disk (daemon/teams/<id>.json).
+function teamTemplates() {
+  const root = path.join(__dirname, "teams");
+  const out = [];
+  try {
+    for (const f of fs.readdirSync(root).filter((x) => x.endsWith(".json"))) {
+      try { const t = JSON.parse(fs.readFileSync(path.join(root, f), "utf8")); if (t && t.id && Array.isArray(t.agents)) out.push(t); }
+      catch (e) { console.error("[teams] bad template " + f + ": " + e.message); }
+    }
+  } catch {}
+  return out;
+}
+function hireTeam(id) {
+  const t = teamTemplates().find((x) => x.id === id);
+  if (!t) throw new Error("no such team template: " + id);
+  const hired = [], skipped = [];
+  for (const a of t.agents) {
+    const aid = String(a.id || slugId(a.name)).replace(/[^\w-]/g, "");
+    if (!aid || reg.agents[aid]) { skipped.push({ id: aid, why: "exists" }); continue; }
+    if (staffCount() >= MAX_STAFF) { skipped.push({ id: aid, why: "office full" }); continue; }
+    const px = a.persona || {};
+    reg.agents[aid] = {
+      name: String(a.name || aid).slice(0, 40), role: String(a.role || "Specialist").slice(0, 40),
+      avatar: Math.min(Math.max(Number(a.avatar) || 1, 1), 12), aura: String(a.aura || "").slice(0, 16),
+      prompt: String(a.prompt || "").slice(0, 8000),
+      persona: { expertise: String(px.expertise || "").slice(0, 2000), personality: String(px.personality || "").slice(0, 2000), language: String(px.language || "").slice(0, 80), rules: String(px.rules || "").slice(0, 2000) },
+      tier: Math.min(Math.max(Number(a.tier) || 3, 1), 3), voice: String(a.voice || "").slice(0, 20),
+      skills: (Array.isArray(a.skills) ? a.skills : []).filter((s) => reg.skills[s]), tools: Array.isArray(a.tools) ? a.tools : [],
+      provider: "claude", model: "", backend: "", memoryPlugins: [], team: t.id,
+    };
+    hired.push(aid);
+  }
+  if (hired.length) {
+    saveReg(); pushRoster();
+    try { if (reg.nativeSkills !== false) for (const aid of hired) skillsSync.syncAgent(AGENTS_DIR, aid, reg.agents[aid].skills, reg.skills); } catch {}
+    broadcast({ type: "team.hired", team: t.id, agents: hired });
+    notify.send({ kind: "system", title: `👥 Hired the ${t.name} team`, body: hired.map((h) => reg.agents[h].name).join(", ") });
+  }
+  return { ok: true, team: t.id, hired, skipped, staff: staffCount(), max: MAX_STAFF };
 }
 
 function jobDue(job, now) {
@@ -1352,24 +2007,25 @@ let lastHeartbeat = Date.now();
 let lastHbSig = null;
 function heartbeat() {
   lastHeartbeat = Date.now();
-  const upcoming = cal.filter((c) => c.at > Date.now() && c.at < Date.now() + 12 * 3600000)
-    .sort((a, b) => a.at - b.at).slice(0, 6)
-    .map((c) => `- ${c.title} @ ${new Date(c.at).toLocaleString("th-TH")}`).join("\n") || "(ว่าง)";
+  const upcoming = calendar.occurrences(Date.now(), Date.now() + 12 * 3600000, { limit: 6 })
+    .map((c) => `- ${c.title} @ ${new Date(c.at).toLocaleString()}`).join("\n") || "(none)";
   const standing = jobs.filter((j) => !j.done && j.enabled !== false).slice(0, 8)
-    .map((j) => `- [${j.mode}] ${j.agent}: ${j.prompt.slice(0, 60)}`).join("\n") || "(ไม่มี)";
-  const board = notes.slice(-8).map((n) => `- ${n.text}`).join("\n") || "(ว่าง)";
+    .map((j) => `- [${j.mode}] ${j.agent}: ${j.prompt.slice(0, 60)}`).join("\n") || "(none)";
+  const board = notes.slice(-8).map((n) => `- ${n.text}`).join("\n") || "(none)";
+  const ts = tasks.summary();
+  const work = `${ts.open} open · ${ts.doing} in progress · ${ts.waiting} waiting · ${ts.overdue} overdue · ${ts.dueToday} due today`;
   // Nothing the Director reports on (calendar / jobs / notes) has changed since
   // his last pass → he'd just say "OK" again. Skip the spawn entirely.
-  const sig = `${upcoming}${standing}${board}`;
+  const sig = `${upcoming}${standing}${board}${work}`;
   if (sig === lastHbSig) return;
   lastHbSig = sig;
   runClaude("main",
-    `รอบตรวจความเรียบร้อยของ Director (ตอนนี้ ${new Date().toLocaleString("th-TH")}):\n\n` +
-    `นัดหมาย 12 ชม.ข้างหน้า:\n${upcoming}\n\nงานที่สั่งค้างไว้:\n${standing}\n\n` +
-    `กระดานโน้ต:\n${board}\n\n` +
-    `ถ้ามีสิ่งที่ CEO ควรรู้ตอนนี้ (นัดใกล้ถึง งานสะดุด โน้ตที่ควรเห็น) ` +
-    `ให้เขียนข้อความแจ้งสั้นๆ อ่านง่าย. ถ้าทุกอย่างเรียบร้อยและไม่มีอะไรต้องรบกวน ` +
-    `ให้ตอบคำเดียวว่า OK`,
+    `Director's routine check (now ${new Date().toLocaleString()}):\n\n` +
+    `Appointments in the next 12 hours:\n${upcoming}\n\nStanding orders:\n${standing}\n\n` +
+    `Task board: ${work}\n\nNotes board:\n${board}\n\n` +
+    `If there is something the CEO should know right now (an appointment coming up, work that stalled, ` +
+    `an overdue card, a note worth seeing), write a short, easy-to-read message in the office language. ` +
+    `If everything is in order and nothing needs their attention, answer with the single word OK.` + officeLangNote(),
     { noSub: true, logPrompt: "💓 รอบตรวจความเรียบร้อย",
       filterText: (t) => (/^\s*OK\.?\s*$/i.test(t) ? "" : t) });
 }
@@ -1396,35 +2052,35 @@ function resumePausedTick(now) {
     broadcast({ type: "chat.message", agent: w.agent,
       text: "▶ โควต้าน่าจะคืนแล้ว — ขอทำงานที่ค้างไว้ต่อจากเดิมนะครับ" });
     runClaude(w.agent,
-      "ทำงานต่อจากที่ค้างไว้ก่อนหน้า (ก่อนหน้านี้สะดุดเพราะติดลิมิตชั่วคราว/โปรแกรมรีสตาร์ท). " +
-      "ดูบริบทในเธรดนี้แล้วทำงานที่ยังไม่เสร็จให้จบ:\n\n" + String(w.prompt || ""),
+      "Continue the work that was left unfinished (it was interrupted by a temporary limit or a restart of the program). " +
+      "Read the context in this thread and finish what is not yet done:\n\n" + String(w.prompt || ""),
       { session: w.key, project: w.project, resumable: true, _tries: w.tries,
-        resumePrompt: w.prompt, logPrompt: "▶ ทำงานต่อ (resume)" });
+        resumePrompt: w.prompt, logPrompt: "▶ ทำงานต่อ (resume)",
+        // Same defect as the job runner had: a resumed Director turn that hands
+        // work back out needs its DELEGATE lines parsed, or the work it just
+        // dispatched is printed as prose and silently lost.
+        filterText: joborder.isDirectorJob(w.agent)
+          ? (t) => stripStatus(makeDelegateFilter(0, w.key)(t))
+          : (t) => stripStatus(t) });
   }
 }
 
 // ---- 30-second scheduler: jobs, reminders, heartbeat.
 setInterval(() => {
   const now = Date.now();
+  // 🌅 One digest a morning, at the time the owner chose — what yesterday cost
+  // and what's waiting today. Through the rules like everything else.
+  if (budget.digestDue(now)) budget.sendDigest(now, { pending: approvals.pendingCount() });
+  try { triggers.tick(now); } catch (e) { console.error("[trigger] tick", e && e.message); }
   for (const job of jobs) {
     if (jobDue(job, now)) {
       if (job.mode === "at" && job.daily) job.lastDay = new Date().toDateString();
       dispatchJob(job);
     }
   }
-  for (const c of cal) {
-    if (!c.notified && now >= c.at - (c.remindMin || 10) * 60000 && now < c.at + 300000) {
-      c.notified = true;
-      saveCal();
-      broadcast({ type: "reminder", agent: "main", text: c.title, at: c.at });
-      runClaude("main",
-        `แจ้งเตือนนัดหมายให้ CEO เดี๋ยวนี้: "${c.title}" เวลา ` +
-        `${new Date(c.at).toLocaleString("th-TH")} (อีกประมาณ ${Math.max(1, Math.round((c.at - now) / 60000))} นาที). ` +
-        `เขียนข้อความเตือนสั้นๆ เป็นกันเอง 1-2 ประโยค`,
-        { noSub: true, logPrompt: `🔔 เตือนนัด: ${c.title}` });
-    }
-  }
-  const hb = Number(reg.heartbeatMin || 0);
+  try { calendar.tick(now); } catch (e) { console.error("[calendar] tick", e && e.message); }
+  try { tasks.tick(now); } catch (e) { console.error("[tasks] tick", e && e.message); }
+  const hb = ecoFloor(Number(reg.heartbeatMin || 0), 180);
   if (hb > 0 && now - lastHeartbeat >= hb * 60000 && agentBusy.size === 0)
     heartbeat();
   resumePausedTick(now);
@@ -1447,15 +2103,61 @@ sweepProjects();
 const SUB_NOTE = `
 
 <system-capability>
-ออฟฟิศนี้แตกร่างเป็น sub-agent ทำงานขนานกันได้ — แต่ใช้ "เฉพาะตอนที่งานมีส่วนอิสระตั้งแต่ 2 ส่วนขึ้นไป
-ที่ทำพร้อมกันได้จริงและคุ้มค่า" เท่านั้น (เช่น ค้นหลายหัวข้อ/หลายแหล่งพร้อมกัน · ตรวจหลายไฟล์ที่ไม่เกี่ยวกัน ·
-เทียบหลายตัวเลือกอิสระ). งานทั่วไป งานเล็ก หรืองานที่ทำต่อเนื่องเป็นลำดับ — ทำเองตรงๆ จะประหยัดและไม่ช้ากว่า.
-ค่าเริ่มต้นคือ "ทำเอง"; แตกร่างก็ต่อเมื่อชัดเจนว่าขนานได้จริงและช่วยให้เร็วขึ้นจริง อย่าแตกร่างพร่ำเพรื่อ.
-ถ้าจะแตก จบคำตอบด้วยบรรทัดนี้ หนึ่งบรรทัดต่อหนึ่งงานย่อย (ไม่เกิน 3-4 บรรทัด):
-SUB: <งานย่อยที่ชัดเจนครบถ้วนในตัวเอง พร้อมบริบทที่จำเป็นทั้งหมด>
-ระบบจะส่งร่างโคลนไปทำขนานกัน แล้วรวมผลกลับมาให้คุณสรุปเป็นคำตอบสุดท้าย.
+This office can split you into parallel sub-agents — but use that ONLY when the work
+genuinely has two or more independent parts worth running at the same time (searching
+several topics or sources at once; checking unrelated files; comparing independent
+options). Ordinary work, small work, or anything that runs in sequence is cheaper and
+no slower done directly.
+The default is to do it yourself. Split only when the work is clearly parallel and
+splitting clearly makes it faster. Do not split out of habit.
+To split, end your reply with one line per sub-task (at most 3-4 lines):
+SUB: <a self-contained sub-task, complete with every piece of context it needs>
+The office runs those clones in parallel and returns their results for you to
+synthesize into the final answer.
 </system-capability>`;
 
+// Where an agent's run actually happens. Everything above this line builds the
+// SAME claude arguments it always did; this decides whether they run here, in a
+// container, or on another machine, and translates the host paths inside them
+// for wherever that is.
+//
+// A backend that cannot be built correctly does NOT quietly fall back to
+// running locally — an owner who put an agent in a box expects it to stay in
+// the box. It comes back as a child that fails on its first tick, so the run
+// ends through the same error path as any other spawn failure and the reason
+// reaches the office feed instead of a log nobody reads.
+function spawnAgent(agentId, argv, options) {
+  const picked = execBackend.pick(reg, agentId);
+  if (picked.unknown)
+    console.error("[backend] agent " + agentId + " wants unknown backend \"" + picked.unknown + "\" — running local");
+  let planned;
+  try {
+    planned = execBackend.plan(picked.spec, {
+      argv, cwd: options.cwd, env: options.env,
+      officeRoot: path.join(__dirname, ".."),
+    });
+  } catch (e) {
+    return failedChild("backend \"" + picked.name + "\": " + e.message);
+  }
+  if (planned.describe !== "local")
+    console.log("[backend] " + agentId + " -> " + planned.describe);
+  return spawn(planned.file, planned.args, planned.options);
+}
+
+// A stand-in for a child process that could never be started. It satisfies the
+// same shape every caller uses (stdin to write the prompt into, stdout/stderr
+// to read) and then emits 'error', which is already handled everywhere.
+function failedChild(message) {
+  const { PassThrough } = require("stream");
+  const ch = new (require("events").EventEmitter)();
+  ch.stdin = new PassThrough(); ch.stdin.resume();
+  ch.stdout = new PassThrough(); ch.stdout.end();
+  ch.stderr = new PassThrough(); ch.stderr.end();
+  ch.kill = () => {};
+  ch.pid = null;
+  setImmediate(() => ch.emit("error", new Error(message)));
+  return ch;
+}
 function runClaude(agent, prompt, opts = {}) {
   const task = "t" + ++taskCounter;
 
@@ -1492,7 +2194,39 @@ function runClaude(agent, prompt, opts = {}) {
     entry.proj = opts.project;
   const projId = entry.proj && projectDir(entry.proj) ? entry.proj : null;
   const cwd = projId ? projectDir(projId) : WORKSPACE;
-  if (projId) ensureTrusted(cwd);
+  // Issue #39: a project that ships its own command hooks doesn't get a session
+  // until the owner has seen them. Park the run (nothing has been broadcast yet)
+  // and replay it verbatim the moment they approve — no re-typing the task.
+  if (projId && !ensureTrusted(cwd, { agent, project: projId })) {
+    const name = (projects.find((p) => p.id === projId) || {}).name || projId;
+    broadcast({ type: "chat.message", agent, session: entry.key,
+      text: `🛡 โปรเจค “${name}” มี hook ของตัวเองที่จะรันอัตโนมัติเมื่อเปิดงาน — ` +
+        `รออนุมัติในศูนย์ความปลอดภัยก่อน แล้วผมจะทำงานนี้ต่อให้เองครับ` });
+    waitForTrust(cwd, (denied) => {
+      if (denied === null) {
+        broadcast({ type: "chat.message", agent, session: entry.key,
+          text: `🛡 ไม่อนุมัติ hook ของโปรเจค “${name}” — งานนี้ยกเลิก (โปรเจคยังไม่ถูกเปิดใช้)` });
+        return;
+      }
+      runClaude(agent, prompt, opts);
+    });
+    return task;
+  }
+  // 💸 A cap that is reached refuses the turn HERE — before a session is touched
+  // or an event broadcast — so nothing half-starts. Running turns are never cut
+  // off; only new ones are refused. Warnings (80%) go out once a day per scope.
+  {
+    const gate = budget.check(agent, projId);
+    if (!gate.ok) {
+      const lbl = gate.scope === "office" ? "the office" : gate.scope + " " + gate.id;
+      broadcast({ type: "chat.message", agent, session: entry.key,
+        text: `💸 Budget reached for ${lbl}: $${gate.spent.toFixed(2)}${gate.estimated ? " (est.)" : ""} of $${gate.cap.toFixed(2)} ${gate.unit}. ` +
+              `This turn was not started. Raise the cap in ⚙ → 💸 BUDGET, or wait for ${gate.unit === "today" ? "tomorrow" : "a higher cap"}.` });
+      broadcast({ type: "budget.refused", agent, scope: gate.scope, id: gate.id, spent: gate.spent, cap: gate.cap }, false);
+      if (opts.onDone) try { opts.onDone(`(budget reached for ${lbl} — turn not started)`, false); } catch {}
+      return task;
+    }
+  }
   // claude sessions are PER-DIRECTORY: a sid born in another cwd cannot be
   // resumed here. Ground truth beats bookkeeping — check the actual session
   // file under this cwd; missing means a fresh claude session here (our own
@@ -1538,8 +2272,14 @@ function runClaude(agent, prompt, opts = {}) {
   // Windows shell quoting); resumed sessions already carry it in context.
   const a = reg.agents[agent];
   const isFresh = isNew;
-  const mtag = modelTag(agent);   // brain tag stamped on this run's messages + usage
-  const mprov = (a && a.provider) || reg.defaultProvider || "claude";  // for cost tally
+  // The effective brain for THIS run: the opt-in failover override (when a prior attempt
+  // on the agent's own brain was sustainedly overloaded) wins over the agent's provider.
+  const ov = opts._brainOverride;
+  const effProvider = (ov && ov.provider) || (a && a.provider) || reg.defaultProvider || "claude";
+  const mtag = ov   // brain tag stamped on this run's messages + usage
+    ? (ov.model ? ov.provider + "/" + ov.model : ov.provider)
+    : modelTag(agent);
+  const mprov = effProvider;  // for cost tally
   const picked = (a && a.tools && a.tools.length ? a.tools : ["Read", "Glob", "Grep"]).slice();
   // The "web-automation" skill IMPLIES the browser tool, so assigning the skill is
   // enough to give an agent the web. Visible 'web' by default; if the owner ticked
@@ -1555,8 +2295,7 @@ function runClaude(agent, prompt, opts = {}) {
   if (mcpNames.length) {
     const conf = { mcpServers: {} };
     for (const n of mcpNames) {
-      const parts = String(reg.mcpServers[n].command).trim().split(/\s+/);
-      conf.mcpServers[n] = { command: parts[0], args: parts.slice(1) };
+      conf.mcpServers[n] = mcpEntry(reg.mcpServers[n]);
     }
     mcpConfig = path.join(__dirname, `mcp_${agent.replace(/[^\w-]/g, "_")}.json`);
     fs.writeFileSync(mcpConfig, JSON.stringify(conf));
@@ -1575,9 +2314,10 @@ function runClaude(agent, prompt, opts = {}) {
       const sk = reg.skills[sid];
       if (sk) preamble += `\n<skill name="${sk.name}">\n${sk.content}\n</skill>\n`;
     }
-    preamble += `\nกระดานโน้ตกลางของออฟฟิศ: ไฟล์ notes.md ใน workspace — ` +
-      `อ่านได้ และเพิ่มบรรทัด "- ข้อความ" เพื่อฝากโน้ตถึง CEO ได้\n`;
-    preamble += memoryNote(agent, String(opts.logPrompt || prompt), projId);
+    preamble += `\nThe office's shared note board is notes.md in the workspace — ` +
+      `you can read it, and append a line "- your message" to leave a note for the CEO.\n`;
+    preamble += officeLangNote(a);
+    preamble += memoryNote(agent, String(opts.logPrompt || prompt), projId, opts.qvec);
     preamble += "</persona>\n\n";
   }
   // The Director (main) is the office MANAGER first — non-negotiable, and it survives any
@@ -1613,11 +2353,11 @@ function runClaude(agent, prompt, opts = {}) {
   }
   if (entry && entry.sid) args.push("--resume", entry.sid);
   // Swappable brain: route this agent to its configured backend (else plain Claude).
-  const route = brainRoute(agent);
+  // An opt-in failover override reroutes THIS run to the fallback brain instead.
+  const route = brainRoute(agent, ov);
   if (route.modelArgs.length) args.push(...route.modelArgs);
-  const child = spawn("claude", args, {
+  const child = spawnAgent(agent, args, {
     cwd,
-    shell: true,
     env: { ...process.env, ...(reg.apiKeys || {}), ...route.env, OFFICE_ADAPTER: "1", OFFICE_AGENT: agent, OFFICE_TASK: task },
   });
   // Track the run per project so the owner can stop it and take the project over.
@@ -1639,6 +2379,11 @@ function runClaude(agent, prompt, opts = {}) {
       console.error(`[claude] watchdog: ${agent}/${task} killed — ${reason}`);
       killTree(child);   // issue #15 review: shell:true on win32 → must taskkill /T, not plain kill
       // Already-cleared (doneFired) runs are skipped by fireDone's guard.
+      ended = true;
+      // Issue #52: the broadcast reaches only a live viewer. The persistent history
+      // (GET /sessions/log) must say WHY the run stopped, or a later reader sees a
+      // trail that just ends after the last tool call.
+      abnormalEnd(`the watchdog stopped this run (${reason}) — work up to this point may or may not have landed; check the working tree`);
       broadcast({ type: "task.failed", agent, task, session: entry.key,
         reason: `watchdog: ${reason}` });
       fireDone(`(watchdog: ${reason})`, false);
@@ -1654,11 +2399,14 @@ function runClaude(agent, prompt, opts = {}) {
   const VOICE_NOTE = canSpeak ? `
 
 <voice-capability>
-คุณมีเสียงพูดจริงในออฟฟิศ — ใช้เพิ่มสีสันได้. เมื่อมีบรรทัดสั้นๆ ที่ "พูดออกมาแล้วน่ารัก/
-เป็นธรรมชาติ" (ทักทาย, ยืนยันสั้นๆ, ประกาศงานเสร็จ, สรุปหนึ่งประโยค) ให้จบคำตอบด้วยบรรทัด:
-SPEAK: <ประโยคพูดสั้นๆ 1 ประโยค เป็นธรรมชาติ ภาษาเดียวกับเจ้าของ>
-ทำได้บ่อยพอประมาณให้ออฟฟิศมีชีวิต แต่ "พูดสั้นเสมอ" — อย่าอ่านทั้งข้อความ.
-ข้อยกเว้นเดียว: ถ้าเจ้าของสั่งให้อ่าน/รายงานด้วยเสียงแบบเต็มๆ ค่อยใส่เนื้อหายาวใน SPEAK ได้.
+You have a real speaking voice in this office — use it for colour. When a short line
+would sound natural said out loud (a greeting, a brief confirmation, announcing work
+is finished, a one-sentence summary), end your reply with:
+SPEAK: <one short, natural spoken sentence, in the owner's language>
+Do it often enough that the office feels alive, but ALWAYS keep it short — never read
+the whole message aloud.
+The one exception: if the owner asks you to read or report something out loud in full,
+then a longer SPEAK line is fine.
 </voice-capability>` : "";
   // 🖼 Make agent-shared media show inline. The chat auto-renders any absolute
   // media path — ANYWHERE on disk, not just under the workspace — as an image/
@@ -1667,10 +2415,11 @@ SPEAK: <ประโยคพูดสั้นๆ 1 ประโยค เป�
   const MEDIA_NOTE = `
 
 <media-capability>
-ให้เจ้าของเห็น/ดู/ฟัง รูป-วิดีโอ-เสียง: พิมพ์ path เต็มของไฟล์ในบรรทัดของมันเอง
-ออฟฟิศจะ render เป็นรูป/เครื่องเล่นในแชทเองทันที — ไฟล์อยู่ที่ไหนก็ได้บนเครื่อง
-(ในโปรเจค, workspace, Desktop, Downloads, ไดรฟ์อื่น…) ไม่ต้องก็อปเข้ามาก่อน.
-อย่าบอกแค่ที่อยู่ไฟล์ หรือแปะลิงก์ดาวน์โหลด.
+To let the owner see or hear an image, video or audio file: print the file's FULL path
+on a line of its own. The office renders it inline in chat as a picture or a player.
+The file can be anywhere on the machine (inside a project, the workspace, Desktop,
+Downloads, another drive) — you never need to copy it in first.
+Do not just describe where the file is, and do not paste a download link.
 </media-capability>`;
   // Ghost sub-agents don't talk to the owner or share media directly (the parent
   // synthesizes their output) — skip the media note for them to save tokens.
@@ -1682,25 +2431,36 @@ SPEAK: <ประโยคพูดสั้นๆ 1 ประโยค เป�
   const TOOLS_NOTE = agent.includes("#") ? "" : `
 
 <use-your-tools>
-ออฟฟิศให้เครื่องมือจริงกับคุณ — เอามาใช้ทำงานให้ "เห็นผลจริง" ไม่ใช่แค่บอกว่าทำได้:
-• ค่าเริ่มต้น = ทำงานเบื้องหลังเงียบๆ ไม่เปิดหน้าต่างรกจอเจ้าของโดยไม่จำเป็น.
-• เมื่อการ "ให้ดูสดๆ" ช่วยให้เข้าใจ/มั่นใจขึ้น หรือเจ้าของขอดู → โชว์เลย: ถ้าคุณมี tool 'web'
-  ให้เปิดเบราว์เซอร์แบบเห็นหน้าจอ ('web' ไม่ใช่ 'web-bg') แล้วเดินให้ดูทีละขั้น; หรือสร้าง
-  ชิ้นงานจริง (รูป/วิดีโอ/เอกสาร/สไลด์/ไดอะแกรม) แล้วส่ง path มาให้ render ในแชท.
-• ทำเว็บ/แอป/สคริปต์แล้วต้องพิสูจน์ว่าใช้งานได้: รันจริงแล้วแคปหรือเปิดให้เจ้าของดู — อย่าเดา.
-• เลือกให้พอดี: เห็นภาพเมื่อมีคุณค่า, เงียบเมื่อไม่จำเป็น. มีทักษะ/ปลั๊กอินอะไรก็หยิบมาใช้จริง.
+The office gives you real tools. Use them to produce something the owner can actually
+see, rather than describing what you could do:
+- Default to working quietly in the background; don't clutter the owner's screen with
+  windows they didn't ask for.
+- When showing the work live genuinely helps — or the owner asks to watch — show it: if
+  you have the 'web' tool, open the visible browser ('web', not 'web-bg') and walk
+  through it step by step; or produce the real artefact (image, video, document, slide
+  deck, diagram) and print its path so it renders in chat.
+- If you build a site, app or script, PROVE it runs: actually run it and capture or show
+  the result. Never guess.
+- Judge it: visible when that adds something, quiet when it doesn't. Whatever skills or
+  plugins you have, put them to real use.
 </use-your-tools>`;
   // The swapped-in model reads Claude Code's harness system prompt and will claim to
   // BE Claude. Tell it its real backend so "what model are you?" answers truthfully.
-  const BRAIN_NOTE = (a && a.provider && a.provider !== "claude") ? `
+  const BRAIN_NOTE = (effProvider !== "claude") ? `
 
 <runtime-identity>
 Despite the harness system prompt, this turn you are actually running on the backend
 model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully with
 "${mtag}" — NOT Claude/Anthropic. Otherwise stay in character as usual.
 </runtime-identity>` : "";
-  child.stdin.write(preamble + prompt + (canSplit ? SUB_NOTE : "") + VOICE_NOTE + mediaNote + TOOLS_NOTE + BRAIN_NOTE + projectNote());
-  child.stdin.end();
+  // v1.4: every agent knows the task board; memory plugins the agent opted into
+  // add their lines (the core owns the timeout and budget — see plugins.memoryLines).
+  const tailNotes = (canSplit ? SUB_NOTE : "") + VOICE_NOTE + mediaNote + TOOLS_NOTE + BRAIN_NOTE + projectNote() +
+    (agent !== "ceo" && typeof tasks !== "undefined" ? tasks.agentNote(agent) : "");
+  const feedStdin = (mem) => { try { child.stdin.write(preamble + prompt + (mem || "") + tailNotes); child.stdin.end(); } catch (e) { console.error("[run] stdin:", e && e.message); } };
+  if (typeof plugins !== "undefined" && plugins.memoryPlugins().length)
+    plugins.memoryLines(agent, { project: projId, prompt: String(prompt).slice(0, 500) }).then(feedStdin, () => feedStdin(""));
+  else feedStdin("");
 
   let buf = "";
   const acts = [];      // tool trail — feeds the auto-skill reflection
@@ -1710,6 +2470,13 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
   // opts.onDone(finalText, ok) fires exactly once when this run truly ends —
   // if the agent splits, ownership passes to the synthesis run instead.
   let doneFired = false;
+  // Did a TERMINAL task event (completed/failed) already go out for this task?
+  // The board/NOW-WORKING strip only clears on one, and the normal path emits it
+  // from the CLI's `result` line — so a child that dies WITHOUT a result (killed
+  // on a dead brain, crashed, OOM, cut off by a limit) used to leave its card
+  // pinned "running" forever while the agent sat idle. fireDone() is the one
+  // funnel every ending passes through, so the backstop belongs there.
+  let ended = false;
   const releaseProj = () => {
     if (!projId) return;
     projRuns[projId] = Math.max(0, (projRuns[projId] || 1) - 1);
@@ -1718,9 +2485,30 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     if (!pa[agent]) delete pa[agent];
     broadcast({ type: "projects.changed" }, false);
   };
+  // Issue #52: one visible line in the session history for every abnormal end —
+  // a watchdog kill, an adapter error, a dead key, a run that ended with no result.
+  // Written once per run, persisted at once, and never for a normal finish.
+  let abnormalNoted = false;
+  const abnormalEnd = (why) => {
+    if (abnormalNoted) return;
+    abnormalNoted = true;
+    try {
+      entry.log.push({ who: "agent", text: "⚠ Run ended abnormally — " + String(why).slice(0, 600), ts: Date.now(), abnormal: true });
+      saveSess();
+    } catch (e) { console.error("[claude] history:", e && e.message); }
+  };
   const fireDone = (text, ok) => {
     if (doneFired) return;
     doneFired = true;
+    // Backstop: this run is over, so the row must go — even when nobody reported
+    // an outcome. (maybeRecover/tryFailover set doneFired themselves after their
+    // own terminal event, so they never double-fire here.)
+    if (!ended) {
+      ended = true;
+      if (!ok) abnormalEnd("the run ended without a result" + (errText.trim() ? " — last stderr: " + errText.trim().split("\n").slice(-2).join(" ").slice(0, 300) : ""));
+      broadcast({ type: ok ? "task.completed" : "task.failed", agent, task,
+        session: entry.key, reason: "ended without a result" });
+    }
     watchdog.clear();     // issue #15: run resolved normally — disarm the watchdog
     runChildren.delete(task);
     releaseProj();
@@ -1748,8 +2536,42 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     recovering = true; doneFired = true;
     runChildren.delete(task);
     releaseProj();
+    ended = true;
     broadcast({ type: "task.completed", agent, task, session: entry.key }); // clear the old row
     autoRecoverOverflow(agent, prompt, opts, entry);
+    return true;
+  };
+  // OPT-IN failover: this run's brain has been unusable — a server overload (5xx)
+  // OR a sustained rate/usage limit (429) — for FAILOVER_AFTER retries, and the owner
+  // set an office fallback brain → stop hammering it and re-run the SAME task on the
+  // fallback. This is the answer to "one agent hits a limit and the whole office
+  // stops": with a spare brain configured, a limited agent (incl. the Director, whose
+  // stall otherwise jams every report-back) keeps working instead of sitting in the
+  // CLI's ~2-min retry. No fallback / already-failed-over → returns false and the CLI
+  // retries exactly as before (a plain 429 then pauses+auto-resumes; unchanged).
+  let failedOver = false;
+  const tryFailover = (st) => {
+    if (failedOver || brainDead || recovering || doneFired || opts._failedOver) return false;
+    // Server-side overload/unavailable (>=500) or a rate/usage ceiling (429).
+    if (!(typeof st === "number" && (st >= 500 || st === 429))) return false;
+    if (apiRetries < FAILOVER_AFTER) return false;              // wait until it's SUSTAINED, not a one-off
+    const fb = officeFallback(mprov);
+    if (!fb) return false;
+    failedOver = true; brainDead = true; doneFired = true;
+    watchdog.clear();
+    runChildren.delete(task);
+    releaseProj();
+    try { killTree(child); } catch (e) { /* best-effort */ }
+    ended = true;
+    broadcast({ type: "task.completed", agent, task, session: entry.key }); // clear the stalled row
+    const an = (reg.agents[agent] || {}).name || agent;
+    const toTag = fb.model ? fb.provider + "/" + fb.model : fb.provider;
+    const why = st === 429 ? "ติดลิมิต (rate/usage) ต่อเนื่อง" : "โดน overload ต่อเนื่อง";
+    broadcast({ type: "chat.message", agent, task, session: entry.key, model: mtag,
+      text: `🛟 สมองของ ${an} (${mtag}) ${why} — สลับไปสมองสำรอง ${toTag} ให้ชั่วคราว แล้วทำงานเดิมต่อ (ปรับได้ในการตั้งค่า)` });
+    // Re-run the SAME task on the fallback brain. Fresh thread (the down brain can't be
+    // summarized through); onDone rides along so a delegation still reports back normally.
+    runClaude(agent, prompt, { ...opts, session: "new", _brainOverride: fb, _failedOver: true });
     return true;
   };
   child.stdout.on("data", (c) => {
@@ -1782,14 +2604,19 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
               : st === 403 ? "ไม่ได้รับอนุญาต (403)"
               : "endpoint ไม่ตอบ (น่าจะ down หรือไม่น่าจะกลับมา)";
             const an = (reg.agents[agent] || {}).name || agent;
+            const whyEn = st === 401 ? "the API key is wrong or expired (401)" : st === 403 ? "the key is not permitted (403)" : "the endpoint is not responding";
+            abnormalEnd(`the brain ${mtag} could not answer — ${whyEn}; the run was stopped instead of retrying blind`);
             broadcast({ type: "chat.message", agent, task, session: entry.key, model: mtag,
               text: `⚠️ สมองของ ${an} (${mtag}) ใช้งานไม่ได้ — ${why}.\n` +
                 `ตรวจ key/ตั้งค่าใน 🧠 BRAIN ของคุณคนนี้ (หรือเปลี่ยนสมอง) แล้วสั่งใหม่ — ไม่ต้องรอ retry ครบ 10 รอบ` });
             try { killTree(child); } catch (e) { /* best-effort */ }
+          } else {
+            // 529/503 (transient overload): if the owner opted in to a fallback brain and
+            // the overload is SUSTAINED, switch the task onto it (tryFailover). Otherwise
+            // deliberately NOT caught — let the CLI's own retry loop try hard; if it
+            // recovers, great; if it can't, the result.is_error surfaces as before.
+            tryFailover(st);
           }
-          // 529/503/429 (transient overload / rate-limit): deliberately NOT caught
-          // here — let the CLI's own retry loop try hard. If it recovers, great; if
-          // it truly can't, the result.is_error surfaces as before (no brain switch).
         }
         continue;   // system events carry no assistant/result content
       }
@@ -1876,6 +2703,7 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
         }
         if (m.is_error && maybeRecover(typeof m.result === "string" ? m.result : "")) {
           statBump("failed", null, Number(m.total_cost_usd) || 0);
+          budget.attribute(agent, projId, Number(m.total_cost_usd) || 0);
           continue;   // the fresh-thread recovery run owns the callback now
         }
         // Context-usage meter: input tokens this turn vs the backend's window, stamped
@@ -1886,18 +2714,23 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
         const usage = { in: inTok, out: u.output_tokens || 0, win: ctxWindow(agent) };
         if (!m.is_error) {
           entry.lastUsage = { ...usage, model: mtag, ts: Date.now() }; saveSess();
-          brainBump(mprov, inTok, u.output_tokens || 0);  // estimate non-Claude spend
+          brainBump(mprov, inTok, u.output_tokens || 0, agent, projId);  // estimate non-Claude spend
         }
+        ended = true;
         broadcast({ type: m.is_error ? "task.failed" : "task.completed",
           agent, task, session: entry.key, model: mtag, usage });
         statBump(m.is_error ? "failed" : "done", null, Number(m.total_cost_usd) || 0);
+        budget.attribute(agent, projId, Number(m.total_cost_usd) || 0);
         if (!m.is_error && subTasks.length) {
           doneFired = true;  // the synthesis run inherits the callback
           releaseProj();
           runSubAgents(agent, entry, subTasks.slice(0, 4), opts.onDone);
         } else {
           fireDone(lastText, !m.is_error);
-          if (!m.is_error) maybeLearnSkill(agent, task, prompt, acts, lastText, projId);
+          // Both outcomes reflect now. Success can generalise into a new skill;
+          // failure can only correct an existing one, which is the more valuable
+          // of the two and was previously thrown away.
+          maybeLearnSkill(agent, task, prompt, acts, lastText, projId, !!m.is_error);
         }
       }
     }
@@ -1909,12 +2742,17 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     console.error("[claude]", s.trim());
   });
   child.on("error", (e) => {
+    ended = true;
+    abnormalEnd("adapter error: " + e.message);
     broadcast({ type: "task.failed", agent, task });
     broadcast({ type: "chat.message", agent, task, text: "adapter error: " + e.message });
     fireDone("", false);
   });
   child.on("close", () => {
-    if (!maybeRecover("")) fireDone(lastText, !!lastText);
+    // brainDead = we killed it ourselves because the brain can't answer; whatever
+    // text it managed is not a success, so the row ends RED (and clears) instead
+    // of pretending the work got done.
+    if (!maybeRecover("")) fireDone(lastText, !brainDead && !!lastText);
   });
   return task;
 }
@@ -2014,9 +2852,16 @@ function teamList() {
 // in his own pane works exactly like an order through the CEO.
 function directorNote() {
   const places = Object.entries(reg.places)
-    .map(([n, f]) => `  - "${n}" → ${f}`).join("\n") || "  (ยังไม่มี — ผู้ใช้ตั้งได้ใน 🗂)";
+    .map(([n, f]) => `  - "${n}" → ${f}`).join("\n") || "  (none yet — the owner sets them in 🗂)";
   const projList = projects.slice(-8)
-    .map((p) => `  - ${p.name} → ${p.dir}`).join("\n") || "  (ยังไม่มี)";
+    .map((p) => `  - ${p.name} → ${p.dir}`).join("\n") || "  (none yet)";
+  const codexLine = (typeof codex !== "undefined" && codex.agentNote()) ? `
+
+CODEX — a second coding agent the office can call in. For a self-contained coding sub-task that
+suits it (when the owner asks for Codex, or when a parallel pair of hands on code is worth it), write:
+DELEGATE: codex @ <project name> :: <clear, self-contained task>
+The office runs Codex inside that project (it may edit files there) and reports its result back to
+you like a teammate's. You stay responsible for reviewing what it did.` : "";
   return `
 
 <system-capability>
@@ -2036,30 +2881,36 @@ One line per assignment — dispatched automatically; their result is reported
 back to you when they finish, so you can answer questions or follow up.
 IMPORTANT: prose like assigning work in words does NOTHING — only the
 DELEGATE line dispatches work.
-เฉพาะเมื่องานที่มอบมีส่วนอิสระหลายส่วนที่ทำขนานกันได้จริงและคุ้มค่า (เช่น ค้นคว้าหลายหัวข้อพร้อมกัน,
-ตรวจหลายไฟล์ที่ไม่เกี่ยวกัน) จึงค่อยสั่งผู้รับ "แตกร่าง" — งานทั่วไปให้ผู้รับทำตรงๆ จะประหยัดกว่า. ตัวอย่างกรณีที่ควรแตก:
-DELEGATE: <agent_id> :: ค้นคว้า A, B, C แบบขนาน — จบคำตอบด้วยบรรทัด SUB: ทีละหัวข้อ.
+Only when a task has several genuinely independent parts worth running in parallel (researching several
+topics at once, checking unrelated files) should you tell the assignee to "split into sub-agents" —
+ordinary work is cheaper done directly. An example of a task worth splitting:
+DELEGATE: <agent_id> :: research A, B and C in parallel — end your answer with one SUB: line per topic.
 
-PROJECT SYSTEM — registered places (ชื่อย่อ → โฟลเดอร์):
+PROJECT SYSTEM — registered places (short name → folder):
 ${places}
 Existing projects:
 ${projList}
-เมื่อผู้ใช้สั่งสร้างโปรเจคใหม่ (เช่น "สร้างโปรเจค test ที่ห้องสมุด") คุณต้องสร้างเอง
-ด้วยบรรทัด protocol นี้ (ระบบสร้าง+ลงทะเบียนให้ทันที):
-PROJECT: <ชื่อโปรเจค> @ <ชื่อ place หรือ full path>
-แล้วค่อยมอบงานแบบระบุโปรเจค: DELEGATE: <agent_id> @ <ชื่อโปรเจค> :: <งาน>
-สำคัญมาก: ห้ามสั่งให้สมาชิกไปสร้างโปรเจคเอง และห้ามทำงานของโปรเจคนอกบรรทัด DELEGATE @ —
-ไม่งั้นงานจะไม่ได้รันอยู่ "ข้างใน" โปรเจคจริงๆ (เจ้าของ resume session ต่อไม่ได้).
-ห้ามสร้างโปรเจคเองโดยผู้ใช้ไม่ได้สั่ง
+When the owner asks for a new project (e.g. "create project test in the library"), YOU create it,
+with this protocol line (the office creates and registers it at once):
+PROJECT: <project name> @ <place name or full path>
+then hand out the work routed to that project: DELEGATE: <agent_id> @ <project name> :: <task>
+Very important: never tell a member to create the project themselves, and never do a project's work
+outside a DELEGATE @ line — otherwise the work does not actually run "inside" the project (the owner
+cannot resume the session). Never create a project the owner did not ask for.
 
-DEFINITION OF DONE — งานจะ "เสร็จ" ก็ต่อเมื่อผลของมัน "มีผลจริงในระบบที่รันอยู่" และคุณ
-verify แล้วเท่านั้น — ไม่ใช่แค่ "เขียนไฟล์เสร็จ". ก่อนรายงานเจ้าของว่าเสร็จ ให้ยืนยันว่าการ
-เปลี่ยนแปลงถูกนำไปใช้จริง (ของที่ build/แก้ในโปรเจคหรือ mirror ยังไม่มีผลจนกว่าจะถูก deploy ไป
-ที่ที่ระบบโหลดจริง + reload + เช็คว่าเวอร์ชัน/พฤติกรรมที่รันอยู่ตรงกับที่ทำ). โดยเฉพาะ plugin:
-มันรันจาก plugins/<id>/ เท่านั้น — ถ้าทีม build/แก้ที่อื่น ต้อง copy เข้า plugins/<id> (ห้ามทับ
-data/), reload, แล้วเช็ค GET /plugins ว่าขึ้นเวอร์ชันใหม่ + log ไม่มี load fail ก่อนถือว่าเสร็จ
-(ใช้ skill "Plugin Builder"). "สร้างเสร็จ" ≠ "กำลังรันอยู่". การ push ขึ้น git/Hub เป็นขั้นแยก
-ที่ต้องให้เจ้าของอนุมัติเสมอ ไม่ถือว่าเป็นส่วนของ "เสร็จ" โดยอัตโนมัติ
+TASK BOARD — every delegation becomes a card on the office board (📋 TASKS), owned by the assignee,
+and moves to done when they finish. When the owner asks what is going on, the board is the answer:
+GET http://127.0.0.1:8787/tasks/board. You can add a card yourself with POST /tasks (see office-tasks).
+
+DEFINITION OF DONE — work is "done" only when its result "has taken effect in the running system" and
+you have verified it — not merely "the files are written". Before reporting to the owner that something
+is done, confirm the change is actually in use (something built or edited in a project or a mirror has
+no effect until it is deployed to where the system really loads it, reloaded, and the running
+version/behaviour checked against what was made). Plugins in particular: they run from plugins/<id>/
+only — if the team built or edited elsewhere, copy it into plugins/<id> (never over data/), reload, then
+check GET /plugins shows the new version and the log has no load failure before calling it done (use the
+"Plugin Builder" skill). "Built" ≠ "running". Pushing to git or the Hub is a separate step that always
+needs the owner's approval and is never part of "done" by default.${codexLine}
 </system-capability>`;
 }
 
@@ -2079,16 +2930,22 @@ function ceoFlow(prompt, session, project, opts = {}) {
     `each member's result will be REPORTED BACK to you when they finish. ` +
     `Prose alone dispatches NOTHING — only DELEGATE lines do). ` +
     `Anything not delegated you handle yourself. Reply to the owner with a short ` +
-    `plan in the language they used.` + directorNote();
+    `plan in the language they used.` + directorNote() + autoNote();
+  // 🤖 AUTO: a fresh order starts a fresh chain (the round budget resets), and if
+  // the Director ends this turn still owing work, it opens the next turn itself.
+  const keyRef = { key: session || "" }, dele = { hit: false };
+  const df = makeDelegateFilter(0, () => keyRef.key, () => { dele.hit = true; });
   return runClaude("main", wrapped, {
     session,
     project,
+    qvec: opts.qvec,          // the caller embedded the owner's words already
     logPrompt: opts.logPrompt || ("👑 (CEO) " + prompt),
-    filterText: makeDelegateFilter(0, session),
-    onDone: (out, ok) => {
-      if (opts.relay && ok && out) try { channels.relay("👑 " + out); } catch {}
-      if (opts.onDone) opts.onDone(out, ok);   // channels/CLI hook the reply ride-back here
-    },
+    filterText: (t) => stripStatus(df(t)),
+    onEntry: (k) => { keyRef.key = k; autoRounds.delete(k); },
+    onDone: autoContinue("main", project, keyRef, (out, ok) => {
+      if (opts.relay && ok && out) try { channels.relay("👑 " + stripStatus(out)); } catch {}
+      if (opts.onDone) opts.onDone(stripStatus(out), ok);   // channels/CLI hook the reply ride-back here
+    }, true, dele),
   });
 }
 
@@ -2111,9 +2968,130 @@ function pumpDirector() {
   dirQueue.shift()(() => { dirBusy = false; pumpDirector(); });
 }
 
+// Appended to EVERY delegated instruction. A teammate is a one-shot `claude -p`
+// process, so the daemon can't "nudge it to keep going" — the only lever is the
+// prompt. Without this, an agent tends to do the first step and stop, waiting for
+// the Director to hand it the next one (the "งานไม่ต่อเนื่อง" the owner reported).
+// This tells it to OWN the task end-to-end and decide within its remit, while
+// PRESERVING the real gates (irreversible / outward actions still need approval).
+const DELEGATE_NOTE = `
+
+<work-autonomy>
+This is work the Director handed to you to carry THROUGH TO THE END — not "do the first step and
+wait for the next instruction". Complete every step yourself until it is genuinely done and verified:
+break it down on your own, make the detailed decisions that fall within your expertise and role without
+asking back, and when you meet a small fork, pick the reasonable option and keep going. Stop to ask the
+Director back only when it is truly necessary — exactly three cases:
+(a) a credential or access you cannot obtain yourself; (b) the task is so ambiguous that a wrong guess
+would send the result the wrong way entirely; (c) something hard to reverse or outward-facing (pushing to
+git or the Hub, deleting things, sending a message outside, spending money), which always needs the
+owner's approval first. When you finish, report the result that is actually done — not mid-way progress.
+If one of the exceptions above blocks you, report briefly what blocks you and what you need, then wait.
+In short: own the task end-to-end, decide within your remit, only ask back when truly blocked.
+</work-autonomy>`;
+
+// ---------------------------------------------------------------- 🤖 AUTO mode
+// "ทำต่อเอง" (reg.autoPilot, opt-in, off by default). The owner's complaint: the
+// team stops mid-job to ask an opinion and the work sits there until they come
+// back. A teammate is a one-shot `claude -p` — nothing can nudge it mid-run — so
+// the only lever is to START THE NEXT TURN. Every owner-facing run therefore ends
+// with one machine-readable STATUS line: CONTINUE means "there is more to do",
+// and the office immediately opens the next turn on the SAME thread instead of
+// waiting for a human. Bounded to AUTOPILOT_MAX rounds per chain so a confused
+// agent can't burn tokens forever, and BLOCKED still stops dead: missing
+// credentials and irreversible/outward actions stay the owner's call. This is
+// about not waiting for an OPINION — it never widens what an agent may do (tool
+// permissions are the separate 🔓 auto-approve switch).
+const AUTOPILOT_MAX = Number(process.env.OFFICE_AUTOPILOT_MAX) || 8;
+const autoRounds = new Map();   // thread key -> rounds already spent in this chain
+
+function autoNote() {
+  if (!reg.autoPilot) return "";
+  return `
+
+<autopilot>
+Keep-going mode (AUTO) is ON: the owner is not watching the screen and nobody will
+answer a question mid-task — asking one only parks the work. Decide on the owner's
+behalf using the best information you have, pick the most reasonable option, state your
+assumptions briefly, and carry the work through to a real finish (do it, don't say you
+will).
+End EVERY message with exactly one status line, always the last line:
+STATUS: DONE — genuinely finished, verified, nothing left hanging
+STATUS: CONTINUE — <the next step you will take yourself>  (the office opens a new turn immediately)
+STATUS: BLOCKED — <what the owner must do or decide>  (only two cases: a credential or
+permission you cannot obtain yourself; or something irreversible or outward-facing such
+as push, deploy, deleting data, sending a message outside, or spending money)
+Never use BLOCKED as a way to ask an opinion. If you merely want to know which way the
+owner would prefer, choose one and CONTINUE.
+In short: decide it yourself, keep going, and end every message with exactly one STATUS line.
+</autopilot>`;
+}
+
+// Wrap a run's onDone so AUTO can open the next turn itself. keyRef is filled in
+// by runClaude's onEntry — the thread the run actually landed on is what we must
+// resume (and what the round counter is keyed by).
+// `dele.hit` = this turn handed work to a teammate; the office is NOT idle and the
+// report-back will drive what comes next, so AUTO must keep its hands off.
+function autoContinue(agent, project, keyRef, next, isDirector, dele) {
+  return (text, ok) => {
+    if (next) { try { next(text, ok); } catch (e) { console.error("[auto] next:", e); } }
+    if (!reg.autoPilot || !ok) return;
+    if (dele && dele.hit) return;
+    const key = keyRef.key || "";
+    const st = readStatus(text);
+    const kind = autoVerdict(text);
+    if (kind !== "CONTINUE") {
+      autoRounds.delete(key);
+      // A real block is the one thing worth interrupting the owner for — send it
+      // to wherever they actually are (Telegram/Discord/…), not just the chat.
+      if (kind === "BLOCKED" && st && st.note) {
+        const an = (reg.agents[agent] || {}).name || agent;
+        approvals.ask({ kind: "blocked", agent, title: `${an} is blocked`, detail: st.note,
+          meta: { key, project, isDirector: !!isDirector } });
+      }
+      return;
+    }
+    const n = (autoRounds.get(key) || 0) + 1;
+    const an = (reg.agents[agent] || {}).name || agent;
+    if (n > AUTOPILOT_MAX) {
+      autoRounds.delete(key);
+      broadcast({ type: "chat.message", agent, session: key,
+        text: `🤖 AUTO: ${an} ทำต่อเองครบ ${AUTOPILOT_MAX} รอบแล้วแต่งานยังไม่จบ — ` +
+          `หยุดไว้ตรงนี้ก่อนกันวนไม่จบ สั่ง "ทำต่อ" ได้เลยครับ` });
+      return;
+    }
+    autoRounds.set(key, n);
+    broadcast({ type: "chat.message", agent, session: key,
+      text: `🤖 AUTO — ไม่รอเจ้าของ: ทำต่อเอง (รอบ ${n}/${AUTOPILOT_MAX})` });
+    const cont =
+      `Carry on with the outstanding work now — the owner is away, don't wait for an answer.\n` +
+      (st && st.note ? `The next step you named yourself: ${st.note}\n` : "") +
+      `Where there's a choice, decide it yourself. Finish it properly and verify it before reporting.` + autoNote();
+    // A breath between turns: the office reads as a team working, not a loop.
+    setTimeout(() => {
+      const d2 = { hit: false };
+      const df = isDirector ? makeDelegateFilter(0, key, () => { d2.hit = true; }) : null;
+      runClaude(agent, cont, {
+        session: key || undefined, project,
+        logPrompt: `🤖 AUTO: ทำต่อเอง (รอบ ${n}/${AUTOPILOT_MAX})`,
+        filterText: df ? (t) => stripStatus(df(t)) : (t) => stripStatus(t),
+        onEntry: (k) => { keyRef.key = k; },
+        onDone: autoContinue(agent, project, keyRef, undefined, isDirector, d2),
+      });
+    }, 1500);
+  };
+}
+
 // DELEGATE:-line parser shared by the CEO order and every report-back turn.
 // onHit fires per dispatched assignment ("did he hand off more work?").
 function makeDelegateFilter(depth, session, onHit) {
+  // `session` may be a string or a GETTER. On the owner-facing paths the filter is
+  // built before the run starts, when a fresh thread has no key yet; a value frozen
+  // then is `undefined`, and the report-back 4.5 s later resolves it as "the latest
+  // thread" — which a job, a heartbeat or a social turn may have moved. A getter
+  // reads keyRef at dispatch time, so the result comes home to the thread the order
+  // was given on. (PR #41 — found and first fixed by @sbrasesco.)
+  const sessionNow = () => (typeof session === "function" ? (session() || undefined) : session);
   return (text) => {
     const keep = [];
     for (const ln of String(text).split("\n")) {
@@ -2138,6 +3116,24 @@ function makeDelegateFilter(depth, session, onHit) {
       // DELEGATE: <agent> :: <job>   — or, routed into a workspace:
       // DELEGATE: <agent> @ <project name> :: <job>
       const m = ln.match(/^\s*DELEGATE:\s*([^:@]+?)(?:\s*@\s*([^:]+?))?\s*::\s*(.+)$/);
+      // 🧑‍💻 DELEGATE: codex @ <project> :: <task> — the office runs Codex inside that
+      // project and reports back like a teammate's result. Only when Codex is here.
+      if (m && /^codex$/i.test(m[1].trim()) && codex.detect().installed && codex.settings().enabled) {
+        const inst = m[3].trim(), projName = (m[2] || "").trim();
+        if (onHit) onHit();
+        notifyChannels(`🧑‍💻 → Codex${projName ? " @ " + projName : ""}: ${inst.slice(0, 200)}`);
+        let card = null;
+        try { card = tasks.create({ title: "🧑‍💻 " + inst.slice(0, 120), detail: inst, kind: "delegation", owner: "main", project: projName, status: "doing", source: { kind: "codex", ref: sessionNow() || "" } }); } catch {}
+        Promise.resolve().then(() => codexMission("exec", { task: inst, project: projName }, "main"))
+          .then((r) => {
+            if (card) { try { tasks.move(card.id, r.ok ? "done" : "waiting"); } catch {} }
+            const text = (r.ok ? r.text : ("Codex failed: " + (r.error || "unknown error") + (r.text ? "\n" + r.text : ""))) +
+              (r.diff && r.diff.files ? `\n\n[changes in ${r.diff.project || projName || "the workspace"}: ${r.diff.files} file(s) — ${r.diff.summary || ""}]` : "\n\n[no file changes]");
+            reportToMain("codex", text, !!r.ok, depth, sessionNow());
+          })
+          .catch((e) => { if (card) { try { tasks.move(card.id, "waiting"); } catch {} } reportToMain("codex", "Codex could not run: " + (e && e.message), false, depth, sessionNow()); });
+        continue;
+      }
       // Accept the agent id OR its display name (models love names).
       let tgt = null;
       if (m) {
@@ -2148,6 +3144,7 @@ function makeDelegateFilter(depth, session, onHit) {
       }
       if (tgt && tgt !== "ceo" && tgt !== "main") {
         broadcast({ type: "task.delegated", agent: "main", target: tgt });
+        notifyChannels(`🕊 → ${(reg.agents[tgt] && reg.agents[tgt].name) || tgt}: ${String(m[3] || "").trim().slice(0, 200)}`);
         if (onHit) onHit();
         const inst = m[3];
         const t = tgt;
@@ -2167,20 +3164,29 @@ function makeDelegateFilter(depth, session, onHit) {
           // agent must NOT enter it — report back so the Director re-plans
           // (and the two never collide inside one working tree).
           if (proj && projWin[proj]) {
-            reportToMain(t, `โปรเจค "${projName || proj}" เจ้าของกำลังเปิดทำงานอยู่ — ` +
-              `เข้าไปทำตอนนี้ไม่ได้ รอจนเจ้าของปิดหน้าต่างก่อน`, false, depth, session);
+            reportToMain(t, `The owner currently has project "${projName || proj}" open in a window — ` +
+              `it cannot be entered right now; wait until the owner closes that window.`, false, depth, sessionNow());
             return;
           }
+          // 📋 A delegation is a card on the board, owned by the assignee, from
+          // "doing" to "done" (or "waiting" when the task failed and needs a human).
+          let card = null;
+          try { card = tasks.create({ title: inst.replace(/\s+/g, " ").slice(0, 120), detail: inst, kind: "delegation", owner: t, project: proj ? ((projects.find((p) => p.id === proj) || {}).name || proj) : "", status: "doing", source: { kind: "delegation", ref: (sessionNow() || "") + ":" + Date.now() } }); } catch {}
           const tl = sess[t] || [];
           const te = tl.length ? tl.reduce((a, b) => (a.ts > b.ts ? a : b)) : null;
-          runClaude(t, inst, {
+          // Carry the autonomy mandate on both the first run AND any auto-resume.
+          const dinst = inst + DELEGATE_NOTE;
+          runClaude(t, dinst, {
             project: proj,
             // No project → a FRESH workspace thread so the agent never inherits a
             // stale project binding from its previous task. With a project, fork a
             // new thread only when the agent's latest one lives elsewhere.
             session: proj ? ((!te || te.proj !== proj) ? "new" : undefined) : "new",
-            resumable: true, resumePrompt: inst,   // delegated work auto-resumes after a limit/restart
-            onDone: (out, ok) => verifyThenReport(t, inst, out, ok, depth, session, proj),
+            resumable: true, resumePrompt: dinst,   // delegated work auto-resumes after a limit/restart
+            onDone: (out, ok) => {
+              if (card) { try { tasks.move(card.id, ok ? "done" : "waiting"); } catch {} }
+              verifyThenReport(t, inst, out, ok, depth, sessionNow(), proj);
+            },
           });
         }, 4500);
       } else keep.push(ln);
@@ -2196,7 +3202,9 @@ function makeDelegateFilter(depth, session, onHit) {
 // the assignee ONCE (resuming their thread), then reports. Never recurses; never blocks
 // (any reviewer failure ships the original result).
 function verifyThenReport(fromId, task, out, ok, depth, session, proj) {
-  if (!reg.verifyDelegated || !ok) return reportToMain(fromId, out, ok, depth, session);
+  // Eco mode skips the QA double-pass — it re-runs a whole review turn per
+  // delegated task, the single biggest optional token cost in the office.
+  if (!reg.verifyDelegated || reg.ecoMode || !ok) return reportToMain(fromId, out, ok, depth, session);
   const a = reg.agents[fromId] || { name: fromId };
   // Snapshot the assignee's WORK thread now — before the review run spawns a new one.
   const wl = sess[fromId] || [];
@@ -2247,20 +3255,27 @@ function reportToMain(fromId, text, ok, depth, session) {
       : `Write the final summary for the owner (CEO) now — clear, concrete, in ` +
         `the language of the original order. Do not delegate further.`);
   queueDirectorTurn((release) => {
-    let delegatedMore = false;
-    runClaude("main", wrapped, {
+    const dele = { hit: false };
+    const keyRef = { key: session || "" };
+    const df = depth < 2 ? makeDelegateFilter(depth + 1, () => keyRef.key, () => { dele.hit = true; }) : null;
+    runClaude("main", wrapped + autoNote(), {
       session,
       noSub: true,
       logPrompt: `📨 รายงานผลจาก ${a.name}`,
-      filterText: depth < 2
-        ? makeDelegateFilter(depth + 1, session, () => { delegatedMore = true; })
-        : undefined,
-      onDone: (_finalText, fOk) => {
+      filterText: df ? (t) => stripStatus(df(t)) : (t) => stripStatus(t),
+      onEntry: (k) => { keyRef.key = k; },
+      // 🤖 AUTO hooks the summary turn: this is where the office used to go quiet
+      // ("…so which would you like?") until the owner came back to answer.
+      onDone: autoContinue("main", undefined, keyRef, (_finalText, fOk) => {
         release();
         // No further hand-offs → that WAS the summary: walk it to the boss.
-        if (!delegatedMore && fOk)
+        if (!dele.hit && fOk) {
           broadcast({ type: "ceo.report", agent: "main" });
-      },
+          // Follow-from-the-phone: the finished-work summary (with any preview
+          // images ridden along as photos) also lands on Telegram/Discord/….
+          notifyChannels(_finalText && "📨 " + stripStatus(_finalText));
+        }
+      }, true, dele),
     });
   });
 }
@@ -2333,8 +3348,7 @@ function runSub(parentId, subId, taskText, entry, onDone) {
   if (mcpNames.length) {
     const conf = { mcpServers: {} };
     for (const n of mcpNames) {
-      const parts = String(reg.mcpServers[n].command).trim().split(/\s+/);
-      conf.mcpServers[n] = { command: parts[0], args: parts.slice(1) };
+      conf.mcpServers[n] = mcpEntry(reg.mcpServers[n]);
     }
     mcpConfig = path.join(__dirname, `mcp_${parentId.replace(/[^\w-]/g, "_")}_sub.json`);
     fs.writeFileSync(mcpConfig, JSON.stringify(conf));
@@ -2352,12 +3366,34 @@ function runSub(parentId, subId, taskText, entry, onDone) {
     } catch {}
   }
   // Ghosts work where their parent works (project-bound threads included).
-  const subCwd = (entry.proj && projectDir(entry.proj)) || WORKSPACE;
+  const sharedCwd = (entry.proj && projectDir(entry.proj)) || WORKSPACE;
+  const projCwd = entry.proj ? projectDir(entry.proj) : null;
+  // ...except when the owner has asked for isolation. Ghosts are the one place
+  // the office runs several sessions at once in one directory, which is a race
+  // no amount of care wins. A worktree is the same repo, checked out separately,
+  // so two ghosts editing one file simply cannot see each other's edits.
+  //
+  // Off by default on purpose: it MOVES where a ghost's edits land. They arrive
+  // as a branch to merge instead of as changes already in the working tree, and
+  // that is not a thing to switch on under someone without asking.
+  // Only for PROJECT work. The plain workspace lives inside the office's own
+  // repository, so isolating there would put a ghost's notes on an office
+  // branch instead of in the workspace — surprising, and not what this is for.
+  const wt = (reg.ghostWorktrees === true && projCwd)
+    ? worktree.create(projCwd, subId) : null;
+  const subCwd = wt ? wt.dir : sharedCwd;
+  // The parent writes jobs the obvious way — "in C:\work\game, edit shared.txt" —
+  // and a ghost handed an absolute path uses it, walking straight out of its own
+  // checkout and back in with its siblings. Measured, not guessed: the first
+  // end-to-end run had two ghosts overwrite each other from inside perfectly
+  // good private checkouts.
+  const job = wt ? worktree.rewritePaths(taskText, projCwd, wt.dir) : taskText;
   // Ghosts run on the parent agent's backend (the swappable brain).
   const route = brainRoute(parentId);
   if (route.modelArgs.length) args.push(...route.modelArgs);
-  const child = spawn("claude", args, {
-    cwd: subCwd, shell: true,
+  // A ghost runs where its parent runs — same backend, same box.
+  const child = spawnAgent(parentId, args, {
+    cwd: subCwd,
     env: { ...process.env, ...(reg.apiKeys || {}), ...route.env, OFFICE_ADAPTER: "1", OFFICE_AGENT: subId, OFFICE_TASK: entry.key },
   });
   child.stdin.write(
@@ -2366,13 +3402,30 @@ function runSub(parentId, subId, taskText, entry, onDone) {
     (a.prompt ? `\nParent persona:\n${a.prompt}\n` : "\n") +
     `You were split off for ONE focused job. Do it fast and directly; your final ` +
     `message must BE the result (data, findings, answer) — no meta talk, no asking ` +
-    `back. Reply in the language of the job. Never split further.\n\nJOB: ${taskText}`);
+    `back. Reply in the language of the job. Never split further.\n` +
+    // Isolation is only real if the INSTRUCTIONS agree with it. Saying which
+    // directory is home stops a ghost drifting back out to the shared one.
+    (wt
+      ? `\nYou have your OWN private checkout of this project at ${wt.dir}. Other ` +
+        `clones are working on the same project at the same time, each in their own ` +
+        `copy. Do every part of this job inside YOUR directory — never reach outside ` +
+        `it, even if some other path looks like the same project. Your changes are ` +
+        `collected from there when you finish.\n`
+      : "") +
+    `\nJOB: ${job}`);
   child.stdin.end();
   let buf = "", lastText = "", finished = false;
   const finish = (ok) => {
     if (finished) return;
     finished = true;
     clearTimeout(watchdog);
+    // Settle the worktree even when the run FAILED: a ghost that was killed
+    // half way through still wrote real files, and throwing them away is worse
+    // than leaving a branch nobody merges.
+    if (wt) {
+      try { lastText += worktree.settle(wt, taskText); }
+      catch (e) { console.error("[worktree] settle:", e.message); }
+    }
     onDone(lastText, ok);
   };
   // Ghosts are short-lived by contract — a stuck one is reaped, its slot
@@ -2711,74 +3764,22 @@ async function imageTextBlock(files) {
     "(ถ้าโมเดลคุณดูภาพได้เอง ให้ใช้ Read กับไฟล์ต้นฉบับเพื่อความละเอียด)]:\n" + parts.join("\n\n");
 }
 
-// ---------------------------------------------------------------- image gen
-// 🖼 a SYSTEM TOOL any agent (or the owner) can call: text → PNG on disk.
-// OpenAI gpt-image-1 first, Gemini image generation as the fallback.
-function genImage(prompt) {
-  return new Promise((resolve, reject) => {
-    const k = reg.apiKeys || {};
-    const https = require("https");
-    const save = (b64) => {
-      const dir = path.join(WORKSPACE, "uploads");
-      fs.mkdirSync(dir, { recursive: true });
-      const name = "gen_" + Date.now() + ".png";
-      const full = path.join(dir, name);
-      fs.writeFileSync(full, Buffer.from(b64, "base64"));
-      resolve({ path: full, url: "/uploads/" + name });
-    };
-    const tryGemini = (err) => {
-      if (!k.GEMINI_API_KEY) return reject(err || new Error("ต้องมี OPENAI_API_KEY หรือ GEMINI_API_KEY (⚙ CONNECT)"));
-      const body = JSON.stringify({
-        contents: [{ parts: [{ text: "Generate an image: " + String(prompt).slice(0, 2000) }] }],
-        generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
-      });
-      const rq = https.request({
-        method: "POST", host: "generativelanguage.googleapis.com",
-        path: "/v1beta/models/gemini-2.5-flash-image:generateContent?key=" + k.GEMINI_API_KEY,
-        headers: { "content-type": "application/json", "content-length": Buffer.byteLength(body) },
-      }, (rs) => {
-        let o = "";
-        rs.on("data", (c) => (o += c));
-        rs.on("end", () => {
-          try {
-            const j = JSON.parse(o);
-            const part = j.candidates && j.candidates[0] &&
-              j.candidates[0].content.parts.find((x) => x.inlineData);
-            if (part) { auxCost("gemini", COST_RATES.gemini_image_each); save(part.inlineData.data); }
-            else reject(new Error((j.error && j.error.message) || "gemini image: empty"));
-          } catch (e) { reject(e); }
-        });
-      });
-      rq.setTimeout(120000, () => rq.destroy(new Error("gemini image timeout")));
-      rq.on("error", reject);
-      rq.write(body);
-      rq.end();
-    };
-    if (!k.OPENAI_API_KEY) return tryGemini(null);
-    const body = JSON.stringify({ model: "gpt-image-1",
-      prompt: String(prompt).slice(0, 4000), size: "1024x1024" });
-    const rq = https.request({
-      method: "POST", host: "api.openai.com", path: "/v1/images/generations",
-      headers: { authorization: "Bearer " + k.OPENAI_API_KEY,
-        "content-type": "application/json", "content-length": Buffer.byteLength(body) },
-    }, (rs) => {
-      let o = "";
-      rs.on("data", (c) => (o += c));
-      rs.on("end", () => {
-        try {
-          const j = JSON.parse(o);
-          if (j.data && j.data[0] && j.data[0].b64_json) { auxCost("openai", COST_RATES.openai_image_each); save(j.data[0].b64_json); }
-          else tryGemini(new Error((j.error && j.error.message) || "openai image: empty"));
-        } catch (e) { tryGemini(e); }
-      });
-    });
-    rq.setTimeout(180000, () => rq.destroy(new Error("openai image timeout")));
-    rq.on("error", (e) => tryGemini(e));
-    rq.write(body);
-    rq.end();
-  });
+// ---------------------------------------------------------------- media room
+// 🖼 🎬 SYSTEM TOOLS any agent (or the owner) can call. The provider work lives
+// in daemon/media.js; this is the office's context for it — which keys, where
+// files land, and who gets billed.
+function mediaCtx() {
+  return {
+    keys: reg.apiKeys || {},
+    uploads: path.join(WORKSPACE, "uploads"),
+    onCost: (provider, kind) => {
+      if (kind === "image")
+        auxCost(provider, provider === "openai" ? COST_RATES.openai_image_each : COST_RATES.gemini_image_each);
+      else if (kind === "video") auxCost(provider, COST_RATES.gemini_video_each);
+    },
+  };
 }
-
+const genImage = (prompt) => media.image(prompt, mediaCtx());
 // ---------------------------------------------------------------- updates
 // A release = a bump of the VERSION file on the `main` branch. We compare the
 // LOCAL VERSION with main's VERSION (raw), so routine commits (docs, web, work
@@ -2918,9 +3919,11 @@ function channelCommand(text) {
       "/agents — รายชื่อทีม",
       "/projects — โปรเจค",
       "/who — ใครกำลังทำงานอยู่",
+      "/inbox — สิ่งที่รอคุณตัดสินใจ (ตอบ \"1 yes\" หรือ \"2 no เหตุผล\")",
       "",
       "พิมพ์ข้อความปกติ = สั่งงาน Director ได้เลย 👑",
     ].join("\n");
+  if (cmd === "inbox" || cmd === "pending") return approvals.summary();
   if (cmd === "agents" || cmd === "team") {
     const list = Object.keys(reg.agents)
       .filter((id) => id !== "ceo")
@@ -2953,10 +3956,33 @@ function channelCommand(text) {
 
 const channels = require("./channels")({
   getConfig: () => reg.channels || {},
+  uploadsDir: path.join(WORKSPACE, "uploads"),   // resolve "/uploads/…" for Telegram photo upload
   log: (s) => console.log(s),
+  // A button pressed under an approval card (Telegram inline keyboard).
+  onCallback(channel, data, answer) {
+    const m = /^apv:([^:]+):([a-z]+)$/.exec(String(data || ""));
+    if (!m) return answer("?");
+    approvals.respond(m[1], m[2], { by: channel + ":button" })
+      .then((ok) => answer(ok ? "✓ " + m[2] : "already decided"));
+  },
   onMessage(channel, from, text, reply, typing) {
     broadcast({ type: "channel.message", channel, from,
       text: String(text).slice(0, 500) });
+    // A reply to something waiting in the inbox ("1 yes", "/deny 2 too risky",
+    // or a bare "yes" when exactly one thing is pending) is answered here and
+    // never reaches the Director as an order.
+    // A keyword that starts a workflow ("standup", "report …") fires it and answers
+    // straight away — the message never becomes a Director order.
+    if (triggers.onChannel(channel, from, String(text))) {
+      try { reply("🔀 started"); } catch {}
+      return;
+    }
+    const ap = approvals.parseReply(String(text));
+    if (ap) {
+      approvals.respond(ap.id, ap.decision, { by: channel + ":" + from, note: ap.note })
+        .then((ok) => { try { reply(ok ? `✓ ${ap.decision}` + (ap.note ? ` — “${ap.note}”` : "") : "That item is no longer waiting."); } catch {} });
+      return;
+    }
     // Slash command? answer instantly, no Director turn (#123).
     const cmd = channelCommand(String(text).trim());
     if (cmd !== null) { try { reply(cmd); } catch (e) { console.error("[chan cmd]", e.message); } return; }
@@ -2989,6 +4015,204 @@ const channels = require("./channels")({
 });
 channels.restart();
 
+// ---------------------------------------------------------------- inbox
+// 🔔 Notifications with rules (daemon/notify.js) and 📥 one approvals queue for
+// everything that waits on a person (daemon/approvals.js). Both are indexes and
+// plumbing; each kind's real resolver stays where it always was.
+const notify = require("./notify")({
+  file: path.join(__dirname, "notifications.json"),
+  reg, saveReg, broadcast,
+  relay: (text, item) => channels.relay(text, item),
+  log: (s) => console.log(s),
+});
+const approvals = require("./approvals")({
+  file: path.join(__dirname, "approvals.json"),
+  broadcast, notify: (spec) => notify.send(spec),
+  log: (s) => console.log(s),
+});
+// 💸 Money budgets (daemon/budget.js): caps per day / agent / project over the
+// spend the office already records, a warning at 80%, a hard stop at 100%.
+const budget = require("./budget")({
+  reg, saveReg, stats: () => stats, notify: (spec) => notify.send(spec), log: (s) => console.log(s),
+});
+
+// 🔀 The workflow engine (daemon/workflows.js) and its triggers (daemon/triggers.js).
+// A workflow step that needs an agent becomes a REAL turn through runClaude — the
+// same engine, the same permission broker, the same budget gate — and its final
+// text is the step's output. The Director gets DELEGATE power on a step, as on a
+// job; anyone else works alone.
+// 📋 Work items (v1.4, design F): one board behind cards the owner writes,
+// delegations, fired jobs, meeting action items and workflow runs.
+const tasks = require("./tasks")({
+  file: path.join(WORKSPACE, "tasks.json"), broadcast, log: (m) => console.log(m),
+  notify: (n) => notify.send(n), agentName: (id) => (reg.agents[id] || {}).name || id,
+});
+// 🧪 Skill regression (v1.6, design J): cases per skill; a self-correction that
+// breaks one is refused. Judged by the same headless turn the reflection uses.
+const skillTests = require("./skilltests")({ reg, saveReg, log: (m) => console.log(m),
+  ask: (prompt, o) => claudeText(prompt, { provider: o && o.provider, model: o && o.model }) });
+// 🧑‍💻 Codex as a system tool (v1.4, design G2). Never the brain: the agent that
+// calls it keeps its persona, memory, permissions and budget line.
+const codex = require("./codex")({
+  reg, saveReg, broadcast, log: (m) => console.log(m),
+  onUsage: (agent, project, inTok, outTok) => brainBump("codex", inTok, outTok, agent, project || null),
+  // 👻 GHOST ISOLATION applies unchanged: with it on, Codex works in its own checkout
+  // and its edits arrive as a branch to merge.
+  isolate: (dir, id) => {
+    if (reg.ghostWorktrees !== true) return null;
+    const wt = worktree.create(dir, "codex-" + id);
+    return wt ? { dir: wt.dir, settle: () => worktree.settle(wt, "codex " + id) } : null;
+  },
+});
+// Which directory a codex call may work in: a registered project (by name or id),
+// a path that IS a registered project, or the shared workspace. Never elsewhere —
+// the office's own scope, not the whole disk.
+function codexDir(project) {
+  const p = String(project || "").trim();
+  if (!p) return { dir: WORKSPACE, project: "" };
+  const byName = projectByName(p) || projects.find((x) => x.id === p);
+  if (byName) return { dir: byName.dir, project: byName.id };
+  const norm = path.resolve(p).toLowerCase();
+  const byDir = projects.find((x) => path.resolve(x.dir).toLowerCase() === norm);
+  if (byDir) return { dir: byDir.dir, project: byDir.id };
+  if (norm.startsWith(path.resolve(WORKSPACE).toLowerCase())) return { dir: path.resolve(p), project: "" };
+  throw new Error(`"${p}" is not a registered project — codex works inside registered projects or the workspace`);
+}
+// A Codex run is a mission row like any other headless turn (🧑‍💻 at the desk).
+function codexMission(kind, o, agent) {
+  const target = codexDir(o.project);
+  const tid = "cx" + Date.now().toString(36);
+  const title = "🧑‍💻 Codex" + (kind === "review" ? " review" : "") + ": " + String(o.task || o.instructions || target.project || "").replace(/\s+/g, " ").slice(0, 70);
+  broadcast({ type: "task.started", agent, task: tid, title });
+  const p = kind === "review"
+    ? codex.review({ dir: target.dir, project: target.project, agent, base: o.base, commit: o.commit, instructions: o.instructions, model: o.model })
+    : codex.exec({ task: o.task, dir: target.dir, project: target.project, agent, sandbox: o.sandbox, model: o.model, images: o.images, isolate: !!target.project });
+  return p.then((r) => {
+    broadcast({ type: r.ok ? "task.completed" : "task.failed", agent, task: tid });
+    if (target.project) broadcast({ type: "project.touched", project: target.project }, false);
+    return r;
+  });
+}
+
+const workflows = require("./workflows")({
+  dir: path.join(WORKSPACE, "workflows"),
+  examplesDir: path.join(__dirname, "workflow-examples"),
+  broadcast, notify: (spec) => notify.send(spec), approvals, budget,
+  relay: (text) => channels.relay(text),
+  log: (s) => console.log(s),
+  runAgent: (agent, prompt, o = {}) => new Promise((resolve) => {
+    const id = reg.agents[agent] && agent !== "ceo" ? agent : "main";
+    const director = id === "main";
+    const keyRef = { key: "" };
+    try {
+      runClaude(id, prompt + (director && !o.noSub ? directorNote() : "") + autoNote(), {
+        session: "new", noSub: !!o.noSub, project: o.project,
+        logPrompt: "🔀 " + (o.workflow ? "workflow " + o.workflow : "workflow") + " · " + String(o.node || "step"),
+        track: { agent: id, title: "🔀 " + String(prompt).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 70) },
+        filterText: director && !o.noSub ? (t) => stripStatus(makeDelegateFilter(0, keyRef.key || undefined)(t)) : (t) => stripStatus(t),
+        onEntry: (k) => { keyRef.key = k; },
+        onDone: (out, ok) => resolve({ ok: !!ok, text: String(out || "") }),
+      });
+    } catch (e) { resolve({ ok: false, text: String(e && e.message) }); }
+  }),
+});
+const triggers = require("./triggers")({ reg, saveReg, workflows, log: (s) => console.log(s) });
+// 🧑‍💻 The codex workflow node: the step's text is the task, cfg.project picks where.
+workflows.registerNode("codex", async (n, h) => {
+  const r = await codexMission("exec", { task: n.text, project: (n.cfg && n.cfg.project) || "", sandbox: n.cfg && n.cfg.sandbox }, "main");
+  if (!r.ok) throw new Error(r.error || "codex failed");
+  return { text: r.text, diff: r.diff };
+}, { label: "🧑‍💻 Codex", hint: "a self-contained coding task for Codex · set cfg.project or it works in the workspace" });
+// A workflow run is a card on the board too (kind "workflow"), so the owner sees
+// what is running without opening the Builder.
+function syncWorkflowCard(run) {
+  if (!run || !run.id) return;
+  try {
+    const card = tasks.bySource("workflow", run.id);
+    if (!card) { if (run.state === "running") tasks.create({ title: "🔀 " + run.name, kind: "workflow", owner: "main", status: "doing", source: { kind: "workflow", ref: run.id } }); return; }
+    if (run.state === "done" && card.status !== "done") tasks.move(card.id, "done");
+    else if (run.state === "failed" && card.status !== "waiting") { tasks.update(card.id, { detail: "failed — see ▶ RUNS in the Workflow Builder" }); tasks.move(card.id, "waiting"); }
+    else if (run.state === "cancelled" && card.status !== "done") tasks.remove(card.id);
+  } catch (e) { console.error("[tasks] workflow card", e && e.message); }
+}
+onBroadcastHook = (evt) => {
+  triggers.onEvent(evt);
+  if (evt && evt.type === "workflow.run") syncWorkflowCard(evt.run);
+  if (typeof plugins !== "undefined") plugins.onEvent(evt);
+};
+approvals.on("workflow", (item, d) => {
+  const m = item.meta || {};
+  workflows.resume(m.runId, m.nodeId, d === "approve" ? "approve" : "reject", item.note);
+});
+// Runs that were mid-flight when the office last stopped pick up where they can;
+// file watchers come back on.
+setTimeout(() => {
+  try { const n = workflows.resumeAll(); if (n) console.log("[wf] resumed " + n + " run(s)"); } catch (e) { console.error("[wf] resume", e && e.message); }
+  try { triggers.startAll(); } catch (e) { console.error("[trigger] start", e && e.message); }
+}, 1500);
+
+// Work milestones → wherever the owner is, through the notification rules.
+// Hoisted function so earlier-in-file call sites can use it. `kind` picks the
+// rule; reg.channelNotify=false still mutes the channel leg (default on).
+function notifyChannels(text, kind) {
+  if (!text) return;
+  const t = String(text);
+  const nlAt = t.indexOf(N_LITERAL);
+  notify.send({ kind: kind || "done", title: (nlAt > 0 ? t.slice(0, nlAt) : t).slice(0, 160),
+    body: nlAt > 0 ? t.slice(nlAt + 1) : "", channelText: t });
+}
+const N_LITERAL = String.fromCharCode(10);
+
+// How each approval kind is actually carried out once a person decides — from
+// the panel, the CLI, or a reply typed on a phone. Every handler is idempotent:
+// a decision that arrives twice (the UI and the phone) does the work once.
+approvals.on("tool-permission", (item, d) => {
+  if (d === "expired") return finishPerm(item.ref, "deny", "timeout");
+  if (d === "always") {
+    const pend = pendingPerms.get(item.ref);
+    if (pend) {
+      const base = String(pend.agent).split("#")[0];
+      reg.autoAllow = reg.autoAllow || {};
+      reg.autoAllow[base] = [...new Set([...(reg.autoAllow[base] || []), pend.tool])];
+      const a = reg.agents[base];
+      if (a && Array.isArray(a.tools) && !a.tools.includes(pend.tool)) a.tools.push(pend.tool);
+      saveReg(); pushRoster();
+    }
+  }
+  finishPerm(item.ref, d === "deny" ? "deny" : "allow", "owner");
+});
+approvals.on("project-trust", (item, d) => { resolveTrust(item.ref, d === "allow"); });
+approvals.on("proposal", (item, d) => {
+  const p = proposals.find((x) => x.id === item.ref);
+  if (p && p.status === "pending" && d !== "expired") decideProposal(p, d, item.note);
+});
+approvals.on("job", (item, d) => {
+  const job = jobs.find((j) => j.id === item.ref);
+  if (!job) return;
+  if (d === "delete") { jobs = jobs.filter((j) => j.id !== item.ref); saveJobs(); broadcast({ type: "jobs.changed" }, false); return; }
+  if (d === "enable" && !job.enabled) {
+    job.enabled = true; saveJobs(); broadcast({ type: "jobs.changed" }, false);
+    if (job.mode === "now") dispatchJob(job);
+  }
+});
+approvals.on("blocked", (item, d) => {
+  if (d !== "continue") return;
+  const m = item.meta || {};
+  const an = (reg.agents[item.agent] || {}).name || item.agent;
+  broadcast({ type: "chat.message", agent: item.agent, session: m.key,
+    text: `▶ ${an}: owner answered — continuing` + (item.note ? ` (“${item.note}”)` : "") });
+  const keyRef = { key: m.key || "" };
+  const df = m.isDirector ? makeDelegateFilter(0, m.key) : null;
+  runClaude(item.agent,
+    `The owner has answered your STATUS: BLOCKED` +
+    (item.note ? `: "${item.note}"` : ` — go ahead and decide it yourself`) +
+    `.` + N_LITERAL + `Carry on with the work from where you stopped.` + autoNote(),
+    { session: m.key || undefined, logPrompt: "▶ continue — owner answered",
+      filterText: df ? (t) => stripStatus(df(t)) : (t) => stripStatus(t),
+      onEntry: (k) => { keyRef.key = k; },
+      onDone: autoContinue(item.agent, m.project, keyRef, undefined, !!m.isDirector) });
+});
+
 // ---------------------------------------------------------------- plugins
 const plugins = require("./plugins")({
   broadcast, reg, saveReg, workspace: WORKSPACE, daemonDir: __dirname,
@@ -2997,6 +4221,14 @@ const plugins = require("./plugins")({
   // post a visible line to the office feed (shows in the overlay stream).
   feed: (text, agent) => broadcast({ type: "chat.message", agent: agent || "main", text: String(text) }),
   log: (s) => console.log(s),
+  // v1.4 hooks (design H): the office's own machinery, handed to plugins.
+  notify: (item) => notify.send(item || {}),
+  approvals: { ask: (item) => approvals.ask({ kind: "plugin", ...(item || {}) }).promise, list: (o) => approvals.list(o || {}), pendingCount: () => approvals.pendingCount() },
+  tasks, calendar,
+  schedule: (p) => createJob(p || {}),
+  triggers, workflows,
+  codex: { exec: (o) => codexMission("exec", o || {}, (o && o.agent) || "main"), review: (o) => codexMission("review", o || {}, (o && o.agent) || "main"), status: () => codex.status() },
+  skillTests,
 });
 
 // ---------------------------------------------------------------- social
@@ -3029,7 +4261,7 @@ const BANTER = [
 
 let lastSocial = Date.now();
 function socialTick(now) {
-  const min = Number(reg.socialMin !== undefined ? reg.socialMin : 120);
+  const min = ecoFloor(Number(reg.socialMin !== undefined ? reg.socialMin : 120), 360);
   if (!min || activeDiscussions > 0 || agentBusy.size > 0) return;
   if (now - lastSocial < min * 60000) return;
   const staff = Object.keys(reg.agents).filter((id) => id !== "ceo" && id !== "main");
@@ -3118,8 +4350,53 @@ function ambientTick(now) {
 // pitch per `proposalMin` minutes (configurable; 0 = unlimited). Agents still
 // discuss freely — only the pitches that REACH the owner are throttled.
 let lastProposalAt = 0;
+// The CEO's verdict on a team pitch — from the panel, the chat card, the CLI or
+// a reply on the phone. Approve → a real project is born and the Director
+// staffs it; reject/hold are remembered. One function so every path agrees.
+function decideProposal(p, decision, message) {
+  p.status = decision === "approve" ? "approved"
+    : decision === "reject" ? "rejected" : "pending";
+  const note = String(message || "").slice(0, 600).trim();   // owner's optional note
+  if (note) p.message = note;
+  saveProposals();
+  const noteLine = note ? `The owner added a note: "${note}"\n` : "";
+  if (decision === "approve") {
+    let proj = null;
+    // Approved projects are born in a DEFAULT projects folder (the
+    // playground) when no location was given — agents never scaffold loose.
+    const playDir = String(reg.playground || path.join(WORKSPACE, "projects"));
+    try {
+      proj = createProject(p.name, "", path.join(playDir, p.name.replace(/[^\wก-๙ -]/g, "_")));
+    } catch (e) { /* duplicate name → Director routes to the existing one */ }
+    queueDirectorTurn((release) => {
+      const pKey = { key: "" };
+      runClaude("main",
+        `The CEO approved the team's project proposal 🎉\n` +
+        `Name: ${p.name}\nIdea: ${p.detail}\nProposed by: ${p.agents.join(", ")}\n` + noteLine +
+        (proj ? `The project has been created at ${proj.dir} (work only inside this folder).\n` : "") +
+        `Rules: never modify the program's core (daemon/godot/shell/cli). ` +
+        `An extension of the office must be a plugin, per docs/guide/plugins.md ` +
+        `(start from the template: github.com/bagidea/bagidea-office-template).\n` +
+        `Staff it now: DELEGATE: <agent> @ ${p.name} :: <a clear first task> — ` +
+        `let the people who proposed the idea lead it, then summarize the plan briefly` +
+        (note ? `, steering the work by the owner's note` : "") + `.`,
+        { logPrompt: `✅ อนุมัติข้อเสนอ: ${p.name}`,
+          filterText: makeDelegateFilter(0, () => pKey.key),
+          onEntry: (k) => { pKey.key = k; },
+          onDone: () => release() });
+    });
+  } else if (decision === "reject" && note) {
+    // The team hears WHY — the owner's note lands in the office feed.
+    broadcast({ type: "chat.message", agent: "main",
+      text: `CEO ยังไม่อนุมัติ "${p.name}" — ${note}` });
+  }
+  broadcast({ type: "proposal." + p.status, agent: p.by, name: p.name, proposal: p.id });
+  { const ap = approvals.byRef("proposal", p.id);
+    if (ap && p.status !== "pending") approvals.respond(ap.id, p.status === "approved" ? "approve" : "reject", { by: "ui", note: message }); }
+}
+
 function addProposal(by, agents, name, detail) {
-  const gap = Number(reg.proposalMin !== undefined ? reg.proposalMin : 120);
+  const gap = ecoFloor(Number(reg.proposalMin !== undefined ? reg.proposalMin : 120), 360);
   if (gap && Date.now() - lastProposalAt < gap * 60000) return null;  // too soon
   lastProposalAt = Date.now();
   const p = { id: "pr" + Date.now(), by, agents, name: String(name).slice(0, 60),
@@ -3127,6 +4404,8 @@ function addProposal(by, agents, name, detail) {
   proposals.push(p);
   saveProposals();
   broadcast({ type: "proposal.created", agent: by, name: p.name, proposal: p.id });
+  approvals.ask({ kind: "proposal", ref: p.id, agent: by, title: `Pitch: ${p.name}`,
+    detail: p.detail + N_LITERAL + "— " + agents.map((id) => (reg.agents[id] && reg.agents[id].name) || id).join(", ") });
   return p;
 }
 
@@ -3161,17 +4440,17 @@ const DISCUSSION_INSTRUCTION =
 // it as one extracted constant makes the social path explicit and prevents the
 // regression where a phase rewrite silently drops project-pitch generation.
 const SOCIAL_PROPOSAL_INSTRUCTION =
-  `\nคุณภาพสำคัญกว่าปริมาณเสมอ. ส่วนใหญ่ไอเดียควร "อยู่เป็นไอเดีย" — เสนอเฉพาะอันที่` +
-  `มีประโยชน์จริง ใช้ได้จริง และคุณจะใช้มันเองหรือเจ้าของได้ใช้จริง ๆ. ` +
-  `อย่าเสนอของเล่นทิ้งขว้างหรือ plugin ขยะ และอย่าเสนอถี่ — ถ้ายังไม่ตกผลึกหรือยังไม่คุ้ม อย่าเพิ่งเสนอ.\n` +
-  `ก่อนจะเสนอ ถามตัวเองให้ครบ: ใครได้ใช้? แก้ปัญหาอะไรจริง ๆ? ทำไมถึงคุ้มที่จะสร้าง? ดีกว่าของที่มีอยู่ตรงไหน?\n` +
-  `ถ้าตกผลึกเป็นโปรเจคที่ "ควรสร้างจริง" ให้เพิ่มบรรทัดสุดท้าย:\n` +
-  `PROPOSAL: <ชื่อโปรเจค> :: <อธิบายให้ชัด: ทำอะไร ใครใช้ แก้ปัญหาอะไร และทำไมถึงคุ้ม — ให้เจ้าของตัดสินใจได้>\n` +
-  `คิดให้รอบคอบและคิดการใหญ่ได้: plugin ที่จริงจังมี UI + แก้ปัญหาให้เจ้าของได้จริง, หรือเป็น` +
-  `เว็บ/เว็บแอป/โปรแกรม/เครื่องมือที่ใช้งานได้จริง (โปรเจคอิสระใน workspace). เลือกขนาดให้เหมาะกับคุณค่าของมัน.\n` +
-  `กติกาความปลอดภัยข้อเดียว: ถ้าจะต่อยอดกับตัวโปรแกรม BagIdea Office เองให้เสนอเป็น ` +
-  `"plugin" เท่านั้น (ดู docs/guide/plugins.md — plugin เข้าถึงโปรแกรมได้ลึก: panel, route, command, ` +
-  `broadcast, ฯลฯ ทำเป็น solution จริงให้เจ้าของได้) — ห้ามแก้ระบบหลัก (daemon/godot/shell) ตรง ๆ เพราะจะทำให้โปรแกรมพัง.`;
+  `\nQuality over quantity, always. Most ideas should "stay ideas" — propose only one that is ` +
+  `genuinely useful, genuinely workable, and that you or the owner would actually use. ` +
+  `No throwaway toys or junk plugins, and don't propose often — if it hasn't crystallized or isn't worth it yet, don't propose it yet.\n` +
+  `Before proposing, ask yourself all of: who would use it? what problem does it really solve? why is it worth building? how is it better than what exists?\n` +
+  `If it crystallizes into a project that "should really be built", add a final line:\n` +
+  `PROPOSAL: <project name> :: <a clear description: what it does, who uses it, what problem it solves and why it is worth it — enough for the owner to decide>\n` +
+  `Think carefully, and think big when warranted: a serious plugin with a UI that solves a real problem for the owner, or a ` +
+  `website / web app / program / tool that really works (an independent project in the workspace). Size it to its value.\n` +
+  `One safety rule: anything that extends the BagIdea Office program itself must be proposed as a ` +
+  `"plugin" only (see docs/guide/plugins.md — a plugin reaches deep into the program: panel, routes, commands, ` +
+  `broadcast and more, enough for a real solution for the owner) — never edit the core (daemon/godot/shell) directly; it would break the program.`;
 
 // Meeting templates fill the launcher (topic + discussion depth). Pure data —
 // the overlay maps them to a <select>; they never change phase structure.
@@ -3315,7 +4594,9 @@ async function runDiscussion(ids, topic, rounds, social, preKey) {
             `(WebSearch / WebFetch / Read) — เฉพาะตอนที่จำเป็นจริงๆ เท่านั้น ไม่ต้องค้นพร่ำเพรื่อ ` +
             `และตอบกลับเป็นข้อความสนทนาตามปกติ.` +
             (social ? SOCIAL_PROPOSAL_INSTRUCTION : ""),
-            { tools: social ? "" : "WebSearch,WebFetch,Read,Glob,Grep", provider: a && a.provider, model: a && a.model, env: { OFFICE_AGENT: id, OFFICE_TASK: task } });
+            { tools: social ? "" : "WebSearch,WebFetch,Read,Glob,Grep", provider: a && a.provider, model: a && a.model, env: { OFFICE_AGENT: id, OFFICE_TASK: task },
+              // Show each participant's turn as a live task row (meeting/break-room).
+              track: { agent: id, title: (social ? "☕ พักเบรก: " : "🗣 ประชุม: ") + String(topic || "").slice(0, 60) } });
           let line = text.split("\n").filter(Boolean).join(" ").slice(0, 500);
           // If the owner pressed End while this claude call was in flight, drop the
           // lagging reply entirely — otherwise it would surface as a ghost message
@@ -3363,8 +4644,11 @@ async function runDiscussion(ids, topic, rounds, social, preKey) {
           text: a.text, due: a.due || "", status: "open", created: Date.now()
         }));
         saveActions(entry.key, stamped);
-        for (const a of stamped)
+        for (const a of stamped) {
           broadcast({ type: "meeting.action", action: a, session: entry.key });
+          // 📋 …and a card on the board, owned by whoever the meeting assigned.
+          try { tasks.create({ title: a.text.slice(0, 160), kind: "action", owner: a.owner, due: a.due, source: { kind: "meeting", ref: a.id } }); } catch {}
+        }
       }
     } catch (e) { console.error("[meeting] action items save failed:", e && e.message); }
     // Markdown minutes inside the agents' workspace — searchable by them.
@@ -3377,7 +4661,7 @@ async function runDiscussion(ids, topic, rounds, social, preKey) {
         `- Participants: ${names}\n\n${summaryBlock}` +
         entry.log.map((m) => `**[${m.phase || "chat"}] ${(reg.agents[m.who] || { name: m.who }).name}**: ${m.text}`).join("\n\n") + "\n";
       fs.writeFileSync(path.join(dir, `${entry.key}.md`), md);
-      try { if (retrievalOk) { retrieval.addDoc("arch", "meeting", `arch:meeting:${entry.key}`, md.slice(0, 1200)); retrieval.persist(); } } catch {}
+      try { if (retrievalOk) { retrieval.addDoc("arch", "meeting", `arch:meeting:${entry.key}`, md.slice(0, 1200)); retrieval.persist(); semanticSync(); } } catch {}
     } catch (e) { console.error("[meeting] minutes write failed:", e && e.message); }
   }
 }
@@ -3460,6 +4744,14 @@ const server = http.createServer((req, res) => {
     try { res.end(fs.readFileSync(path.join(__dirname, "winlang.js"))); }
     catch { res.end("window.WinLang={build:async()=>({lang:'th',map:{},tr:s=>s,ensure:async()=>{}})};"); }
 
+  } else if (req.method === "GET" && req.url.split("?")[0] === "/md.js") {
+    // Universal agent-text renderer (marked + DOMPurify + esc/md helpers) shared by
+    // overlay/workflow/watch. Every agent/user text path funnels through md()/esc()
+    // so nothing bypasses sanitization - see daemon/md.js for the security invariant.
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
+    try { res.end(fs.readFileSync(path.join(__dirname, "md.js"))); }
+    catch { res.end("window.esc=function(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]});};window.md=function(t){if(t==null)t='';return window.esc(String(t)).replace(/\\n/g,'<br>');};"); }
+
   } else if (req.method === "GET" && req.url.split("?")[0] === "/watch") {
     // Read-only live activity stream for an agent (opened as its own window) —
     // it only listens on the WS, never sends, so it can't disturb the agent.
@@ -3486,6 +4778,32 @@ const server = http.createServer((req, res) => {
     try { res.end(fs.readFileSync(path.join(__dirname, "pluginshub.html"))); }
     catch { res.end("<p>plugins hub unavailable</p>"); }
 
+  } else if (req.method === "GET" && req.url.split("?")[0] === "/tools/catalog") {
+    // The MCP tool catalog — same deal as the plugin one: fetched LIVE from the
+    // website so a package that gets renamed or deprecated can be corrected by a
+    // PR instead of an office release, falling back to the bundled copy offline.
+    // Half this catalog had rotted out from under us before it was wired this way.
+    const sendLocalTools = () => {
+      let txt = '{"tools":[]}';
+      try { txt = fs.readFileSync(path.join(__dirname, "..", "web", "tools.json"), "utf8"); } catch {}
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(txt);
+    };
+    try {
+      const https = require("https");
+      const rq = https.get(
+        "https://raw.githubusercontent.com/bagidea/bagidea-office/main/web/tools.json",
+        { timeout: 3500, headers: { "user-agent": "bagidea-office" } }, (rs) => {
+          if (rs.statusCode !== 200) { rs.resume(); return sendLocalTools(); }
+          let d = ""; rs.on("data", (c) => (d += c));
+          rs.on("end", () => {
+            try { JSON.parse(d); res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }); res.end(d); }
+            catch { sendLocalTools(); }
+          });
+        });
+      rq.on("error", sendLocalTools);
+      rq.on("timeout", () => { rq.destroy(); sendLocalTools(); });
+    } catch { sendLocalTools(); }
   } else if (req.method === "GET" && req.url.split("?")[0] === "/plugins/catalog") {
     // The community plugin catalog — fetched LIVE from the website (so PR-curated
     // additions show up without waiting for an office update), falling back to the
@@ -3575,19 +4893,37 @@ const server = http.createServer((req, res) => {
         // CEO orders route through the Director; talking to the Director
         // directly gives him the same dispatch power. New threads adopt the
         // requested project workspace.
+        // 🤖 AUTO rides on every owner-facing turn: talking straight to the Director
+        // or to one teammate stalls the same way a CEO order does.
+        // Embed the owner's message ONCE, here, where waiting is allowed. Prompt
+        // assembly below is synchronous the whole way down, so this is the last
+        // point at which a query vector can be fetched at all. Null when the
+        // semantic tier is off or its endpoint is unreachable — recall is then
+        // the word index, exactly as before.
+        let qvec = null;
+        try { qvec = await semantic.embedQuery(cleanForQuery(origPrompt)); } catch {}
+        const keyRef = { key: session || "" }, dele = { hit: false };
+        const reply = wait ? (t, ok) => waited && waited(stripStatus(t), ok) : undefined;
         const task = agent === "ceo"
           ? ceoFlow(prompt, session, project,
-              { logPrompt: voice ? "🎤👑 (สั่งด้วยเสียง) " + origPrompt : origPrompt,
+              { qvec,
+                logPrompt: voice ? "🎤👑 (สั่งด้วยเสียง) " + origPrompt : origPrompt,
                 relay: true,  // mirror the CEO conversation to connected channels
-                onDone: wait ? (t, ok) => waited && waited(t, ok) : undefined })
+                onDone: reply })
           : agent === "main"
-            ? runClaude("main", prompt + directorNote(),
-                { session, project, logPrompt: origPrompt,
-                  filterText: makeDelegateFilter(0, session),
-                  onDone: wait ? (t, ok) => waited && waited(t, ok) : undefined })
-            : runClaude(agent, prompt, { session, project, logPrompt: origPrompt,
+            ? (() => {
+                const df = makeDelegateFilter(0, () => keyRef.key, () => { dele.hit = true; });
+                return runClaude("main", prompt + directorNote() + autoNote(),
+                  { session, project, logPrompt: origPrompt, qvec,
+                    filterText: (t) => stripStatus(df(t)),
+                    onEntry: (k) => { keyRef.key = k; autoRounds.delete(k); },
+                    onDone: autoContinue("main", project, keyRef, reply, true, dele) });
+              })()
+            : runClaude(agent, prompt + autoNote(), { session, project, logPrompt: origPrompt, qvec,
                 resumable: true, resumePrompt: origPrompt,  // a member's direct task auto-resumes
-                onDone: wait ? (t, ok) => waited && waited(t, ok) : undefined });
+                filterText: (t) => stripStatus(t),
+                onEntry: (k) => { keyRef.key = k; autoRounds.delete(k); },
+                onDone: autoContinue(agent, project, keyRef, reply, false) });
         if (!wait) {
           res.writeHead(200, { "content-type": "application/json" });
           res.end(JSON.stringify({ task }));
@@ -3657,7 +4993,7 @@ const server = http.createServer((req, res) => {
     // (provider/model) and latest context usage. Feeds the 🧠 BRAINS sidebar panel.
     const pc = reg.providerConfig || {};
     const KNOWN = ["claude", "glm", "deepseek", "qwen", "minimax", "moonshot",
-      "openai", "gemini", "openrouter", "nvidia", "groq", "cerebras", "xai", "mistral",
+      "openai", "atlascloud", "gemini", "openrouter", "nvidia", "groq", "cerebras", "xai", "mistral",
       "together", "fireworks", "ollama", "lmstudio"];
     const byProvider = {};
     const agents = [];
@@ -3801,11 +5137,24 @@ const server = http.createServer((req, res) => {
     // declares modelsUrl).
     const providerCatalog = {};
     for (const [id, spec] of Object.entries(providers.PROVIDERS)) {
-      const models = (spec.models || []).slice();
+      const hint = (spec.models || []).slice();
+      const pc = (reg.providerConfig || {})[id] || {};
+      const live = (pc.models || []).filter(Boolean);
+      // Claude: the LIVE list from api.anthropic.com wins outright (newest-first),
+      // keeping only the aliases the API never lists ("" = provider default, plus
+      // opus/sonnet/haiku). That's what makes a same-day model appear in the picker.
+      // Other providers keep their curated order here — the UI appends their live
+      // ids after it — because a vendor's /models order isn't newest-first.
+      const models = (id === "claude" && live.length)
+        ? [...hint.filter((m) => !m || !/\d/.test(m)), ...live]
+        : hint;
       providerCatalog[id] = {
         models,
-        best: id === "claude" ? "claude-opus-4-8" : (models.filter(Boolean)[0] || ""),
+        best: id === "claude"
+          ? (live.find((m) => /^claude-/.test(m)) || "claude-opus-5")
+          : (hint.filter(Boolean)[0] || ""),
         hasModelsUrl: !!spec.modelsUrl || spec.format === "openai",
+        modelsAt: pc.modelsAt || 0,
       };
     }
     res.writeHead(200, { "content-type": "application/json" });
@@ -3818,10 +5167,17 @@ const server = http.createServer((req, res) => {
     const q = u.searchParams.get("q") || "";
     const k = Math.min(20, Math.max(1, parseInt(u.searchParams.get("k") || "8", 10) || 8));
     const tiers = (u.searchParams.get("tiers") || "").split(",").filter(Boolean);
-    let hits = [];
-    try { if (retrievalOk) hits = retrieval.search(q, { k, tiers: tiers.length ? tiers : undefined }); } catch {}
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ q, hits, stats: retrievalOk ? retrieval.stats() : null }));
+    // An archive search is the one place worth waiting a moment for meaning:
+    // the note whose WORDS do not match the question is usually the one being
+    // looked for. The router is not async, so this waits on the promise and
+    // falls through to plain BM25 if the endpoint is off or unreachable.
+    semantic.embedQuery(q).catch(() => null).then((qvec) => {
+      let hits = [];
+      try { if (retrievalOk) hits = retrieval.search(q, { k, qvec, tiers: tiers.length ? tiers : undefined }); } catch {}
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ q, hits, stats: retrievalOk ? retrieval.stats() : null,
+        semantic: semantic.stats() }));
+    });
 
   } else if (req.method === "POST" && req.url === "/registry/agent") {
     // Create or update an agent — including its BRAIN (provider/model), persona,
@@ -3868,6 +5224,12 @@ const server = http.createServer((req, res) => {
           provider: (providers.PROVIDERS[p.provider] || (reg.providerConfig && reg.providerConfig[p.provider]))
             ? p.provider : (cur.provider || "claude"),
           model: String(p.model !== undefined ? p.model : (cur.model || "")).slice(0, 60),
+          // 📦 where this agent RUNS (local / a configured container / another
+          // machine). Unset means the office default.
+          backend: String(p.backend !== undefined ? p.backend : (cur.backend || "")).slice(0, 40),
+          // 🧠 memory plugins this agent opted into (v1.4): lines they contribute at
+          // prompt time. Opt-in per agent, by design.
+          memoryPlugins: Array.isArray(p.memoryPlugins) ? p.memoryPlugins.map(String).slice(0, 20) : (cur.memoryPlugins || []),
         };
         saveReg();
         pushRoster();
@@ -3900,6 +5262,31 @@ const server = http.createServer((req, res) => {
       }
     });
 
+  // ---- 🧪 skill tests (v1.6) --------------------------------------------------
+  } else if (req.method === "GET" && req.url.split("?")[0] === "/skills/tests") {
+    const id = new URL(req.url, "http://x").searchParams.get("id") || "";
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify(id ? { id, cases: skillTests.cases(id), lastTest: (reg.skills[id] || {}).lastTest || null } : { summary: skillTests.summary() }));
+
+  } else if (req.method === "POST" && req.url === "/skills/tests") {
+    // { id, cases: [{ prompt, expect, note }] } — the owner's (or a plugin's) cases for one skill.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try { const p = JSON.parse(body); const cases = skillTests.setCases(p.id, p.cases); res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ ok: true, cases })); }
+      catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/skills/tests/run") {
+    // { id, content? } — run the cases now (against the current text, or a candidate).
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      let p; try { p = JSON.parse(body); } catch { res.writeHead(400); return res.end("bad json"); }
+      skillTests.run(p.id, p.content).then((r) => {
+        const sk = reg.skills[p.id]; if (sk && p.content == null) { sk.lastTest = { at: r.at, ok: r.ok, passed: r.results.filter((x) => x.pass).length, total: r.results.length, candidate: false }; saveReg(); }
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(r));
+      }).catch((e) => { res.writeHead(400); res.end(String(e && e.message)); });
+    });
+
   } else if (req.method === "POST" && req.url === "/registry/skill") {
     // Create, update or remove a skill in the library. Removal also strips
     // the skill from every agent that had it assigned.
@@ -3930,6 +5317,10 @@ const server = http.createServer((req, res) => {
             name: String(p.name || id).slice(0, 60),
             description: String(p.description || "").slice(0, 200),
             content: String(p.content || "").slice(0, 4000),
+            // Once a human has written in here, the office's own reflection stops
+            // rewriting it. Self-improvement is for what the office wrote itself;
+            // your words are not its draft.
+            edited: true,
           };
         }
         saveReg();
@@ -3950,6 +5341,61 @@ const server = http.createServer((req, res) => {
       }
     });
 
+  } else if (req.method === "POST" && req.url === "/registry/backend") {
+    // Execution backends — WHERE agents run. Owner-only: an agent that could
+    // edit this could move itself out of the container it was put in.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body);
+        if (p.default !== undefined) {         // pick the office-wide default
+          const d = String(p.default || "local");
+          if (d !== "local" && !reg.execBackends[d]) throw new Error("no such backend: " + d);
+          reg.execBackend = d;
+        } else {
+          const n = String(p.name || "").trim().toLowerCase()
+            .replace(/[^a-z0-9_-]/g, "-").slice(0, 40);
+          if (!n) throw new Error("no name");
+          if (n === "local") throw new Error("'local' is the built-in backend and cannot be redefined");
+          if (p.remove) {
+            delete reg.execBackends[n];
+            for (const a of Object.values(reg.agents)) if (a.backend === n) delete a.backend;
+            if (reg.execBackend === n) reg.execBackend = "local";
+          } else {
+            const kind = String(p.kind || "").trim();
+            if (!["docker", "ssh"].includes(kind)) throw new Error("kind must be docker or ssh");
+            const spec = { kind };
+            if (kind === "docker") {
+              spec.image = String(p.image || "").trim().slice(0, 200);
+              if (p.network) spec.network = String(p.network).trim().slice(0, 60);
+              if (Array.isArray(p.args)) spec.args = p.args.map((x) => String(x).slice(0, 120)).slice(0, 20);
+            } else {
+              spec.host = String(p.host || "").trim().slice(0, 200);
+              spec.officeDir = String(p.officeDir || "").trim().slice(0, 400);
+              if (p.dir) spec.dir = String(p.dir).trim().slice(0, 400);
+              if (p.identity) spec.identity = String(p.identity).trim().slice(0, 400);
+              if (p.port) spec.port = Math.max(1, Math.min(65535, Number(p.port) || 22));
+            }
+            // Build it once here so a broken definition is refused at the point
+            // the owner can still see why, not on the next agent run.
+            execBackend.plan(spec, {
+              argv: ["-p", "--settings", path.join(WORKSPACE, ".claude", "settings.json")],
+              cwd: WORKSPACE, env: {}, officeRoot: path.join(__dirname, ".."),
+            });
+            reg.execBackends[n] = spec;
+          }
+        }
+        saveReg();
+        pushRoster();
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        // JSON, because the Tools UI reads api() responses as JSON — a refusal
+        // the owner cannot see is the same as no refusal at all.
+        res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ error: String(e.message) }));
+      }
+    });
   } else if (req.method === "POST" && req.url === "/registry/mcp") {
     // Custom capability = MCP servers (the Claude Code plugin standard).
     // name + launch command; assignment per agent via "mcp:<name>" entries.
@@ -4146,7 +5592,12 @@ end tell`;
             res.writeHead(409, { "content-type": "text/plain; charset=utf-8" });
             return res.end("agent กำลังทำงานในโปรเจคนี้อยู่ — กด ⏹ หยุดก่อนเพื่อเข้าไปดู/ทำเอง หรือรอจนงานเสร็จ");
           }
-          ensureTrusted(dir);  // no trust dialog ambush in the new window
+          // No trust-dialog ambush in the new window — and no repo-supplied hook
+          // firing in it either, until the owner has approved it (#39).
+          if (!ensureTrusted(dir, { project: id })) {
+            res.writeHead(409, { "content-type": "text/plain; charset=utf-8" });
+            return res.end("โปรเจคนี้มี hook ของตัวเองที่จะรันอัตโนมัติ — อนุมัติในศูนย์ความปลอดภัยก่อนถึงจะเปิดได้");
+          }
           // Smart entry: resume the NEWEST session explicitly — straight into
           // where the work happened. Fresh claude only when there's no session.
           const sid = newestSid(dir);
@@ -4189,7 +5640,14 @@ end tell`;
           }
           runChildren.delete(t);
           // Always clear the strip — covers stale/replayed entries whose child is already gone.
-          broadcast({ type: "task.completed", agent: (rec && rec.agent) || agent || "", task: t });
+          // NEVER name an empty agent: the wallpaper gives a body to whatever id an event
+          // carries, and "" is not a teammate — stopping a stale row used to leave a
+          // nameless phantom standing on the floor that nothing could clean up. Unknown
+          // owner ⇒ omit the field and let the renderer resolve it from the task id.
+          const who = (rec && rec.agent) || agent || "";
+          const ev = { type: "task.completed", task: t };
+          if (who) ev.agent = who;
+          broadcast(ev);
         };
         if (task) kill(runChildren.get(task), task);
         if (agent) { for (const [t, rec] of [...runChildren]) if (rec.agent === agent) kill(rec, t); }
@@ -4330,24 +5788,7 @@ end tell`;
     // Create a standing work order: now / at (one-shot or daily) / every N.
     readBody(req, (body) => {
       try {
-        const p = JSON.parse(body);
-        if (!p.agent || !reg.agents[p.agent] || p.agent === "ceo") throw new Error("bad agent");
-        if (!p.prompt) throw new Error("no prompt");
-        const job = {
-          id: "j" + Date.now(),
-          agent: p.agent,
-          prompt: String(p.prompt).slice(0, 4000),
-          mode: ["now", "at", "every"].includes(p.mode) ? p.mode : "now",
-          at: Number(p.at) || 0,
-          time: String(p.time || "").slice(0, 5),
-          daily: !!p.daily,
-          everyMin: Math.max(5, Number(p.everyMin) || 10),  // floor: 5 min
-          enabled: true,
-          created: Date.now(),
-        };
-        jobs.push(job);
-        saveJobs();
-        if (job.mode === "now") dispatchJob(job);
+        const job = createJob(JSON.parse(body));
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ id: job.id }));
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
@@ -4359,6 +5800,8 @@ end tell`;
         const p = JSON.parse(body);
         const job = jobs.find((j) => j.id === p.id);
         if (!job) { res.writeHead(404); return res.end("unknown job"); }
+        { const ap = approvals.byRef("job", p.id);
+          if (ap && (p.remove || p.enabled === true)) approvals.respond(ap.id, p.remove ? "delete" : "enable", { by: "ui" }); }
         if (p.remove) {
           jobs = jobs.filter((j) => j.id !== p.id);
         } else {
@@ -4415,31 +5858,128 @@ end tell`;
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });
 
-  } else if (req.method === "GET" && req.url === "/calendar") {
+  } else if (req.method === "GET" && req.url.split("?")[0] === "/calendar") {
+    // 📅 events + the next 30 days of occurrences (recurrence expanded).
+    const q = new URL(req.url, "http://x").searchParams;
+    const from = Number(q.get("from")) || Date.now(), to = Number(q.get("to")) || from + 30 * 86400000;
     res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-    res.end(JSON.stringify({ cal }));
+    res.end(JSON.stringify({ cal: calendar.list(), upcoming: calendar.occurrences(from, to, { limit: 300 }) }));
 
   } else if (req.method === "POST" && req.url === "/calendar") {
+    // { title, at, end?, allDay?, remindMin?, recurrence?, link?, agent?, notes? } · { edit: id, …patch } · { remove: id }
     readBody(req, (body) => {
       try {
         const p = JSON.parse(body);
-        if (p.remove) cal = cal.filter((c) => c.id !== p.remove);
-        else if (p.edit) {
-          const c = cal.find((x) => x.id === p.edit);
-          if (!c) throw new Error("not found");
-          if (p.title) c.title = String(p.title).slice(0, 120);
-          if (p.at) { const at = Number(p.at) || Date.parse(p.at); if (at) { c.at = at; c.notified = false; } }
-          if (p.remindMin !== undefined) c.remindMin = Math.max(1, Number(p.remindMin) || 10);
-        } else {
-          const at = Number(p.at) || Date.parse(p.at);
-          if (!p.title || !at) throw new Error("need title + at");
-          cal.push({ id: "c" + Date.now(), title: String(p.title).slice(0, 120),
-            at, remindMin: Math.max(1, Number(p.remindMin) || 10), notified: false });
-        }
-        saveCal();
-        res.writeHead(200); res.end("ok");
+        let out = { ok: true };
+        if (p.remove) { if (!calendar.remove(p.remove)) throw new Error("not found"); }
+        else if (p.edit) out = calendar.edit(p.edit, p);
+        else out = calendar.add(p);
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(out));
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });
+
+  } else if (req.method === "GET" && req.url === "/calendar/ics") {
+    // The office calendar as a .ics file — subscribe to it, or import it once.
+    res.writeHead(200, { "content-type": "text/calendar; charset=utf-8", "content-disposition": "attachment; filename=\"bagidea-office.ics\"" });
+    res.end(calendar.toICS());
+
+  } else if (req.method === "POST" && req.url === "/calendar/import") {
+    // { ics: "<text>" } — VEVENTs in; the same UID updates instead of duplicating. Human UI only.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBodyRaw(req, (raw) => {
+      try {
+        let text = raw.toString("utf8");
+        if (/^\s*\{/.test(text)) text = String(JSON.parse(text).ics || "");
+        const r = calendar.importICS(text);
+        res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(r));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  // ---- 📋 tasks (v1.4) --------------------------------------------------------
+  } else if (req.method === "GET" && req.url.split("?")[0] === "/tasks") {
+    const q = new URL(req.url, "http://x").searchParams;
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ tasks: tasks.list({ status: q.get("status") || "", owner: q.get("owner") || "", project: q.get("project") || "", kind: q.get("kind") || "",
+      open: q.get("open") === "1", limit: Number(q.get("limit")) || 0 }), summary: tasks.summary() }));
+
+  } else if (req.method === "GET" && req.url === "/tasks/board") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ board: tasks.board(), summary: tasks.summary(), agents: Object.fromEntries(Object.entries(reg.agents).map(([id, a]) => [id, a.name || id])) }));
+
+  } else if (req.method === "POST" && req.url === "/tasks") {
+    // Create a card. Agents use this from Bash (see tasks.agentNote); the UI too.
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body);
+        if (p.owner && p.owner !== "you" && !reg.agents[p.owner]) throw new Error("unknown owner: " + p.owner);
+        const t = tasks.create(p, req.headers["x-bagidea-ui"] ? "you" : (p.by || "agent"));
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(t));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/tasks/update") {
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body);
+        if (p.owner && p.owner !== "you" && !reg.agents[p.owner]) throw new Error("unknown owner: " + p.owner);
+        const t = tasks.update(p.id, p, req.headers["x-bagidea-ui"] ? "you" : "agent");
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(t));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/tasks/move") {
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body);
+        const t = tasks.move(p.id, p.status, req.headers["x-bagidea-ui"] ? "you" : "agent");
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(t));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/tasks/delete") {
+    // Deleting is the owner's — an agent marks a card done, it never makes one vanish.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try { const p = JSON.parse(body); res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ ok: tasks.remove(p.id) })); }
+      catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  // ---- 🧑‍💻 codex (v1.4) --------------------------------------------------------
+  } else if (req.method === "GET" && req.url === "/codex/status") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify(codex.status()));
+
+  } else if (req.method === "POST" && req.url === "/codex/settings") {
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try { const out = codex.setSettings(JSON.parse(body)); res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(out)); }
+      catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && (req.url === "/codex/exec" || req.url === "/codex/review")) {
+    // { task | instructions, project?, sandbox?, model?, agent?, base?, commit? } — returns when Codex finishes.
+    readBody(req, (body) => {
+      let p; try { p = JSON.parse(body); } catch { res.writeHead(400); return res.end("bad json"); }
+      const agent = p.agent && reg.agents[p.agent] && p.agent !== "ceo" ? p.agent : "main";
+      const kind = req.url.endsWith("/review") ? "review" : "exec";
+      if (kind === "exec" && !String(p.task || "").trim()) { res.writeHead(400); return res.end("task is required"); }
+      let run;
+      try { run = codexMission(kind, p, agent); } catch (e) { res.writeHead(400); return res.end(String(e.message)); }
+      run.then((r) => { res.writeHead(200, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(r)); })
+         .catch((e) => { res.writeHead(500); res.end(String(e && e.message)); });
+    });
+
+  } else if (req.method === "POST" && req.url === "/codex/cancel") {
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try { const p = JSON.parse(body); res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ ok: codex.cancel(p.id) })); }
+      catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "GET" && req.url === "/workflows/types") {
+    // Node types the Builder can offer: built-ins plus what the office and plugins registered.
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ types: workflows.nodeTypes() }));
 
   } else if (req.method === "POST" && req.url === "/registry/key") {
     // 🔑 API key vault: ENV_NAME → value, injected into every agent run's
@@ -4513,6 +6053,31 @@ end tell`;
         res.writeHead(200, { "content-type": "application/json" });
         res.end("{}");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/models/refresh") {
+    // ↻ Pull the LIVE model list for one provider, or "all" (claude + every
+    // connected one). Anthropic included — that list used to be hand-maintained
+    // per release, which is why a just-released model could stay invisible.
+    readBody(req, async (body) => {
+      let p = "all";
+      try { p = JSON.parse(body || "{}").provider || "all"; } catch {}
+      try {
+        const out = p === "all" ? await refreshAllModels("ui") : { [p]: await refreshProviderModels(p) };
+        const results = {};
+        for (const [k, v] of Object.entries(out)) results[k] = { ok: !!(v && v.ok), n: (v && v.n) || 0, msg: (v && v.msg) || "" };
+        const one = p === "all" ? null : out[p];
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({
+          ok: p === "all" ? Object.values(results).some((r) => r.ok) : !!(one && one.ok),
+          models: (one && one.models) || null,
+          msg: (one && one.msg) || "",
+          results,
+        }));
+      } catch (e) {
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, models: null, msg: String((e && e.message) || e), results: {} }));
+      }
     });
 
   } else if (req.method === "POST" && req.url === "/registry/provider/test") {
@@ -4681,10 +6246,17 @@ end tell`;
         // location anywhere on disk is fine. Lets the owner reveal media that lives
         // outside the workspace (the same files chat now previews from anywhere).
         if (!fs.existsSync(p)) { res.writeHead(404); return res.end("not found"); }
-        // explorer needs "/select," and the path as ONE argument or it ignores
-        // the selection and opens Documents. spawn passes argv as-is (no shell),
-        // so a single combined token is the reliable form (spaces included).
-        if (process.platform === "win32") spawn("explorer.exe", ["/select," + p], { detached: true });
+        // explorer.exe does NOT parse its command line with CRT rules: it wants
+        // exactly `/select,"C:\dir\file.ext"` — the switch bare, the path quoted.
+        // Passing "/select,<path>" as one argv token makes Node quote the WHOLE
+        // token ("/select,C:\dir\my file.png") whenever the path holds a space —
+        // explorer then fails to see /select at all and silently opens Documents.
+        // windowsVerbatimArguments hands the line over untouched, so the quotes
+        // land around the path only. A path can't contain `"` on Windows, so
+        // wrapping it is safe. Verified on a path with spaces AND commas.
+        if (process.platform === "win32")
+          spawn("explorer.exe", ['/select,"' + p + '"'],
+            { detached: true, windowsVerbatimArguments: true });
         else if (process.platform === "darwin") spawn("open", ["-R", p], { detached: true });
         else spawn("xdg-open", [path.dirname(p)], { detached: true });
         res.writeHead(200); res.end("ok");
@@ -4802,6 +6374,52 @@ end tell`;
     res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ plugins: plugins.list() }));
 
+  // ---- 📦 the official plugin library (v1.5) ----------------------------------
+  // Plugins that ship WITH the office (daemon/plugin-library/) but are not
+  // installed until the owner says so — plugins/ stays empty by policy. One
+  // click copies the folder into plugins/<id> and reloads; from then on it is an
+  // ordinary plugin (data/ is its own, removal is the normal route).
+  } else if (req.method === "GET" && req.url === "/plugins/library") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ library: pluginLibrary() }));
+
+  } else if (req.method === "POST" && req.url === "/plugins/library/install") {
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        const id = String(JSON.parse(body || "{}").id || "").replace(/[^\w-]/g, "");
+        const entry = pluginLibrary().find((p) => p.id === id);
+        if (!entry) throw new Error("no such library plugin: " + id);
+        const dest = path.join(__dirname, "..", "plugins", id);
+        if (fs.existsSync(dest)) throw new Error("already installed: " + id);
+        fs.cpSync(entry.dir, dest, { recursive: true, filter: (src) => !/[\\/]data([\\/]|$)/.test(src.slice(entry.dir.length)) });
+        const result = plugins.load();
+        broadcast({ type: "plugins.changed" }, false);
+        const failed = (result.failed || []).find((f) => f.id === id);
+        if (failed) { res.writeHead(400, { "content-type": "application/json; charset=utf-8" }); return res.end(JSON.stringify({ ok: false, id, error: failed.error })); }
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: true, id, name: entry.name }));
+      } catch (e) { res.writeHead(400, { "content-type": "text/plain; charset=utf-8" }); res.end(String(e.message)); }
+    });
+
+  // ---- 👥 team templates (v1.5, design I) ------------------------------------
+  } else if (req.method === "GET" && req.url === "/teams") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ teams: teamTemplates().map((t) => ({ id: t.id, name: t.name, tagline: t.tagline, for: t.for,
+      agents: t.agents.map((a) => ({ id: a.id, name: a.name, role: a.role, avatar: a.avatar, present: !!reg.agents[a.id] })) })), staff: staffCount(), max: MAX_STAFF }));
+
+  } else if (req.method === "POST" && req.url === "/teams/hire") {
+    // Hire a whole template team at once. Agents whose id already exists are
+    // left alone (never overwritten); the hire cap still applies.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        const id = String(JSON.parse(body || "{}").id || "");
+        const r = hireTeam(id);
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(r));
+      } catch (e) { res.writeHead(400, { "content-type": "text/plain; charset=utf-8" }); res.end(String(e.message)); }
+    });
+
   } else if (req.method === "POST" && req.url === "/plugins/reload") {
     // load() syntax-checks every index.js (node --check) before require(), so a
     // JS-broken plugin is rejected with a clear parser error instead of crashing
@@ -4825,26 +6443,49 @@ end tell`;
       const tmp = require("os").tmpdir();
       try { fs.unlinkSync(path.join(tmp, "bagidea_editor_ready")); } catch {}
       fs.writeFileSync(path.join(tmp, "bagidea_editor_open_request"), String(Date.now()));
-      // fallback: if the shell isn't running, launch directly after a beat
+      // fallback: if the shell isn't running, launch directly after a beat.
+      // Try every place a Godot engine could really be — the installer's tools
+      // dir included ("some machines can't open the editor" was these fallbacks
+      // pointing at paths no install ever uses, then failing SILENTLY).
       const gdir = path.join(__dirname, "..", "godot");
+      const first = (list) => list.find((p) => p && fs.existsSync(p)) || "";
       let godot = "";
       if (process.platform === "win32") {
-        const branded = path.join(gdir, "bin", "BagIdeaOffice.exe");
-        godot = fs.existsSync(branded) ? branded
-          : (process.env.BAGIDEA_GODOT || "C:\\Program Files\\Godot\\Godot_v4.6.3-stable_win64.exe");
+        godot = first([
+          path.join(gdir, "bin", "BagIdeaOffice.exe"),
+          process.env.BAGIDEA_GODOT,
+          path.join(process.env.LOCALAPPDATA || "", "BagIdeaOffice", "tools", "godot", "Godot_v4.6.3-stable_win64.exe"),
+          "C:\\Program Files\\Godot\\Godot_v4.6.3-stable_win64.exe",
+        ]);
       } else if (process.platform === "darwin") {
-        const app = path.join(gdir, "bin-mac", "Godot.app", "Contents", "MacOS", "Godot");
-        godot = fs.existsSync(app) ? app : "Godot";
+        godot = first([
+          path.join(gdir, "bin-mac", "Godot.app", "Contents", "MacOS", "Godot"),
+          process.env.BAGIDEA_GODOT,
+          "/Applications/Godot.app/Contents/MacOS/Godot",
+        ]);
       } else {
-        // Linux/other: a bundled binary under godot/bin-linux/, else $BAGIDEA_GODOT,
-        // else rely on `godot` on PATH (installed by install-linux.sh).
-        const bin = path.join(gdir, "bin-linux", "godot");
-        godot = fs.existsSync(bin) ? bin : (process.env.BAGIDEA_GODOT || "godot");
+        godot = first([path.join(gdir, "bin-linux", "godot"), process.env.BAGIDEA_GODOT,
+          "/usr/local/bin/godot", "/usr/bin/godot"]);
       }
-      const shellUp = fs.existsSync(path.join(tmp, "bagidea_shell_alive"));
-      if (!shellUp && fs.existsSync(godot)) {
-        spawn(godot, ["--path", gdir, "--", "--editor3d"],
-          { detached: true, stdio: "ignore", windowsHide: false }).unref();
+      // The shell's alive-flag is only proof while FRESH (it re-touches every 5s
+      // since 0.9.45; a crash used to leave a stale flag that muted this fallback
+      // forever). Old shells wrote it once — grace them with a long window.
+      let shellUp = false;
+      try {
+        const st = fs.statSync(path.join(tmp, "bagidea_shell_alive"));
+        shellUp = Date.now() - st.mtimeMs < 15000 ||
+          (Date.now() - st.mtimeMs < 6 * 3600 * 1000 && !!procAlive("bagidea-office-shell"));
+      } catch {}
+      if (!shellUp) {
+        if (!godot) {
+          res.writeHead(500, { "content-type": "application/json; charset=utf-8" });
+          return res.end(JSON.stringify({ error:
+            "Godot engine not found — re-run the installer, or set BAGIDEA_GODOT to your Godot 4.6 executable" }));
+        }
+        const child = spawn(godot, ["--path", gdir, "--", "--editor3d"],
+          { detached: true, stdio: "ignore", windowsHide: false });
+        child.on("error", (e) => console.error("[editor] spawn failed:", e && e.message));
+        child.unref();
       }
       broadcast({ type: "editor.opening" }, false);
       res.writeHead(200); res.end("ok");
@@ -5097,10 +6738,13 @@ end tell`;
       pendingPerms: pendingPerms.size,
       jobs: jobs.filter((j) => !j.done && j.enabled !== false).length,
       notes: notes.length,
-      events: cal.filter((c) => c.at > Date.now()).length,
+      events: calendar.occurrences(Date.now(), Date.now() + 30 * 86400000, { limit: 200 }).length,
+      tasks: tasks.summary(),
+      codex: codex.detect().installed,
       channels: channels.status(),
       features: featuresMap(),
       projects: projectStatus().map((p) => ({ name: p.name, ai: p.ai, open: p.open })),
+      budget: budget.summary(),
     }));
 
   } else if (req.method === "GET" && req.url === "/channels/status") {
@@ -5137,6 +6781,17 @@ end tell`;
       } catch { res.writeHead(400); res.end("bad json"); }
     });
 
+  } else if (req.method === "POST" && req.url === "/registry/eco") {
+    // 🌱 Eco mode on/off — see ecoFloor(). CLI: `bagidea eco on|off`.
+    readBody(req, (body) => {
+      try {
+        reg.ecoMode = !!JSON.parse(body).on;
+        saveReg();
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, eco: reg.ecoMode }));
+      } catch { res.writeHead(400); res.end("bad json"); }
+    });
+
   } else if (req.method === "POST" && req.url === "/registry/sound") {
     // World sound effects on/off (persisted + live ui.sound broadcast).
     readBody(req, (body) => {
@@ -5158,6 +6813,124 @@ end tell`;
     readBody(req, (body) => {
       try {
         reg.verifyDelegated = !!JSON.parse(body).enabled;
+        saveReg();
+        pushRoster();
+        res.writeHead(200);
+        res.end("ok");
+      } catch {
+        res.writeHead(400);
+        res.end("bad json");
+      }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/autopilot") {
+    // 🤖 AUTO ("ทำต่อเอง"): agents decide for themselves and open their own next
+    // turn instead of stopping to ask the owner (opt-in, default off).
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body);
+        reg.autoPilot = !!(p.enabled !== undefined ? p.enabled : p.on);
+        if (!reg.autoPilot) autoRounds.clear();   // switching off ends every chain now
+        saveReg();
+        pushRoster();
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ auto: reg.autoPilot, max: AUTOPILOT_MAX }));
+      } catch {
+        res.writeHead(400);
+        res.end("bad json");
+      }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/autoapprove") {
+    // 🔓 Auto-allow every tool prompt so unattended work never stalls (opt-in, default off).
+    readBody(req, (body) => {
+      try {
+        reg.autoApprove = !!JSON.parse(body).enabled;
+        saveReg();
+        pushRoster();
+        res.writeHead(200);
+        res.end("ok");
+      } catch {
+        res.writeHead(400);
+        res.end("bad json");
+      }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/skill/revert") {
+    // Undo the last revision of a self-improved skill. Refinement is the office
+    // rewriting its own instructions, so there has to be a way back that does
+    // not involve the owner reconstructing what it used to say.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        const id = String(JSON.parse(body).id || "");
+        const sk = reg.skills[id];
+        if (!sk) throw new Error("no such skill");
+        if (!sk.prev) throw new Error("this skill has no earlier version to go back to");
+        const back = sk.prev;
+        delete sk.prev;                    // one step, not a stack
+        sk.content = back;
+        sk.revs = Math.max(0, (sk.revs || 1) - 1);
+        delete sk.refinedWhy;
+        saveReg();
+        pushRoster();
+        if (retrievalOk) try { retrieval.reindexSkill(id, sk); retrieval.persist(); } catch {}
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: true, name: sk.name }));
+      } catch (e) {
+        res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ error: String(e.message) }));
+      }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/semantic") {
+    // Meaning-based recall. Owner-only, and it takes the endpoint rather than a
+    // provider name on purpose: an embeddings API is the one shape every vendor
+    // agrees on, and a local Ollama is a first-class answer here, not a fallback.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body);
+        const next = {
+          enabled: !!p.enabled,
+          baseUrl: String(p.baseUrl || "").trim().replace(/\/+$/, "").slice(0, 300),
+          model: String(p.model || "").trim().slice(0, 120),
+          keyName: String(p.keyName || "").trim().slice(0, 60),
+        };
+        if (next.enabled && (!next.baseUrl || !next.model))
+          throw new Error("an embeddings endpoint and a model are both required");
+        reg.semantic = next;
+        saveReg();
+        // Prove it works NOW, while the owner is looking at the form. An
+        // endpoint that only fails later fails silently, and silent means the
+        // office quietly goes back to word matching and nobody knows why.
+        if (!semanticConfigure()) {
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          return res.end(JSON.stringify({ ok: true, ready: false, stats: semantic.stats() }));
+        }
+        semantic.embedQuery("ping").then((v) => {
+          if (!v) {
+            res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+            return res.end(JSON.stringify({ ok: true, ready: false, error: "the endpoint did not return an embedding — check the URL, the model name, and whether it is running" }));
+          }
+          semanticSync(500);
+          pushRoster();
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ok: true, ready: true, dims: v.length, stats: semantic.stats() }));
+        });
+      } catch (e) {
+        res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ error: String(e.message) }));
+      }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/ghostworktrees") {
+    // Isolate parallel ghosts in their own git worktrees. Owner-only and
+    // off by default: it changes where a ghost's edits end up.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        reg.ghostWorktrees = !!JSON.parse(body).enabled;
         saveReg();
         pushRoster();
         res.writeHead(200);
@@ -5410,28 +7183,87 @@ end tell`;
     } catch (e) { res.writeHead(400); res.end(String(e.message)); } });
 
   } else if (req.method === "POST" && req.url === "/workflows/run") {
-    // Run the workflow NOW — hand it to the Director as an order (full DELEGATE
-    // power), and ride the result back.
+    // Run it NOW through the engine: each node executes on its own, in parallel
+    // where the edges allow, with a persisted record. Returns at once with the
+    // run; progress arrives as workflow.node / workflow.run events and in
+    // GET /workflows/run?id=. `legacy:true` keeps the pre-1.3 behaviour (the
+    // whole drawing handed to the Director as one order).
     readBody(req, (body) => { try {
       const w = JSON.parse(body || "{}");
-      queueDirectorTurn((release) => {
-        ceoFlow(
-          "Execute this workflow now. Do each step in order. When a node has SEVERAL " +
-          "OUTGOING arrows, those branches run in PARALLEL — and you must REALLY run " +
-          "them in parallel by ending your reply with one `SUB: <branch task>` line per " +
-          "branch (they become real ghost clones the owner can watch split off). Do NOT " +
-          "just say you split — emit the SUB: lines. A node with several incoming arrows " +
-          "waits for all branches, then continues from their merged results. Report the " +
-          "final result.\n\n" + workflowToText(w),
-          undefined, undefined,
-          { logPrompt: "🔀▶ รัน workflow: " + (w.name || ""),
-            onDone: (out, ok) => {
-              release();
-              res.writeHead(200, { "content-type": "application/json" });
-              res.end(JSON.stringify({ ok: !!ok, result: ok && out ? out : "รันไม่สำเร็จ ลองใหม่อีกครั้ง" }));
-            } });
-      });
+      if (w.legacy) return runWorkflowViaDirector(w, res);
+      const wf = w.nodes ? { id: w.id || "", name: w.name || "Workflow", nodes: w.nodes, edges: w.edges || [] } : workflows.load(w.id);
+      if (!wf) { res.writeHead(404); return res.end("unknown workflow"); }
+      const run = workflows.start(wf, { trigger: { source: "manual", data: w.data || {} }, by: req.headers["x-bagidea-ui"] ? "owner" : "api" });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true, run: workflows.getRun(run.id), result: "started" }));
     } catch (e) { res.writeHead(400); res.end(String(e.message)); } });
+
+  } else if (req.method === "GET" && req.url.startsWith("/workflows/runs")) {
+    const q = new URL(req.url, "http://x").searchParams;
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(workflows.runs({ workflowId: q.get("id") || "", limit: q.get("limit") })));
+
+  } else if (req.method === "GET" && req.url.startsWith("/workflows/run?")) {
+    const id = new URL(req.url, "http://x").searchParams.get("id") || "";
+    const run = workflows.getRunFull(id);
+    res.writeHead(run ? 200 : 404, { "content-type": "application/json" });
+    res.end(JSON.stringify(run || {}));
+
+  } else if (req.method === "POST" && req.url === "/workflows/cancel") {
+    readBody(req, (body) => {
+      try {
+        if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+        const ok = workflows.cancel(String(JSON.parse(body || "{}").id || ""));
+        res.writeHead(ok ? 200 : 404, { "content-type": "application/json" }); res.end(JSON.stringify({ ok }));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "GET" && req.url === "/triggers") {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ triggers: triggers.list(), kinds: triggers.kinds() }));
+
+  } else if (req.method === "POST" && req.url === "/triggers") {
+    readBody(req, (body) => {
+      try {
+        if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+        const p = JSON.parse(body || "{}");
+        const t = p.id ? triggers.update(String(p.id), p) : triggers.add(p);
+        if (!t) { res.writeHead(404); return res.end("unknown trigger"); }
+        res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(t));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/triggers/delete") {
+    readBody(req, (body) => {
+      try {
+        if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+        const ok = triggers.remove(String(JSON.parse(body || "{}").id || ""));
+        res.writeHead(ok ? 200 : 404, { "content-type": "application/json" }); res.end(JSON.stringify({ ok }));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/triggers/fire") {
+    // Test a trigger by hand, with an optional payload.
+    readBody(req, (body) => {
+      try {
+        if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+        const p = JSON.parse(body || "{}");
+        const run = triggers.fire(String(p.id || ""), { event: "manual", data: p.data || {} }, "owner");
+        res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ ok: true, run: workflows.getRun(run.id) }));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url.startsWith("/hook/")) {
+    // An inbound webhook. No UI header — the whole point is that something out
+    // there calls it. The token in the URL selects the trigger; an optional
+    // secret verifies the body's HMAC. The daemon listens on 127.0.0.1 only, so
+    // this reaches the internet through a tunnel (cloudflared / ngrok) you run.
+    readBodyRaw(req, (raw) => {
+      const token = req.url.slice(6).split("?")[0].replace(/[^\w-]/g, "");
+      const r = triggers.webhook(token, req.headers, raw);
+      res.writeHead(r.status, { "content-type": "application/json" });
+      res.end(JSON.stringify(r.run ? { ok: true, run: r.run } : { ok: false, error: r.error }));
+    });
 
   } else if (req.method === "POST" && req.url === "/workflows/skill") {
     // Compile the workflow into a reusable SKILL — then it can be assigned to an
@@ -5475,6 +7307,104 @@ end tell`;
       }
     });
 
+  } else if (req.method === "GET" && req.url.split("?")[0] === "/approvals") {
+    const q = req.url.split("?")[1] || "";
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ items: approvals.list({ pending: /pending=1/.test(q) }), pending: approvals.pendingCount() }));
+
+  } else if (req.method === "POST" && req.url === "/approvals") {
+    // Ask the owner something — plugins and scripts. Resolves when they answer.
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body || "{}");
+        if (!p.title) throw new Error("no title");
+        const { id, item } = approvals.ask({ kind: "plugin", ...p, id: undefined });
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ id, item }));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/approvals/respond") {
+    readBody(req, (body) => {
+      try {
+        if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+        const { id, decision, note } = JSON.parse(body || "{}");
+        approvals.respond(String(id), String(decision), { by: "ui", note }).then((ok) => {
+          res.writeHead(ok ? 200 : 404, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok }));
+        });
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "GET" && req.url.split("?")[0] === "/notify") {
+    const q = new URLSearchParams(req.url.split("?")[1] || "");
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ items: notify.list({ unread: q.get("unread") === "1", limit: q.get("limit") }),
+      unread: notify.unreadCount(), rules: notify.rules(), quiet: notify.quiet() }));
+
+  } else if (req.method === "POST" && req.url === "/notify/read") {
+    readBody(req, (body) => {
+      let ids = "all"; try { ids = JSON.parse(body || "{}").ids || "all"; } catch {}
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ unread: notify.markRead(ids) }));
+    });
+
+  } else if (req.method === "POST" && req.url === "/notify/rules") {
+    readBody(req, (body) => {
+      try {
+        if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+        notify.setRules(JSON.parse(body || "{}"));
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ rules: notify.rules(), quiet: notify.quiet() }));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/notify/presence") {
+    // The overlay pings while the owner is at the keyboard; silence means away.
+    readBody(req, () => { notify.presence(true); res.writeHead(200); res.end("ok"); });
+
+  } else if (req.method === "POST" && req.url === "/notify/send") {
+    // Plugins, scripts and `bagidea notify` — routed by the rules like anything else.
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body || "{}");
+        if (!p.title) throw new Error("no title");
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(notify.send(p)));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "GET" && req.url === "/budget") {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify(budget.summary()));
+
+  } else if (req.method === "POST" && req.url === "/budget") {
+    // Caps are the owner's to set — human UI only, like every other switch that
+    // changes what the office may do.
+    readBody(req, (body) => {
+      try {
+        if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+        budget.setCaps(JSON.parse(body || "{}"));
+        broadcast({ type: "budget.changed", caps: budget.caps() }, false);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(budget.summary()));
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/budget/digest") {
+    // Send the digest now (the ⚙ test button and `bagidea budget digest`).
+    readBody(req, () => {
+      const text = budget.sendDigest(Date.now(), { pending: approvals.pendingCount() });
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ text }));
+    });
+
+  } else if (req.method === "GET" && req.url === "/inbox") {
+    // One call for the CLI and the phone: what waits, and what's unread.
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ pending: approvals.list({ pending: true }), unread: notify.unreadCount(),
+      recent: notify.list({ limit: 20 }) }));
+
   } else if (req.method === "POST" && req.url === "/perm/request") {
     // PreToolUse hook long-polls here; we answer when the user decides.
     readBody(req, (body) => {
@@ -5500,13 +7430,47 @@ end tell`;
         broadcast({ type: "perm.approved", agent, task, tool, perm: id, via: "rule" });
         return;
       }
+      // Unattended mode (opt-in, reg.autoApprove): the owner can't come click Allow
+      // — e.g. they queued work and stepped out — so every prompt is auto-approved
+      // instead of stalling 50s then denying. Still broadcast (via:"auto") so the
+      // feed/board shows exactly what was allowed. Off by default; owner toggles it.
+      if (reg.autoApprove) {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ decision: "allow" }));
+        broadcast({ type: "perm.approved", agent, task, tool, perm: id, via: "auto" });
+        return;
+      }
       broadcast({ type: "perm.requested", agent, task, tool, perm: id, input });
       const timer = setTimeout(() => {
         // No human around — deny safely and let the agent re-plan.
         finishPerm(id, "deny", "timeout");
       }, 50000);
       pendingPerms.set(id, { res, timer, agent, task, tool });
+      approvals.ask({ kind: "tool-permission", ref: id, agent,
+        title: `${(reg.agents[String(agent).split("#")[0]] || {}).name || agent} wants to use ${tool}`,
+        detail: String(input || "").slice(0, 1500), expiresMs: 50000, meta: { task } });
     });
+
+  } else if (req.method === "POST" && req.url === "/project/trust") {
+    // Issue #39 — the owner's answer to "this project ships its own hooks".
+    // Approval is bound to the exact fingerprint, so editing settings.json or the
+    // script it calls asks again instead of riding the old yes.
+    readBody(req, (body) => {
+      try {
+        const { id, decision } = JSON.parse(body);
+        const ok = resolveTrust(String(id), decision === "allow");
+        res.writeHead(ok ? 200 : 404, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok }));
+      } catch { res.writeHead(400); res.end(); }
+    });
+
+  } else if (req.method === "GET" && req.url === "/project/trust") {
+    // Pending cards, so a reopened overlay (or the CLI) can show what's waiting.
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify([...pendingTrust.values()].map((r) => ({
+      trust: r.id, dir: r.dir, project: r.project, changed: r.changed,
+      hooks: r.hooks, scripts: r.scripts.map((s) => ({ rel: s.rel, outside: s.outside })),
+    }))));
 
   } else if (req.method === "POST" && req.url === "/perm/respond") {
     readBody(req, (body) => {
@@ -5553,6 +7517,86 @@ end tell`;
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });
 
+  } else if (req.method === "POST" && req.url === "/gen/image/edit") {
+    // 🖼 system tool: an existing picture + an instruction → a NEW picture.
+    // The original is never written to; an edit that destroys its own input is
+    // not an edit anyone can iterate with.
+    readBody(req, (body) => {
+      try {
+        const { file, url, prompt } = JSON.parse(body);
+        if (!prompt) throw new Error("no instruction");
+        const src = file || (url && url.startsWith("/uploads/")
+          ? path.join(WORKSPACE, "uploads", path.basename(url)) : null);
+        if (!src) throw new Error("no source image");
+        media.edit(src, prompt, mediaCtx()).then((out) => {
+          broadcast({ type: "image.generated", url: out.url }, false);
+          res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify(out));
+        }).catch((e) => {
+          res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
+          res.end(String(e.message));
+        });
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "POST" && req.url === "/gen/video") {
+    // 🎬 Start a video. This one BILLS, and by a lot more than a picture, so it
+    // is owner-only from the UI header — an agent cannot decide on its own to
+    // spend a couple of dollars on a clip.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("video is owner-started only"); }
+    readBody(req, (body) => {
+      try {
+        const p = JSON.parse(body);
+        if (!p.prompt) throw new Error("no prompt");
+        const image = p.url && String(p.url).startsWith("/uploads/")
+          ? path.join(WORKSPACE, "uploads", path.basename(p.url)) : undefined;
+        media.videoStart(p.prompt, mediaCtx(), { image, aspectRatio: p.aspectRatio })
+          .then((st) => {
+            res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify(st));
+          })
+          .catch((e) => {
+            res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
+            res.end(String(e.message));
+          });
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
+  } else if (req.method === "GET" && req.url.split("?")[0] === "/gen/video") {
+    // 🎬 Poll. Minutes, not seconds — so the caller holds the operation name
+    // and asks, rather than the office holding a request open that long.
+    const op = new URL(req.url, "http://x").searchParams.get("op") || "";
+    media.videoPoll(op, mediaCtx()).then((st) => {
+      if (st.done) broadcast({ type: "video.generated", url: st.url }, false);
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify(st));
+    }).catch((e) => {
+      res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
+      res.end(String(e.message));
+    });
+
+  } else if (req.method === "GET" && req.url.split("?")[0] === "/studio") {
+    // 🎨 Media Studio — make, edit and animate, in one window.
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    try { res.end(fs.readFileSync(path.join(__dirname, "studio.html"))); }
+    catch { res.end("<p>studio unavailable</p>"); }
+
+  } else if (req.method === "GET" && req.url === "/studio/list") {
+    // Everything the office has made, newest first — the Studio's gallery.
+    try {
+      const dir = path.join(WORKSPACE, "uploads");
+      const out = fs.readdirSync(dir)
+        .filter((f) => /^gen_.*\.(png|mp4)$/i.test(f))
+        .map((f) => ({ url: "/uploads/" + f, mtime: fs.statSync(path.join(dir, f)).mtimeMs,
+          kind: /\.mp4$/i.test(f) ? "video" : "image" }))
+        .sort((a, b) => b.mtime - a.mtime).slice(0, 60);
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ items: out }));
+    } catch {
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      res.end('{"items":[]}');
+    }
+
   } else if (req.method === "GET" && req.url === "/proposals") {
     res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ proposals: proposals.slice(-30).reverse() }));
@@ -5588,41 +7632,7 @@ end tell`;
         const { id, decision, message } = JSON.parse(body);
         const p = proposals.find((x) => x.id === id);
         if (!p) { res.writeHead(404); return res.end("unknown proposal"); }
-        p.status = decision === "approve" ? "approved"
-          : decision === "reject" ? "rejected" : "pending";
-        const note = String(message || "").slice(0, 600).trim();   // owner's optional note
-        if (note) p.message = note;
-        saveProposals();
-        const noteLine = note ? `เจ้าของฝากข้อความ: "${note}"\n` : "";
-        if (decision === "approve") {
-          let proj = null;
-          // Approved projects are born in a DEFAULT projects folder (the
-          // playground) when no location was given — agents never scaffold loose.
-          const playDir = String(reg.playground || path.join(WORKSPACE, "projects"));
-          try {
-            proj = createProject(p.name, "", path.join(playDir, p.name.replace(/[^\wก-๙ -]/g, "_")));
-          } catch (e) { /* duplicate name → Director routes to the existing one */ }
-          queueDirectorTurn((release) => {
-            runClaude("main",
-              `CEO อนุมัติข้อเสนอโปรเจคของทีมแล้ว 🎉\n` +
-              `ชื่อ: ${p.name}\nไอเดีย: ${p.detail}\nผู้เสนอ: ${p.agents.join(", ")}\n` + noteLine +
-              (proj ? `โปรเจคถูกสร้างไว้แล้วที่ ${proj.dir} (ทำงานในโฟลเดอร์นี้เท่านั้น)\n` : "") +
-              `กติกา: ห้ามแก้ไขระบบหลักของโปรแกรม (daemon/godot/shell/cli) เด็ดขาด — ` +
-              `ถ้าเป็นการต่อยอดออฟฟิศ ให้ทำเป็น plugin ตาม docs/guide/plugins.md ` +
-              `(เริ่มจาก template: github.com/bagidea/bagidea-office-template).\n` +
-              `จัดทีมเลย: DELEGATE: <agent> @ ${p.name} :: <งานชิ้นแรกที่ชัดเจน> ` +
-              `ให้คนที่เสนอไอเดียได้ทำเป็นหลัก แล้วสรุปแผนสั้นๆ` +
-              (note ? ` และนำข้อความของเจ้าของไปปรับทิศทางงานด้วย` : ""),
-              { logPrompt: `✅ อนุมัติข้อเสนอ: ${p.name}`,
-                filterText: makeDelegateFilter(0, undefined),
-                onDone: () => release() });
-          });
-        } else if (decision === "reject" && note) {
-          // The team hears WHY — the owner's note lands in the office feed.
-          broadcast({ type: "chat.message", agent: "main",
-            text: `CEO ยังไม่อนุมัติ "${p.name}" — ${note}` });
-        }
-        broadcast({ type: "proposal." + p.status, agent: p.by, name: p.name, proposal: p.id });
+        decideProposal(p, decision, message);
         res.writeHead(200); res.end("ok");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });
@@ -5752,6 +7762,25 @@ end tell`;
       } catch { res.writeHead(400); res.end("bad json"); }
     });
 
+  } else if (req.method === "POST" && req.url === "/registry/fallback") {
+    // OPT-IN office-wide emergency fallback brain: which backend a sustainedly-overloaded
+    // agent is re-run on. Empty / "none" clears it (feature off). Only a known builtin or a
+    // configured custom provider is accepted — so a typo can't silently disable failover.
+    readBody(req, (body) => {
+      try {
+        const b = JSON.parse(body);
+        const p = String(b.provider || "").trim();
+        if (!p || p === "none") { reg.fallbackProvider = ""; reg.fallbackModel = ""; }
+        else {
+          if (!providers.PROVIDERS[p] && !((reg.providerConfig || {})[p])) throw new Error("unknown provider");
+          reg.fallbackProvider = p;
+          reg.fallbackModel = String(b.model || "").slice(0, 60);
+        }
+        saveReg();
+        res.writeHead(200); res.end("ok");
+      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+    });
+
   } else if (req.method === "GET" && req.url === "/tts/presets") {
     res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
     res.end(JSON.stringify(Object.fromEntries(
@@ -5820,14 +7849,22 @@ end tell`;
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps],
         { detached: true, stdio: "ignore", windowsHide: false }).unref();
     } else if (process.platform === "darwin") {
-      // macOS: git pull + rebuild in a visible Terminal window
+      // macOS: git pull + rebuild in a visible Terminal window.
+      // The install root follows the account name, so it can carry an apostrophe
+      // ("/Users/O'Brien/…") — quote it for the shell, then quote the whole
+      // command again as an AppleScript string. Pasted in raw it ends the quote
+      // and the rest of the path becomes commands to run.
       const root = path.join(__dirname, "..");
-      const script = `tell application "Terminal" to do script "cd '${root}' && git pull && ./build-mac.sh"`;
+      const shq = "'" + root.replace(/'/g, "'\\''") + "'";
+      const inner = `cd ${shq} && git pull && ./build-mac.sh`;
+      const script = `tell application "Terminal" to do script "${inner.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
       spawn("osascript", ["-e", script], { detached: true, stdio: "ignore" }).unref();
     } else {
-      // Linux: same idea, x-terminal-emulator
+      // Linux: same idea, x-terminal-emulator. build-LINUX.sh — this ran the
+      // macOS build script, so the in-app update button rebuilt nothing here.
       const root = path.join(__dirname, "..");
-      spawn("x-terminal-emulator", ["-e", `cd '${root}' && git pull && bash build-mac.sh`],
+      const shq = "'" + root.replace(/'/g, "'\\''") + "'";
+      spawn("x-terminal-emulator", ["-e", `cd ${shq} && git pull && bash build-linux.sh`],
         { detached: true, stdio: "ignore" }).unref();
     }
     res.writeHead(200); res.end("ok");
@@ -5871,6 +7908,10 @@ function finishPerm(id, decision, why) {
     type: decision === "allow" ? "perm.approved" : "perm.denied",
     agent: p.agent, task: p.task, tool: p.tool, perm: id, via: why,
   });
+  // Whichever way it was decided (panel, chat card, timeout), the inbox record
+  // closes with it — so the phone never shows a card the office already settled.
+  const ap = approvals.byRef("tool-permission", id);
+  if (ap) approvals.respond(ap.id, decision, { by: why });
   return true;
 }
 
@@ -5964,15 +8005,21 @@ function handleLive(req, sock) {
           generationConfig: { responseModalities: ["AUDIO"],
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: presetVoice } } } },
           systemInstruction: { parts: [{ text:
-            `คุณคือ "${a.name || "ผู้ช่วย"}" หัวหน้าทีม (Director) ของ BagIdea Office — มือขวาของเจ้าของ (CEO). ` +
-            `ตอนนี้กำลังคุยสายเสียงสดกับเจ้าของ พูดเป็นกันเอง กระชับ เป็นธรรมชาติ (ภาษาไทย เว้นแต่เจ้าของพูดอังกฤษ). ` +
-            `คุณรู้จักงานและออฟฟิศของตัวเองดี — ตอบเรื่องทีม โปรเจค สถานะงาน และช่วยคิด/วางแผนได้เต็มที่. ` +
-            `ถ้าเจ้าของสั่งงานใหม่ ให้รับเรื่องไว้แล้วบอกว่าจะไปจัดการ/มอบหมายให้ทีมหลังวางสาย ` +
-            `(ระหว่างสายยังลงมือทำงานหรือเรียกเครื่องมือไม่ได้).\n\n` +
+            `You are "${a.name || "Assistant"}", the Director of BagIdea Office — the ` +
+            `owner's (the CEO's) right hand. ` +
+            `You are on a live voice call with them right now: speak casually, briefly and ` +
+            `naturally. ${liveLangLine()} ` +
+            `You know this office and its work well — answer about the team, the projects and ` +
+            `the state of the work, and think or plan with them freely. ` +
+            `If the owner gives you new work, take it down and say you will handle it or hand ` +
+            `it to the team after the call (you cannot run tools or do the work while on the call).` + 
+            `\n\n` +
             (voiceGender(a.voice) === "m"
-              ? `เพศของคุณ: ผู้ชาย — พูดและอ้างถึงตัวเองแบบผู้ชายเสมอ (ใช้ ครับ/ผม) ให้ตรงกับเสียงของคุณ ห้ามพูดแบบผู้หญิง.\n\n`
-              : `เพศของคุณ: ผู้หญิง — พูดและอ้างถึงตัวเองแบบผู้หญิงเสมอ (ใช้ ค่ะ/ฉัน/ดิฉัน) ให้ตรงกับเสียงของคุณ ห้ามพูดแบบผู้ชาย.\n\n`) +
-            `ทีมงาน:\n${team}\n\nสถานะออฟฟิศตอนนี้:\n${snap || "(ยังไม่มีโปรเจค/งานค้าง)"}\n\nบันทึกออฟฟิศ:\n${ctxNote}` }] },
+              ? `Your gender: male — always speak and refer to yourself as a man (in Thai, ครับ/ผม), ` +
+                `matching your voice. Never speak as a woman.\n\n`
+              : `Your gender: female — always speak and refer to yourself as a woman (in Thai, ` +
+                `ค่ะ/ฉัน/ดิฉัน), matching your voice. Never speak as a man.\n\n`) +
+            `The team:\n${team}\n\nThe office right now:\n${snap || "(no projects or outstanding work yet)"}\n\nOffice notes:\n${ctxNote}` }] },
         } }));
         toClient({ type: "ready" });
       },
@@ -6078,6 +8125,9 @@ const OEP_PORT = process.env.OEP_PORT || 8787;  // override only for isolated te
 // skips the installer's wire-hooks script (clone-and-run dev workflow).
 try { wireWorkspaceSettings(WORKSPACE, __dirname); }
 catch (e) { console.error("[startup] wireWorkspaceSettings failed:", e && e.message); }
+// Let a never-logged-in user (GLM/DeepSeek-only) run agents: skip the CLI's
+// interactive first-run wizard that would otherwise hang every headless spawn.
+ensureOnboarded();
 server.listen(OEP_PORT, "127.0.0.1", () => {
   console.log(`[oep] http+ws listening :${OEP_PORT}`);
   // Fresh boot ⇒ nothing is running (runChildren starts empty). A task.started left
@@ -6085,6 +8135,16 @@ server.listen(OEP_PORT, "127.0.0.1", () => {
   // next client connect and pin agents as "working" forever. Journal a reset so it
   // replays last and clears any stale working state on the wallpaper + overlay.
   broadcast({ type: "task.reset" });
+  // Same reasoning for worktrees: a ghost that was mid-run when the office was
+  // killed left a checkout behind. Nothing is running yet, so anything still
+  // there is abandoned. Its BRANCH survives — only the checkout is swept.
+  try {
+    // Nothing is live yet, so every checkout under the ghost home is abandoned
+    // — a ghost settles its own on the way out, success or failure alike, so
+    // the only way one survives is the office being killed mid-run.
+    const n = worktree.sweep(new Set());
+    if (n) console.log("[worktree] swept " + n + " abandoned ghost checkout(s)");
+  } catch (e) { console.error("[worktree] sweep:", e.message); }
 });
 
 // Parent-death watchdog: if the shell that spawned us (via OEP_SPAWNED=1) exits

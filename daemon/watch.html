@@ -32,6 +32,7 @@
   <span class="live">live · read-only (ไม่รบกวนการทำงาน)</span>
 </header>
 <div id="log"></div>
+<script src="/md.js"></script>
 <script>
   const q = new URLSearchParams(location.search);
   const agents = (q.get("agents") || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -40,7 +41,8 @@
   document.title = "👁 " + (q.get("title") || agents.join(", ") || "Watch");
   const log = document.getElementById("log");
   const dot = document.getElementById("dot");
-  const esc = (s) => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  // esc + md come from /md.js (shared renderer). This is a debug view, so agent
+  // text stays literal via esc() - raw markdown stays visible while debugging.
   function add(cls, html) {
     const d = document.createElement("div");
     d.className = "row " + cls;

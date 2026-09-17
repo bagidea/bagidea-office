@@ -1,0 +1,15 @@
+{
+  "id": "github-triage",
+  "name": "🐙 GitHub Triage",
+  "version": "1.0.0",
+  "description": "Issues in → labelled, answered, assigned — with you approving every reply before it goes out. A webhook trigger, a workflow, and the gh CLI. Point a repository's webhook at the office and the queue empties itself.",
+  "panel": "panel.html",
+  "window": { "w": 640, "h": 660, "resizable": true },
+  "commands": [
+    { "name": "setup", "args": "<owner/repo> [:: webhook secret]", "desc": "Install the triage workflow + a webhook trigger for that repository; returns the URL to paste into GitHub" },
+    { "name": "triage", "args": "<owner/repo>#<number>", "desc": "Triage one issue right now (no webhook needed)" },
+    { "name": "status", "args": "", "desc": "Repositories wired up, and the last runs" }
+  ],
+  "needsKeys": [],
+  "library": { "for": "maintainers · dev shops", "hooks": ["triggers.add", "workflow.save"], "needs": "the gh CLI logged in (gh auth login); a tunnel (cloudflared / ngrok) for GitHub to reach the hook" }
+}

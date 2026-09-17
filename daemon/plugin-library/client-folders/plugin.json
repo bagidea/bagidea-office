@@ -1,0 +1,15 @@
+{
+  "id": "client-folders",
+  "name": "🗂 Client Folders",
+  "version": "1.0.0",
+  "description": "A folder per client. Whatever lands in it — a brief, a contract, an invoice, a spreadsheet — the agent you chose picks it up, does the right thing with it, and tells you. Built on file triggers and the workflow engine.",
+  "panel": "panel.html",
+  "window": { "w": 640, "h": 620, "resizable": true },
+  "commands": [
+    { "name": "add", "args": "<client> :: <folder path> [:: agent id] [:: instructions]", "desc": "Watch a folder for a client; the agent handles every new file" },
+    { "name": "remove", "args": "<client>", "desc": "Stop watching that client's folder" },
+    { "name": "list", "args": "", "desc": "Clients, folders and the last files handled" }
+  ],
+  "needsKeys": [],
+  "library": { "for": "agencies · freelancers · anyone with clients", "hooks": ["triggers.add", "workflow.save", "tasks"] }
+}

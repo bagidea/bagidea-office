@@ -29,6 +29,8 @@ daemon/mcp_*.json
 daemon/jobs.json
 daemon/notes.json
 daemon/calendar.json
+daemon/approvals.json
+daemon/notifications.json
 daemon/projects.json
 daemon/monitor.txt
 daemon/monitors.txt

@@ -38,18 +38,44 @@ until it turns ✅ (the system "tests the key + fetches the model list" automati
 
 > 🧠 A ghost (sub-agent) uses the same provider as its parent agent automatically
 
+## ↻ The model list stays current by itself
+
+A model released today should be pickable today — you should never have to wait for an
+office release to see it. So the office pulls each provider's **live** model list
+(`/models`) instead of trusting a list baked into the code:
+
+- **on start-up**, and **every 12 hours**, for Claude + every connected provider
+- **⚙ → CONNECT → 🧠 MODELS / PROVIDERS → `↻ Refresh model list`** — pulls every provider
+  right now, and shows what came back (`✓ claude 11 · openai 80 · …`) plus when it last ran
+- **the `↻` button next to the Model field** (AGENTS → edit an agent) — re-pulls just the
+  provider selected there, so a brand-new model appears in that dropdown immediately
+
+**Claude is included.** Anthropic's `/v1/models` needs your own credentials rather than a
+provider key, so the office authenticates with `ANTHROPIC_API_KEY` when you've set one, and
+otherwise with the Claude Code CLI's existing login on this machine (read-only; it is sent
+nowhere except `api.anthropic.com`). That's what puts a same-day Claude release in the
+picker. If neither is available, the built-in list is used and nothing breaks.
+
+The newest model is pre-selected as the default when you pick a provider — you can always
+drop back to an older one from the dropdown, and an **agent's saved model is never changed
+for you**.
+
 ## Supported providers
 
 ### 🟢 Direct (Anthropic-compatible) — nothing in between
 
 | Provider | Recommended model | Endpoint (global) | Get a key |
 |---|---|---|---|
-| **Claude** (default) | opus / sonnet / haiku | — (uses your login/plan) | claude.ai or ANTHROPIC_API_KEY |
-| **GLM** (Z.AI) | `glm-4.6` | `https://api.z.ai/api/anthropic` | z.ai (has a key-based coding plan) |
+| **Claude** (default) | `claude-opus-5` · or the `opus`/`sonnet`/`haiku` aliases | — (uses your login/plan) | claude.ai or ANTHROPIC_API_KEY |
+| **GLM** (Z.AI) | `glm-5.2[1m]` / `glm-5.2` | `https://api.z.ai/api/anthropic` | z.ai (has a key-based coding plan) |
 | **DeepSeek** | `deepseek-v4-pro` / `-flash` | `https://api.deepseek.com/anthropic` | platform.deepseek.com |
 | **Qwen** (Alibaba) | `qwen3-coder-plus` | `https://dashscope-intl.aliyuncs.com/apps/anthropic` | Alibaba Model Studio |
 | **MiniMax** | `MiniMax-M3` | `https://api.minimax.io/anthropic` | platform.minimax.io |
-| **Kimi** (Moonshot) | `kimi-k2.5` | `https://api.moonshot.ai/anthropic` | platform.moonshot.ai |
+| **Kimi** (Moonshot) | `kimi-k2.6` | `https://api.moonshot.ai/anthropic` | platform.moonshot.ai |
+| **Kimi Code** (coding plan) | `kimi-for-coding` | `https://api.kimi.com/coding` | kimi.com/code (separate `sk-kimi-…` key) |
+
+> **GLM tip:** GLM-5.2's full **1M-token context** is unlocked only by the `glm-5.2[1m]` model id — plain `glm-5.2` serves ~200k. The picker lists `[1m]` first for that reason.
+> **Kimi vs Kimi Code:** these are two different products — **Kimi** (Moonshot) uses your general `platform.moonshot.ai` API key; **Kimi Code** is the separate kimi.com/code coding subscription with its own `sk-kimi-…` key and a single `kimi-for-coding` model. Add whichever you pay for.
 
 ### 🔵 Via the built-in proxy (OpenAI-compatible) — no LiteLLM/Python to install
 
@@ -58,6 +84,7 @@ The office ships a **built-in, zero-dependency proxy that translates Anthropic �
 | Provider | Recommended model | Model name format |
 |---|---|---|
 | **OpenAI** | `gpt-4o` | bare name |
+| **Atlas Cloud** | `openai/gpt-4.1-mini` | **`vendor/model`** |
 | **Gemini** (Google) | `gemini-2.5-flash` | bare name |
 | **OpenRouter** | `openai/gpt-4o`, `anthropic/claude-…` | **`vendor/model`** |
 | **NVIDIA build** | `meta/llama-3.3-70b-instruct` | **`vendor/model`** |
@@ -112,6 +139,26 @@ automatic for **every model**:
 
 You can tune the context window per provider in the registry at `providerConfig.<p>.contextWindow`
 (and the budget used to decide on compaction at `providerConfig.<p>.contextBudget`)
+
+## 🛟 Fallback brain — survive a provider outage (opt-in)
+
+Providers go down. GLM/Z.AI in particular throws `529 · overloaded` under load, and
+while it's down any agent on that brain just sits there erroring. Set an **office-wide
+fallback brain** and the office will re-run that task on the fallback instead:
+
+- Go to **Settings → CONNECT → 🛟 fallback brain** and pick any **connected** provider (plus
+  an optional model). That's it — it applies to every agent.
+- It's **off by default**. With no fallback set, nothing changes: an overloaded brain
+  just retries hard, exactly as before.
+- It fires **only** when the overload is *sustained* (repeated `5xx`), never on a one-off
+  blip, and **only** onto a provider that's actually connected — so a task can't be
+  rerouted into a second dead brain. It never loops back onto the down brain or fails
+  over twice for the same task.
+- Only server overload/unavailability (`5xx`) triggers it. Bad auth (`401/403`) still
+  fast-fails with a clear message; rate/usage limits (`429`) still pause-and-resume.
+
+The failed-over run keeps the original task and still reports back to whoever delegated
+it, with a one-line note that it switched brains and why.
 
 ## 📊 Monitoring
 

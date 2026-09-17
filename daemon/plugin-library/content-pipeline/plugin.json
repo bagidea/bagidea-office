@@ -1,0 +1,16 @@
+{
+  "id": "content-pipeline",
+  "name": "📰 Content Pipeline",
+  "version": "1.0.0",
+  "description": "RSS or a URL in → the article fetched → summarized → a post drafted in your voice → you approve → published to your channel. An RSS trigger kind and two nodes for the Workflow Builder, and a ready-made pipeline.",
+  "panel": "panel.html",
+  "window": { "w": 640, "h": 640, "resizable": true },
+  "commands": [
+    { "name": "follow", "args": "<feed url> [:: every N min] [:: voice/instructions]", "desc": "Follow a feed: every new item runs the pipeline" },
+    { "name": "unfollow", "args": "<feed url>", "desc": "Stop following a feed" },
+    { "name": "run", "args": "<article url> [:: instructions]", "desc": "Run the pipeline on one article right now" },
+    { "name": "list", "args": "", "desc": "Feeds followed and the last items" }
+  ],
+  "needsKeys": [],
+  "library": { "for": "marketing · newsletters · social", "hooks": ["triggers.register", "workflow.node", "workflow.save"] }
+}

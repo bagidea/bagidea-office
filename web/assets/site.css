@@ -98,7 +98,20 @@ h2.title + .lead { text-align:center; color:var(--dim); max-width:720px; margin:
 .feat:hover { border-color:var(--accent); transform:translateY(-3px); }
 .feat .ic { font-size:26px; }
 .feat h3 { margin:12px 0 7px; font-size:18px; font-weight:720; }
-.feat p { color:var(--dim); font-size:14.5px; }
+/* overflow-wrap: a card listing providers as one slash-joined run
+   (Claude/GLM/DeepSeek/…) has no break opportunity, and on a phone that single
+   "word" dragged the whole page sideways. */
+.feat p { color:var(--dim); font-size:14.5px; overflow-wrap:anywhere; }
+
+/* the ecosystem loop — Goal → Think → Act → Learn → Extend → Collaborate → Repeat.
+   Wraps as chips so a long translation still reads as a cycle on a phone. */
+.loop { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; align-items:center; margin-top:44px; }
+.loop span { background:rgba(94,200,255,.08); border:1px solid rgba(94,200,255,.32); color:#cfe6ff;
+  border-radius:999px; padding:8px 18px; font-weight:750; font-size:14.5px; }
+.loop span.rep { background:rgba(255,206,106,.09); border-color:rgba(255,206,106,.38); color:#ffe2a8; }
+.loop i { color:var(--accent); font-style:normal; font-weight:800; }
+.eco-quote { max-width:740px; margin:30px auto 0; text-align:center; font-size:17.5px;
+  font-weight:700; color:var(--text); line-height:1.6; }
 
 /* split rows (image + text) */
 .split { display:grid; grid-template-columns:1fr 1fr; gap:38px; align-items:center; margin-top:46px; }
@@ -111,7 +124,11 @@ h2.title + .lead { text-align:center; color:var(--dim); max-width:720px; margin:
 .split ul li { margin:6px 0; }
 
 /* install steps */
-.steps { counter-reset:s; margin-top:40px; display:grid; gap:16px; max-width:860px; margin-inline:auto; }
+/* minmax(0,1fr): a grid track is min-content-sized by default, so the long
+   one-line installer URL inside <pre> pushed the track — and the whole page —
+   wider than a phone screen. The pre scrolls on its own instead. */
+.steps { counter-reset:s; margin-top:40px; display:grid; grid-template-columns:minmax(0,1fr);
+  gap:16px; max-width:860px; margin-inline:auto; }
 .step { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; position:relative; padding-inline-start:64px; }
 .step::before { counter-increment:s; content:counter(s); position:absolute; inset-inline-start:18px; top:18px;
   width:32px; height:32px; border-radius:9px; background:linear-gradient(135deg,var(--accent),var(--accent2));
@@ -226,7 +243,10 @@ footer .col a { display:block; padding:3px 0; }
 .copyright { text-align:center; color:var(--dim); font-size:13px; margin-top:34px; padding-top:22px; border-top:1px solid var(--line); }
 
 /* docs layout */
-.docwrap { display:grid; grid-template-columns:248px 1fr; gap:40px; max-width:1180px; margin:0 auto; padding:34px 22px 80px; align-items:start; }
+/* minmax(0,1fr) for the same reason as .steps: the content column was sized to
+   its min-content (long commands inside <pre>), so the docs page scrolled
+   sideways on narrower screens. */
+.docwrap { display:grid; grid-template-columns:248px minmax(0,1fr); gap:40px; max-width:1180px; margin:0 auto; padding:34px 22px 80px; align-items:start; }
 .docnav { position:sticky; top:80px; max-height:calc(100vh - 96px); overflow:auto; font-size:14px; }
 .docnav h4 { color:var(--accent); font-size:12px; text-transform:uppercase; letter-spacing:1px; margin:18px 0 8px; }
 .docnav a { display:block; color:var(--dim); padding:5px 10px; border-radius:8px; border-inline-start:2px solid transparent; }

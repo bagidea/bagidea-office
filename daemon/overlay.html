@@ -47,6 +47,20 @@
   }
   .winbtn svg { width: 15px; height: 15px; display: block; }
   .winbtn:hover { background: rgba(94,200,255,0.25); border-color: var(--accent); }
+  /* Large mode: invisible resize strips along every edge/corner. The webview
+     covers the whole frameless window, so the OS never shows native resize
+     handles — these zones start an OS resize drag via IPC instead. */
+  #resizeEdges { display: none; }
+  body.largemode #resizeEdges { display: contents; }
+  #resizeEdges div { position: fixed; z-index: 100000; }
+  .rz-n  { top:0; left:12px; right:12px; height:6px; cursor:n-resize; }
+  .rz-s  { bottom:0; left:12px; right:12px; height:6px; cursor:s-resize; }
+  .rz-e  { right:0; top:12px; bottom:12px; width:6px; cursor:e-resize; }
+  .rz-w  { left:0; top:12px; bottom:12px; width:6px; cursor:w-resize; }
+  .rz-ne { top:0; right:0; width:14px; height:14px; cursor:ne-resize; }
+  .rz-nw { top:0; left:0; width:14px; height:14px; cursor:nw-resize; }
+  .rz-se { bottom:0; right:0; width:14px; height:14px; cursor:se-resize; }
+  .rz-sw { bottom:0; left:0; width:14px; height:14px; cursor:sw-resize; }
   .winbtn.hide:hover { background: rgba(255,84,72,0.3); border-color: #ff5448; }
   /* "stop the agent to take over" pill — wider, labelled; arms on first click. */
   .winbtn.work { width: auto; padding: 0 9px; gap: 4px; font-size: 11px;
@@ -183,6 +197,21 @@
 
   #log { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 9px; }
   .msg { max-width: 82%; padding: 8px 12px; border-radius: 12px; white-space: pre-wrap; word-wrap: break-word; }
+  /* md()-rendered body: parent .msg keeps pre-wrap, but markdown lays out its own
+     spacing via <p>/<br>, so the body switches to normal + tight margins. <pre>
+     keeps its own pre formatting (overrides here) and wraps long code. */
+  .msg .mdbody { white-space: normal; overflow-wrap: anywhere; }
+  .msg .mdbody p { margin: 0 0 .3em; }
+  .msg .mdbody p:last-child { margin-bottom: 0; }
+  .msg .mdbody ul, .msg .mdbody ol { margin: .2em 0; padding-left: 1.3em; }
+  .msg .mdbody li { margin: .1em 0; }
+  .msg .mdbody pre { white-space: pre-wrap; word-break: break-word; margin: .2em 0; }
+  .msg .mdbody code { font: inherit; }
+  .msg .mdbody h1, .msg .mdbody h2, .msg .mdbody h3, .msg .mdbody h4, .msg .mdbody h5, .msg .mdbody h6 { font-size: 1em; font-weight: 700; margin: .4em 0 .2em; }
+  .msg .mdbody h1:first-child, .msg .mdbody h2:first-child, .msg .mdbody h3:first-child { margin-top: 0; }
+  .msg .mdbody a { color: var(--accent); }
+  .msg .mdbody blockquote { margin: .2em 0; padding-left: .8em; border-left: 2px solid rgba(255,255,255,.15); color: var(--dim); }
+  .msg .mdbody hr { border: none; border-top: 1px solid rgba(255,255,255,.12); margin: .4em 0; }
   .msg.you { align-self: flex-end; background: rgba(94,200,255,0.13); border: 1px solid var(--line); border-bottom-right-radius: 4px; }
   /* spoken command: same right-side bubble, voice-flavored */
   .msg.you.voice { border-color: rgba(255,110,130,0.55); background: rgba(255,110,130,0.10); }
@@ -354,12 +383,19 @@
      they were left in (the "modal stuck in feed mode" report). */
   body.feedmode #modal, body.feedmode #fsPick, body.feedmode #sessMenu,
   body.feedmode #dayMenu { display: none !important; }
-  /* Mouse-over = reading: the glass turns near-solid so text pops. */
-  body.feedmode { background: rgba(4, 7, 13, 0.92); transition: background 0.3s; }
-  body.feedmode:hover { background: rgba(4, 7, 13, 0.985); }
+  /* The feed's ghost-over-your-desktop translucency is the SHELL's job, not this
+     stylesheet's — one uniform alpha on the window (see set_feed_alpha). v0.9.51
+     and v0.9.52 tried to do it here, on a per-pixel-transparent window, and the
+     page cannot: only some of its layers reach the desktop, so the gutter, the
+     header and the corners sat on an opaque backing and lit up as a pale frame.
+     Keep every surface below OPAQUE. */
   body.feedmode #feedHead {
     display: flex; align-items: center; gap: 7px;
     position: fixed; top: 0; left: 0; right: 0; height: 30px; padding: 0 12px;
+    /* The head paints over body's top corners, so it has to carry the same round
+       or the strip ends up with two soft corners at the bottom and two square ones
+       at the top. 17px = the house 18px less body's 1px border. */
+    border-radius: 17px 17px 0 0;
     font-size: 10.5px; letter-spacing: 2px; color: #9fb6d8; font-weight: 700;
     background: rgba(16, 24, 42, 0.85); border-bottom: 1px solid var(--line);
   }
@@ -375,7 +411,9 @@
   body.feedmode #feed {
     display: flex; flex-direction: column-reverse; gap: 5px;
     position: fixed; top: 34px; bottom: 6px; left: 6px; right: 6px;
-    overflow-y: auto; padding: 2px;
+    /* overflow-x is explicit: leaving it at `visible` makes the browser
+       promote it to `auto`, and the feed only ever scrolls vertically. */
+    overflow-y: auto; overflow-x: hidden; padding: 2px;
     mask-image: linear-gradient(to bottom, transparent, black 12%);
   }
   .fitem .fpbtns { display: flex; gap: 5px; margin-top: 5px; }
@@ -629,10 +667,18 @@
   }
   .fitem .face { width: 26px; height: 26px; border-radius: 7px; flex: none;
     background: #1c2740; }
-  .fitem .ftxt { min-width: 0; }
+  .fitem .ftxt { min-width: 0; flex: 1 1 auto; }
   .fitem .ftxt b { display: block; font-size: 11px; color: #cfe3ff; }
   .fitem .ftxt .sess { color: var(--dim); font-weight: 400; font-size: 9.5px; }
   .fitem .ftxt .body { color: rgba(225,232,245,0.92); word-break: break-word; }
+  /* The feed renders the same markdown the chat does, so it needs the same
+     wrapping: a bare <pre> defaults to white-space:pre, and one long path or
+     code line then pushes the whole stream sideways — which is where the
+     stray horizontal scrollbar under the feed came from. */
+  .fitem .ftxt .body pre { white-space: pre-wrap; word-break: break-word; margin: .2em 0; }
+  .fitem .ftxt .body code { font: inherit; }
+  .fitem .ftxt .body img { max-width: 100%; }
+  .fitem .ftxt .body table { display: block; max-width: 100%; overflow-x: auto; }
   .fitem.alert { border-color: rgba(255,176,84,0.8); background: rgba(255,150,60,0.13); }
   .fitem.ghostly { border-color: rgba(140,160,255,0.4); }
   /* 🧠 BRAINS monitor */
@@ -733,6 +779,16 @@
   /* Edge's native password-reveal eye is black-on-black on our theme. */
   input::-ms-reveal { filter: invert(0.85); }
   .tabs .tab.on { color: var(--accent); border-color: var(--accent); background: rgba(94,200,255,0.1); }
+  /* 📋 the task board (v1.4) */
+  .board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .bcol { background: rgba(255,255,255,.04); border-radius: 8px; padding: 6px; min-height: 90px; min-width: 0; }
+  .bcol h5 { margin: 0 0 6px; font-size: 10.5px; color: var(--dim); letter-spacing: .4px; font-weight: 600; }
+  .card { background: rgba(0,0,0,.28); border-radius: 7px; padding: 6px 7px; margin-bottom: 5px; font-size: 11.5px; cursor: grab; border-left: 3px solid transparent; word-break: break-word; }
+  .card:hover { background: rgba(0,0,0,.4); }
+  .card.p1 { border-left-color: #ff6b6b; } .card.p2 { border-left-color: #ffcf5e; } .card.p4 { opacity: .75; }
+  .card .m { font-size: 10px; color: var(--dim); margin-top: 3px; }
+  .card.over .m { color: #ff8a8a; } .card.blocked { opacity: .6; }
+  .bcol.drop { outline: 1px dashed #6fd3ff; }
   .arow {
     display: flex; gap: 10px; align-items: center; padding: 7px 9px;
     border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; margin-bottom: 7px;
@@ -818,7 +874,11 @@
   .chk.on { color: var(--accent); border-color: var(--accent); background: rgba(94,200,255,0.1); }
   .autobadge { font-size: 9.5px; color: #ffd28a; border: 1px solid rgba(255,210,138,0.4); border-radius: 10px; padding: 1px 7px; margin-left: 6px; }
   .switch { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--dim); margin-bottom: 10px; cursor: pointer; }
-  .switch .knob { width: 34px; height: 18px; border-radius: 12px; background: rgba(255,255,255,0.12); position: relative; transition: background 0.15s; }
+  /* flex:none is load-bearing — the label is a sibling flex item, so a LONG label
+     (the auto-approve one wraps to 2-3 lines) used to squeeze the 34px track down
+     to a bare dot: the switch stopped looking like a switch at all. Track stays
+     34x18 and the label wraps beside it; align-self keeps it on the first line. */
+  .switch .knob { width: 34px; height: 18px; flex: none; align-self: flex-start; margin-top: 1px; border-radius: 12px; background: rgba(255,255,255,0.12); position: relative; transition: background 0.15s; }
   .switch .knob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #8294ab; transition: left 0.15s, background 0.15s; }
   .switch.on .knob { background: rgba(94,200,255,0.4); }
   .switch.on .knob::after { left: 18px; background: var(--accent); }
@@ -879,6 +939,41 @@
     #log { padding: 10px; }
     footer { padding: 8px 10px; }
   }
+  /* ---- 🔔 notifications + 📥 approvals (v1.1) ---------------------------- */
+  aside h2 .cnt { display: none; margin-left: 6px; background: #ff5448; color: #fff; border-radius: 9px;
+    padding: 0 6px; font-size: 10px; letter-spacing: 0; vertical-align: middle; }
+  aside h2 .cnt.on { display: inline-block; }
+  aside h2 .mini { float: right; font-size: 10px; letter-spacing: 0; padding: 1px 7px; border-radius: 6px;
+    border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--dim); cursor: pointer; }
+  .ntf { border: 1px solid var(--line); border-left: 3px solid #7dcdff; border-radius: 8px; padding: 6px 8px;
+    margin-bottom: 6px; font-size: 11.5px; background: rgba(255,255,255,0.03); cursor: pointer; animation: chipIn 0.25s ease both; }
+  .ntf.unread { border-left-color: #ffb054; background: rgba(255,176,84,0.07); }
+  .ntf .t { color: #cfe3ff; font-weight: 600; }
+  .ntf .b { color: var(--dim); white-space: pre-wrap; word-break: break-word; margin-top: 2px; max-height: 60px; overflow: hidden; }
+  .ntf .w { color: rgba(160,170,190,0.55); font-size: 10px; margin-top: 2px; }
+  .apv { border: 1px solid #ffb054aa; border-radius: 10px; padding: 8px 9px; margin-bottom: 8px;
+    background: rgba(255,176,84,0.08); font-size: 12px; animation: popIn 0.34s cubic-bezier(.2,1.4,.4,1) both; }
+  .apv .k { font-size: 10px; letter-spacing: 1px; color: #ffd28a; }
+  .apv .h { font-weight: 600; color: #cfe3ff; margin: 2px 0; }
+  .apv .d { color: var(--dim); white-space: pre-wrap; word-break: break-word; font-size: 11px; max-height: 96px; overflow-y: auto; margin: 4px 0; }
+  .apv textarea { width: 100%; box-sizing: border-box; margin: 4px 0 6px; font: inherit; font-size: 11px; color: var(--text);
+    background: rgba(255,255,255,0.05); border: 1px solid var(--line); border-radius: 7px; padding: 5px 7px; resize: none; height: 34px; }
+  .apv .row { display: flex; gap: 5px; flex-wrap: wrap; }
+  .apv button { flex: 1 1 auto; padding: 5px; font-size: 12px; border-radius: 7px; border: 1px solid var(--line);
+    background: rgba(255,255,255,0.05); cursor: pointer; }
+  .apv button.yes { color: #4ade80; border-color: #4ade8055; }
+  .apv button.no { color: #ff5448; border-color: #ff544855; }
+  #toasts { position: fixed; right: 14px; bottom: 64px; z-index: 400; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast { pointer-events: auto; width: 270px; background: linear-gradient(160deg, #1a2740 0%, #0e1526 70%);
+    border: 1px solid rgba(125,205,255,0.35); border-radius: 12px; padding: 9px 12px; font-size: 12px; cursor: pointer;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: popIn 0.3s cubic-bezier(.2,1.3,.4,1) both; }
+  .toast .t { font-weight: 700; color: #cfe3ff; }
+  .toast .b { color: var(--dim); margin-top: 2px; max-height: 54px; overflow: hidden; white-space: pre-wrap; }
+  #ntfRules { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  #ntfRules th { font-size: 10px; letter-spacing: 1px; color: var(--dim); font-weight: 600; padding: 3px 4px; text-align: center; }
+  #ntfRules th:first-child, #ntfRules td:first-child { text-align: left; }
+  #ntfRules td { padding: 4px; border-top: 1px dashed rgba(255,255,255,0.06); text-align: center; }
+  #ntfRules select { font: inherit; font-size: 11px; color: var(--text); background: rgba(255,255,255,0.05); border: 1px solid var(--line); border-radius: 6px; padding: 2px 4px; }
 </style>
 
 <header id="titlebar" style="cursor:grab">
@@ -889,6 +984,7 @@
   <button id="setBtn" title="Office settings — agents, roles" style="margin-left:6px">⚙</button>
   <button id="moreBtn" title="เพิ่มเติม" style="margin-left:6px">⋯</button>
   <button id="sideBtn" title="Security Center & Mission Control" style="margin-left:6px">🛡<span id="permBadge"></span></button>
+  <div class="winbtn" id="largeBtn" title="Large window (resizable)" style="margin-left:6px"></div>
   <div class="winbtn" id="miniBtn" title="Mini window" style="margin-left:6px"></div>
   <div class="winbtn hide" id="hideBtn" title="Hide (chat head brings it back)">—</div>
 </header>
@@ -898,6 +994,7 @@
   <div class="opt" id="workflowBtn">🔀 <span>Workflow Builder</span></div>
   <div class="opt" id="toolshubBtn">🧰 <span>Tools Hub</span></div>
   <div class="opt" id="pluginshubBtn">🧩 <span>Plugins Hub</span></div>
+  <div class="opt" id="studioBtn">🎨 <span>Media Studio</span></div>
   <div class="opt" id="editBtn">🎨 <span>จัดออฟฟิศ</span></div>
   <div class="opt" id="discussBtn">🗣 <span>ประชุม agents</span></div>
   <div class="opt" id="mapBtn">🗺 <span>แผนที่</span></div>
@@ -906,6 +1003,8 @@
   <div class="opt" id="langBtn">🌐 <span>ภาษา / Language</span></div>
 </div>
 <div id="langMenu"></div>
+<!-- 🔔 in-app toasts (v1.1); the OS's own toasts arrive with the v1.2 shell -->
+<div id="toasts"></div>
 <div id="dispMenu"></div>
 
 <!-- 🔄 update banner: appears when a newer release is on main -->
@@ -925,6 +1024,10 @@
     <div id="log"></div>
   </div>
   <aside id="side" class="closed">
+    <h2>🔔 NOTIFICATIONS <span id="ntfCount" class="cnt"></span><button id="ntfReadAll" class="mini" title="ทำเครื่องหมายว่าอ่านแล้วทั้งหมด">✓ อ่านแล้ว</button></h2>
+    <div id="ntfList"></div>
+    <h2>📥 APPROVALS <span id="apvCount" class="cnt"></span></h2>
+    <div id="apvList"></div>
     <h2>🛡 SECURITY CENTER</h2>
     <div id="perms"></div>
     <h2>🛰 MISSION CONTROL</h2>
@@ -1008,6 +1111,7 @@
   </div>
 </div>
 <div id="modal"><div id="modalCard"></div></div>
+<script src="/md.js"></script>
 
 <script>
   // dev error beacon → daemon log
@@ -1032,6 +1136,14 @@
   // DICT["thai"] = { en, zh, ja }
   const DICT = {
     "ยกเลิก": { en: "Cancel", zh: "取消", ja: "キャンセル" },
+    // ↻ live model lists (CONNECT tab) — the rest of the languages are filled at runtime
+    "↻ อัปเดตรายชื่อโมเดล": { en: "↻ Refresh model list", zh: "↻ 刷新模型列表", ja: "↻ モデル一覧を更新" },
+    "อัปเดตล่าสุด": { en: "updated", zh: "更新于", ja: "更新" },
+    "เมื่อครู่": { en: "just now", zh: "刚刚", ja: "たった今" },
+    "นาทีที่แล้ว": { en: "min ago", zh: "分钟前", ja: "分前" },
+    "ชม.ที่แล้ว": { en: "h ago", zh: "小时前", ja: "時間前" },
+    "วันที่แล้ว": { en: "d ago", zh: "天前", ja: "日前" },
+    "ยังไม่เคยดึง — กดเพื่อดึงรายชื่อโมเดลล่าสุดจากผู้ให้บริการ": { en: "Never pulled — click to fetch each provider's latest model list.", zh: "尚未获取 — 点击以拉取各服务商的最新模型列表。", ja: "未取得 — クリックして各プロバイダーの最新モデル一覧を取得します。" },
     // destructive-delete confirmations + proposal bulk-clear
     "ลบ": { en: "Delete", zh: "删除", ja: "削除" },
     "ลบ role": { en: "Delete role", zh: "删除角色", ja: "ロールを削除" },
@@ -1095,6 +1207,45 @@
     "คลิกบนผังเพื่อวาง · ลากเพื่อย้าย · ดับเบิลคลิกเพื่อลบ": { en: "Click to place · drag to move · double-click to remove", zh: "点击放置 · 拖动移动 · 双击删除", ja: "クリックで配置 · ドラッグで移動 · ダブルクリックで削除" },
     "ล้างทั้งหมด": { en: "Clear all", zh: "全部清除", ja: "すべて消去" },
     "บันทึกผัง": { en: "Save layout", zh: "保存布局", ja: "レイアウト保存" },
+    // 🤖 AUTO (keep-going) mode
+    "🤖 ทำต่อเอง (AUTO): น้องๆ ตัดสินใจแทนคุณแล้วทำต่อจนจบ ไม่หยุดถามความเห็นกลางทาง — จะหยุดก็ต่อเมื่อติดจริง (ไม่มีสิทธิ์/key) หรือถึงขั้นที่ย้อนกลับไม่ได้ (push, deploy, ลบของ, จ่ายเงิน)": {
+      en: "🤖 Keep going (AUTO): the team decides for you and works through to the finish instead of stopping mid-job to ask — it only stops when genuinely blocked (missing access/key) or at something irreversible (push, deploy, deleting, spending)",
+      zh: "🤖 自动推进（AUTO）：团队替你做决定并一口气做到完成，不会中途停下来问你 — 只有真正受阻（缺少权限/密钥）或遇到不可逆的操作（推送、部署、删除、花钱）时才会停",
+      ja: "🤖 自走モード（AUTO）: 途中で意見を聞くために止まらず、チームが自分で判断して最後までやり切ります — 本当に詰まったとき（権限/キーがない）や取り返しのつかない操作（push・deploy・削除・支払い）でのみ停止します" },
+    "ทำต่อเองได้สูงสุด %n รอบต่องาน แล้วหยุดรอคุณ · เปิดคู่กับ 🔓 ข้างล่างเพื่อไม่ให้ค้างรอกด Allow": {
+      en: "Up to %n self-driven rounds per job, then it waits for you · pair with 🔓 below so it never sits waiting on Allow",
+      zh: "每项工作最多自动推进 %n 轮，之后会等你 · 与下方 🔓 搭配使用，才不会卡在等待 Allow",
+      ja: "1件につき最大 %n ラウンドまで自走し、その後はあなたを待ちます · 下の 🔓 と併用すると Allow 待ちで止まりません" },
+    "🤖 เปิดโหมดทำต่อเอง — น้องๆ จะไม่หยุดถามแล้ว": {
+      en: "🤖 Keep-going mode ON — the team won't stop to ask",
+      zh: "🤖 已开启自动推进 — 团队不会再停下来问你",
+      ja: "🤖 自走モード ON — もう質問で止まりません" },
+    "🤖 ปิดโหมดทำต่อเอง — กลับมาถามก่อนตัดสินใจใหญ่ๆ": {
+      en: "🤖 Keep-going mode OFF — they'll check with you before big calls",
+      zh: "🤖 已关闭自动推进 — 重大决定前会先问你",
+      ja: "🤖 自走モード OFF — 大きな判断の前に確認します" },
+    // 🛡 project trust (a project's own .claude hooks)
+    "โปรเจคนี้มี hook ของตัวเอง จะรันคำสั่งข้างล่างนี้เองทุกครั้งที่เปิดงาน (ไม่ผ่านการ์ดขออนุญาต)": {
+      en: "This project ships its own hooks — it runs the commands below by itself every time work opens here (no permission card)",
+      zh: "该项目自带 hook — 每次在这里开始工作时都会自行运行下列命令（不经过授权卡片）",
+      ja: "このプロジェクトは独自のフックを持っています — ここで作業を開くたび、下のコマンドを自動実行します（許可カードを通りません）" },
+    "hook ของโปรเจคนี้ถูกแก้ไขหลังจากที่คุณอนุมัติไปแล้ว — ตรวจอีกครั้ง": {
+      en: "This project's hooks changed after you approved them — check again",
+      zh: "该项目的 hook 在你批准之后发生了变化 — 请再次确认",
+      ja: "承認後にこのプロジェクトのフックが変更されました — もう一度確認してください" },
+    "สคริปต์ที่เรียกชี้ออกไปนอกโปรเจค": {
+      en: "A referenced script resolves outside the project",
+      zh: "被调用的脚本指向项目之外",
+      ja: "参照スクリプトがプロジェクト外を指しています" },
+    "เชื่อถือโปรเจคนี้": { en: "Trust this project", zh: "信任此项目", ja: "このプロジェクトを信頼" },
+    "ไม่อนุมัติ": { en: "Don't allow", zh: "不允许", ja: "許可しない" },
+    "โปรเจค": { en: "Project", zh: "项目", ja: "プロジェクト" },
+    "อนุมัติ hook แล้ว": { en: "hooks approved", zh: "已批准 hook", ja: "フックを承認しました" },
+    "ไม่อนุมัติ hook": { en: "hooks not allowed", zh: "未批准 hook", ja: "フックを許可しませんでした" },
+    "🛡 การ์ดนี้หมดอายุไปแล้ว (คำขอถูกปิดไปก่อนหน้า)": {
+      en: "🛡 This card has expired (the request was already closed)",
+      zh: "🛡 此卡片已失效（请求先前已关闭）",
+      ja: "🛡 このカードは期限切れです（リクエストは既に閉じられました）" },
     // settings tabs
     "AGENTS": { en: "AGENTS", zh: "代理", ja: "エージェント" },
     "ROLES": { en: "ROLES", zh: "角色", ja: "役職" },
@@ -1104,6 +1255,7 @@
     // ops tabs
     "📁 PROJECTS": { en: "📁 PROJECTS", zh: "📁 项目", ja: "📁 プロジェクト" },
     "📋 TASKS": { en: "📋 TASKS", zh: "📋 任务", ja: "📋 タスク" },
+    "🔁 JOBS": { en: "🔁 JOBS", zh: "🔁 定时任务", ja: "🔁 ジョブ" },
     "📅 CALENDAR": { en: "📅 CALENDAR", zh: "📅 日历", ja: "📅 カレンダー" },
     "📝 NOTES": { en: "📝 NOTES", zh: "📝 笔记", ja: "📝 ノート" },
     "🏢 ORG": { en: "🏢 ORG", zh: "🏢 组织", ja: "🏢 組織" },
@@ -1272,8 +1424,12 @@
   const ROLES = ["Researcher", "Engineer", "Designer", "Analyst", "Operator", "Specialist"];
   const NPCS = [1, 2, 3, 4, 5, 6, 9, 10, 11, 12];
   // Live registry from the daemon (roster.sync) — identity source of truth.
-  let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true, VERIFY = false;
+  let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true, VERIFY = false, AUTOAPPROVE = false;
+  let AUTOPILOT = false, AUTOPILOTMAX = 8;   // 🤖 keep-going mode + its round budget
   let BUILTIN_DESC = {}, REGMCP = {}, SOUND = true, HEARTBEAT = 0;
+  let REGBACKENDS = {}, REGBACKEND = "local";
+  let GHOSTWT = false;
+  let SEMANTIC = { enabled:false, ready:false, vectors:0, model:"", baseUrl:"" };
   let FEATURES = { openai: false, gemini: false, stt: false, tts: false, live: false, image: false };
   let TTSON = true, SOCIALMIN = 60, MAXSTAFF = 18, PROPOSALMIN = 120;
   let PROJECTS_CACHE = [];
@@ -1442,10 +1598,13 @@
       const f = document.createElement("div");
       f.className = "face";
       face(f, who, 20);
-      w.append(f, document.createTextNode(who.toUpperCase()));
+      w.append(f, document.createTextNode(nameOf(who).toUpperCase()));
       d.appendChild(w);
     }
-    d.appendChild(document.createTextNode(text));
+    const body = document.createElement("div");
+    body.className = "mdbody";
+    body.innerHTML = md(text);   // sanitized markdown - see /md.js invariant
+    d.appendChild(body);
     if (String(cls).includes("agent")) attachMediaPreviews(d, text);
     const tm = document.createElement("div");
     tm.className = "msgtime";
@@ -1544,8 +1703,18 @@
     for (const [id, m] of Object.entries(missions)) {
       const d = document.createElement("div");
       d.className = "mission " + m.state;
-      d.innerHTML = `<b>${m.agent}</b> · ${m.state}` +
-        (m.tool ? ` · <i>${m.tool}</i>` : "") + `<div class="id">${id}</div>`;
+      const nm = document.createElement("b");
+      nm.textContent = nameOf(m.agent);
+      d.append(nm, document.createTextNode(" · " + m.state));
+      if (m.tool) {
+        const tl = document.createElement("i");
+        tl.textContent = m.tool;
+        d.append(document.createTextNode(" · "), tl);
+      }
+      const tid = document.createElement("div");
+      tid.className = "id";
+      tid.textContent = id;
+      d.append(tid);
       missionsEl.appendChild(d);
     }
   }
@@ -1623,12 +1792,117 @@
   document.getElementById("sideBtn").onclick = () =>
     setSide(sideEl.classList.contains("closed"));
   sideTab.onclick = () => setSide(sideEl.classList.contains("closed"));
+  // ---- 🔔 notifications + 📥 approvals (v1.1) --------------------------------
+  // The Security Center keeps its rich tool-permission cards; every OTHER kind
+  // of thing that waits on a person renders here. The badge counts both.
+  const ntfList = document.getElementById("ntfList");
+  const apvList = document.getElementById("apvList");
+  const escN = (x) => String(x ?? "").replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+  const uiPost = (p, body) => fetch(p, { method: "POST", headers: { "content-type": "application/json", "x-bagidea-ui": "1" }, body: JSON.stringify(body || {}) });
+  let NTF_UNREAD = 0;
+  const KIND_TH = { "tool-permission": "ขอใช้เครื่องมือ", "project-trust": "hook ของโปรเจกต์", proposal: "ข้อเสนอโปรเจกต์",
+    blocked: "agent ติด รอคำตอบ", job: "งานรอสั่งรัน", workflow: "workflow รออนุมัติ", plugin: "plugin ถาม" };
+  function apvPending() { return apvList ? apvList.children.length : 0; }
+  function renderApvCount() {
+    const c = document.getElementById("apvCount"); if (!c) return;
+    const n = apvPending() + permsEl.children.length;
+    c.textContent = n; c.classList.toggle("on", n > 0);
+  }
+  function renderNtfCount() {
+    const c = document.getElementById("ntfCount"); if (!c) return;
+    c.textContent = NTF_UNREAD; c.classList.toggle("on", NTF_UNREAD > 0);
+  }
+  function whenText(ts) {
+    const d = new Date(ts); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+  function openLink(link) {
+    const l = String(link || "");
+    if (l.startsWith("approval:")) {
+      setSide(true);
+      const el = document.getElementById("apv-" + l.slice(9)) || document.getElementById("perm-" + l.slice(9));
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+  function addNtf(item, top) {
+    if (!ntfList || document.getElementById("ntf-" + item.id)) return;
+    const d = document.createElement("div");
+    d.id = "ntf-" + item.id;
+    d.className = "ntf" + (item.read ? "" : " unread");
+    d.innerHTML = `<div class="t">${escN(item.title)}</div>` +
+      (item.body ? `<div class="b">${escN(item.body)}</div>` : "") +
+      `<div class="w">${whenText(item.at)}${item.agent ? " · " + escN(nameOf(item.agent)) : ""}</div>`;
+    d.onclick = () => {
+      if (!item.read) { item.read = 1; d.classList.remove("unread"); uiPost("/notify/read", { ids: [item.id] }).catch(() => {}); }
+      openLink(item.link);
+    };
+    if (top) ntfList.prepend(d); else ntfList.appendChild(d);
+    while (ntfList.children.length > 60) ntfList.removeChild(ntfList.lastChild);
+  }
+  function addApv(item) {
+    if (!apvList || item.kind === "tool-permission" || item.decided) return;   // Security Center owns tool cards
+    if (document.getElementById("apv-" + item.id)) return;
+    const d = document.createElement("div");
+    d.id = "apv-" + item.id; d.className = "apv";
+    d.innerHTML =
+      `<div class="k">${escN(KIND_TH[item.kind] || item.kind)}${item.agent ? " · " + escN(nameOf(item.agent)) : ""}</div>` +
+      `<div class="h">${escN(item.title)}</div>` +
+      (item.detail ? `<div class="d">${escN(item.detail)}</div>` : "") +
+      `<textarea placeholder="${tr("ฝากข้อความถึงทีม (ไม่บังคับ)")}"></textarea><div class="row"></div>`;
+    const row = d.querySelector(".row"), ta = d.querySelector("textarea");
+    (item.options || []).forEach((o, i, arr) => {
+      const b = document.createElement("button");
+      b.className = i === 0 ? "yes" : (i === arr.length - 1 ? "no" : "");
+      b.textContent = o.label || o.value;
+      b.onclick = async () => {
+        row.querySelectorAll("button").forEach((x) => (x.disabled = true));
+        try { await uiPost("/approvals/respond", { id: item.id, decision: o.value, note: ta.value.trim() }); }
+        catch { row.querySelectorAll("button").forEach((x) => (x.disabled = false)); }
+      };
+      row.appendChild(b);
+    });
+    apvList.appendChild(d);
+    renderApvCount(); renderBadge();
+  }
+  function removeApv(id) {
+    const el = document.getElementById("apv-" + id); if (el) el.remove();
+    renderApvCount(); renderBadge();
+  }
+  function showToast(item) {
+    const box = document.getElementById("toasts"); if (!box) return;
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.innerHTML = `<div class="t">${escN(item.title)}</div>` + (item.body ? `<div class="b">${escN(item.body)}</div>` : "");
+    t.onclick = () => { t.remove(); openLink(item.link); };
+    box.appendChild(t);
+    while (box.children.length > 4) box.removeChild(box.firstChild);
+    setTimeout(() => { if (t.parentNode) t.remove(); }, 9000);
+  }
+  // Presence: while there's input here, the owner is "at the keyboard"; silence
+  // for a few minutes means away, and the rules can route a toast/phone only then.
+  let _presAt = 0;
+  const presencePing = () => { const n = Date.now(); if (n - _presAt > 30000) { _presAt = n; fetch("/notify/presence", { method: "POST", body: "{}" }).catch(() => {}); } };
+  ["mousemove", "keydown", "pointerdown"].forEach((e) => document.addEventListener(e, presencePing, { passive: true }));
+  function loadInbox() {
+    fetch("/approvals?pending=1").then((r) => r.json()).then((j) => (j.items || []).forEach(addApv)).catch(() => {});
+    fetch("/notify?limit=50").then((r) => r.json()).then((j) => {
+      NTF_UNREAD = j.unread || 0; renderNtfCount();
+      if (ntfList) ntfList.innerHTML = "";
+      (j.items || []).forEach((it) => addNtf(it, false));
+    }).catch(() => {});
+  }
+  const ntfReadAll = document.getElementById("ntfReadAll");
+  if (ntfReadAll) ntfReadAll.onclick = () => uiPost("/notify/read", { ids: "all" }).then(() => {
+    NTF_UNREAD = 0; renderNtfCount(); ntfList.querySelectorAll(".ntf.unread").forEach((x) => x.classList.remove("unread"));
+  }).catch(() => {});
+
   function renderBadge() {
-    const n = permsEl.children.length;
+    const n = permsEl.children.length + apvPending();
     const b = document.getElementById("permBadge");
     b.textContent = n;
     b.classList.toggle("on", n > 0);
     sideTab.classList.toggle("alert", n > 0);
+    // The tray icon gets a dot while anything waits — visible with every window closed.
+    try { if (window.__shellPost && renderBadge._last !== n) { renderBadge._last = n; window.__shellPost("badge:" + n); } } catch {}
   }
 
   // Native context menu has no business in our chrome.
@@ -2054,7 +2328,27 @@
     if (!on && !permsEl.querySelector(".perm")) setSide(false);
     document.body.classList.toggle("feedmode", on);
     if (on) feedEl.scrollTop = 0;  // column-reverse: 0 = the live bottom edge
+    // Pointing at the strip means you are reading it → tell the shell to firm the
+    // window up. The page can't do this itself any more (the translucency is the
+    // window's alpha now, not CSS), but it IS the only thing that reliably knows
+    // where the pointer is: the webview covers the window, so the native side
+    // never sees a mouse move. Re-report on entering feed as well — the pointer
+    // may already be inside, and no enter event fires for a cursor that never moved.
+    if (on) reportFeedHover(pointerInside);
   };
+  // Tracked on the document element: it spans the viewport, and enter/leave there
+  // are the window's own edges.
+  let pointerInside = false;
+  function reportFeedHover(over) {
+    if (window.__shellPost && document.body.classList.contains("feedmode"))
+      window.__shellPost("feed-hover:" + (over ? 1 : 0));
+  }
+  document.documentElement.addEventListener("mouseenter", () => {
+    pointerInside = true; reportFeedHover(true);
+  });
+  document.documentElement.addEventListener("mouseleave", () => {
+    pointerInside = false; reportFeedHover(false);
+  });
   // column-reverse stream: newest = FIRST child (renders at the bottom),
   // scrollTop 0 = bottom. History scrolls; we only auto-stick when the user
   // is already at the live edge — scrolled-up reading is never yanked away.
@@ -2078,7 +2372,7 @@
     }
     const body = document.createElement("div");
     body.className = "body";
-    body.textContent = String(text).slice(0, 220);
+    body.innerHTML = md(String(text).slice(0, 220));   // sanitized - see /md.js
     t.append(b, body);
     d.append(f, t);
     const empty = document.getElementById("feedEmpty");
@@ -2191,19 +2485,34 @@
   function trackRunning(ev) {
     // Daemon (re)started → nothing is running; drop any stale/replayed entries.
     if (ev.type === "task.reset") { RUNNING.clear(); renderRunning(); return; }
+    // Sub-agent (ghost) fan-out: surface each parallel ghost as its OWN live row so
+    // the owner sees the whole crew working, not just the parent. Keyed by ghost id
+    // (contains '#') — handled BEFORE the '#' filter below, which drops other traffic.
+    if (ev.type === "subagent.spawned") {
+      const pid = String(ev.agent || "").split("#")[0];
+      const tag = String(ev.sub || "").includes("#") ? ev.sub.split("#")[1].toUpperCase() : "SUB";
+      RUNNING.set(ev.sub, { agent: pid, ghost: true, task: ev.sub, session: ev.session || "",
+        ts: ev.ts || Date.now(), title: "👻 " + tag + ": " + String(ev.text || "").slice(0, 70) });
+      renderRunning(); return;
+    }
+    if (ev.type === "subagent.done") { if (RUNNING.delete(ev.sub)) renderRunning(); return; }
+    if (ev.type === "subagent.progress") { const g = RUNNING.get(ev.sub); if (g) g.ts = ev.ts || Date.now(); return; }
     if (ev.theater || String(ev.agent || "").includes("#")) return;
     if (ev.type === "task.started")
       RUNNING.set(ev.task, { agent: ev.agent, title: ev.title || "",
         session: ev.session || "", ts: ev.ts || Date.now(), task: ev.task });
     else if (ev.type === "task.completed" || ev.type === "task.failed")
       RUNNING.delete(ev.task);
+    // A long run kept alive by tool activity: refresh its timestamp so the 60-min
+    // idle sweep in renderRunning() never drops a task that is genuinely still going.
+    else if (ev.type === "task.progress") { const r = RUNNING.get(ev.task); if (r) r.ts = ev.ts || Date.now(); return; }
     else return;
     renderRunning();
   }
   let NOW_OPEN = false;  // expanded? (shared across both modes, sticky)
   function renderRunning() {
     const now = Date.now();
-    for (const [k, v] of RUNNING) if (now - v.ts > 30 * 60000) RUNNING.delete(k);
+    for (const [k, v] of RUNNING) if (now - v.ts > 60 * 60000) RUNNING.delete(k);
     const items = [...RUNNING.values()].reverse();  // newest first
     const strip = document.getElementById("nowStrip");
     const ftask = document.getElementById("feedTasks");
@@ -2221,7 +2530,7 @@
       // so the chrome words won't be auto-translated — do it inline via tr().
       sum.innerHTML = `<span class="dot"></span>` +
         `<b>${tr("กำลังทำ %n งาน").replace("%n", items.length)}</b>` +
-        `<span class="latest">${nameOf(latest.agent)}: ${(latest.title || "…").replace(/</g, "&lt;")}</span>` +
+        `<span class="latest">${nameOf(latest.agent)}: ${esc(latest.title || "…")}</span>` +
         `<span class="caret">${NOW_OPEN ? tr("▲ พับ") : tr("▼ ดูทั้งหมด")}</span>`;
       sum.onclick = () => { NOW_OPEN = !NOW_OPEN; renderRunning(); };
       box.appendChild(sum);
@@ -2266,6 +2575,11 @@
       if (!resolveFeedPerm(ev.perm, ev.via === "timeout" ? "✗ หมดเวลา — ปฏิเสธอัตโนมัติ" : "✗ ไม่อนุญาต", false))
         addFeed(ev.agent, "🛡 " + ev.tool + " — denied ✗", sess);
     }
+    else if (ev.type === "trust.requested")
+      addFeed(ev.agent || "main", "🛡 โปรเจค " + (ev.project || "") + " มี hook ของตัวเอง — รออนุมัติ", sess);
+    else if (ev.type === "trust.approved" || ev.type === "trust.denied")
+      addFeed("main", "🛡 โปรเจค " + (ev.project || "") +
+        (ev.type === "trust.approved" ? " — อนุมัติ hook แล้ว ✓" : " — ไม่อนุมัติ hook ✗"), sess);
     else if (ev.type === "task.completed") addFeed(ev.agent, "✓ งานเสร็จ", sess);
     else if (ev.type === "task.failed") addFeed(ev.agent, "✗ งานล้มเหลว", sess);
     else if (ev.type === "task.delegated") addFeed("main", "📋 มอบหมายงานให้ " + nameOf(ev.target), sess);
@@ -2280,6 +2594,20 @@
     }
     else if (ev.type === "channel.message")
       addFeed("ceo", `📨 [${ev.channel}] ${ev.from}: ${ev.text}`, "", "alert");
+    else if (ev.type === "approval.requested") { addApv(ev); if (ev.kind !== "tool-permission") setSide(true); }
+    else if (ev.type === "approval.decided") removeApv(ev.id);
+    else if (ev.type === "notify.item") {
+      NTF_UNREAD = ev.unread || 0; renderNtfCount();
+      if (ev.item) addNtf(ev.item, true);
+      if (ev.toast && ev.item) {
+        showToast(ev.item);
+        // …and as a real window in the corner of the screen, drawn by the shell,
+        // for when this chat window is hidden or covered.
+        try { if (window.__shellPost) window.__shellPost("notify:" + String(ev.item.title || "").slice(0, 120) + "\u001f" + String(ev.item.body || "").slice(0, 240)); } catch {}
+      }
+      if (ev.sound) { try { sfx("alert"); } catch {} }
+    }
+    else if (ev.type === "notify.read") { NTF_UNREAD = ev.unread || 0; renderNtfCount(); }
     else if (ev.type === "proposal.created") {
       // Actionable both ways — in the feed stream, and inline in the chat you're watching.
       addFeedProposal(ev);
@@ -2375,6 +2703,50 @@
       addChip("🛡 การ์ดนี้หมดอายุไปแล้ว (คำขอถูกปิดไปก่อนหน้า)");
     }
   }
+  // ---- project trust (issue #39) -------------------------------------------
+  // A project folder can ship its own .claude/settings.json with a command hook —
+  // that runs when a session opens there, BEFORE any tool prompt exists. So it gets
+  // its own card in the Security Center, showing the literal commands, and the work
+  // waits here until you answer. Approval is bound to this exact setup: edit the
+  // settings or the script it calls and you're asked again.
+  function addTrustCard(ev) {
+    if (document.getElementById("trust-" + ev.trust)) return;
+    const d = document.createElement("div");
+    d.className = "perm";
+    d.id = "trust-" + ev.trust;
+    const rows = (ev.hooks || []).map((h) =>
+      esc(h.event || "?") + " → " + esc(h.command || "")).join("\n");
+    const extra = (ev.scripts || []).filter((s) => s.outside)
+      .map((s) => esc(s.rel)).join(", ");
+    d.innerHTML =
+      `<b>🛡 ${esc(ev.project || ev.dir || "")}</b><br>` +
+      `<span style="font-size:11px;opacity:.85">${ev.changed
+        ? tr("hook ของโปรเจคนี้ถูกแก้ไขหลังจากที่คุณอนุมัติไปแล้ว — ตรวจอีกครั้ง")
+        : tr("โปรเจคนี้มี hook ของตัวเอง จะรันคำสั่งข้างล่างนี้เองทุกครั้งที่เปิดงาน (ไม่ผ่านการ์ดขออนุญาต)")}</span>` +
+      `<pre>${rows}</pre>` +
+      (extra ? `<span style="font-size:11px;color:#fca5a5">⚠ ${tr("สคริปต์ที่เรียกชี้ออกไปนอกโปรเจค")}: ${extra}</span>` : "") +
+      `<div class="row"><button class="allow">✓ ${tr("เชื่อถือโปรเจคนี้")}</button>` +
+      `<button class="deny">✗ ${tr("ไม่อนุมัติ")}</button></div>`;
+    const btns = d.querySelectorAll("button");
+    btns[0].onclick = () => respondTrust(ev.trust, "allow");
+    btns[1].onclick = () => respondTrust(ev.trust, "deny");
+    permsEl.appendChild(d);
+    setSide(true);
+    renderBadge();
+  }
+  async function respondTrust(id, decision) {
+    const r = await fetch("/project/trust", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, decision }),
+    });
+    if (!r.ok) { removeTrustCard(id); addChip(tr("🛡 การ์ดนี้หมดอายุไปแล้ว (คำขอถูกปิดไปก่อนหน้า)")); }
+  }
+  function removeTrustCard(id) {
+    const el = document.getElementById("trust-" + id);
+    if (el) el.remove();
+    renderBadge();
+  }
+
   function removePermCard(id) {
     // Same request renders in two places (sidebar + the inline chat mirror) —
     // clear both, by their distinct id prefixes, when it's answered/withdrawn.
@@ -2638,6 +3010,38 @@
       const v = modalCard.querySelector("#kVal").value.trim();
       if (n && v) api("/registry/key", { name: n, value: v }).then(() => renderConnectTab());
     };
+    // ── ↻ Refresh EVERY brain's model list on demand (claude + all connected
+    // providers). The office also does this on boot and every 12h, so the pickers
+    // follow what the vendors actually serve — this button is for "a new model
+    // dropped today and I want it right now".
+    {
+      const rBtn = modalCard.querySelector("#refreshAllModels");
+      const rHint = modalCard.querySelector("#modelsAllHint");
+      const when = (ts) => {
+        const m = Math.floor((Date.now() - ts) / 60000);
+        return m < 1 ? tr("เมื่อครู่") : m < 60 ? m + " " + tr("นาทีที่แล้ว")
+          : m < 1440 ? Math.floor(m / 60) + " " + tr("ชม.ที่แล้ว") : Math.floor(m / 1440) + " " + tr("วันที่แล้ว");
+      };
+      if (rHint) {
+        const ats = Object.values(regAll.providerCatalog || {}).map((c) => c.modelsAt || 0);
+        const last = ats.length ? Math.max(...ats) : 0;
+        const nClaude = (((regAll.providerConfig || {}).claude || {}).models || []).length;
+        rHint.textContent = last
+          ? tr("อัปเดตล่าสุด") + " " + when(last) + (nClaude ? " · Claude " + nClaude : "")
+          : tr("ยังไม่เคยดึง — กดเพื่อดึงรายชื่อโมเดลล่าสุดจากผู้ให้บริการ");
+      }
+      if (rBtn) rBtn.onclick = async () => {
+        rBtn.disabled = true;
+        if (rHint) rHint.textContent = "…";
+        const r = await api("/registry/models/refresh", { provider: "all" }).catch(() => null);
+        const res = (r && r.results) || {};
+        const okIds = Object.keys(res).filter((k) => res[k].ok);
+        if (rHint) rHint.textContent = okIds.length
+          ? "✓ " + okIds.map((k) => k + " " + res[k].n).join(" · ")
+          : "⚠ " + (Object.values(res).map((v) => v.msg).filter(Boolean)[0] || "");
+        rBtn.disabled = false;
+      };
+    }
     // ── 🧠 model providers: paste key → Connect → live connected state.
     const provbox = modalCard.querySelector("#provbox");
     if (provbox) {
@@ -2753,6 +3157,7 @@
       // ── OpenAI-compatible (via the built-in proxy)
       subhead("ผ่าน proxy (OpenAI-compatible)");
       [["openai", "OpenAI", "platform.openai.com/api-keys"], ["gemini", "Gemini", "aistudio.google.com/apikey"],
+       ["atlascloud", "Atlas Cloud", "www.atlascloud.ai/console/api-keys"],
        ["openrouter", "OpenRouter", "openrouter.ai/keys"], ["nvidia", "NVIDIA build", "build.nvidia.com"],
        ["groq", "Groq", "console.groq.com/keys"], ["cerebras", "Cerebras", "cloud.cerebras.ai"],
        ["xai", "xAI · Grok", "console.x.ai"], ["mistral", "Mistral", "console.mistral.ai/api-keys"],
@@ -2768,7 +3173,7 @@
       // ── Custom — add your own (anthropic- or openai-compatible)
       subhead("Custom — เพิ่ม provider เอง");
       const BUILTIN = new Set(["claude", "glm", "deepseek", "qwen", "minimax", "moonshot",
-        "kimicode", "openai", "gemini", "openrouter", "nvidia", "groq", "cerebras", "xai",
+        "kimicode", "openai", "atlascloud", "gemini", "openrouter", "nvidia", "groq", "cerebras", "xai",
         "mistral", "together", "fireworks", "ollama", "lmstudio", "litellm"]);
       Object.keys(pcAll).filter((id) => !BUILTIN.has(id) && pcAll[id] && pcAll[id].label)
         .forEach((id) => providerCard(id, pcAll[id].label + (pcAll[id].kind === "openai" ? " · OpenAI" : " · Anthropic"),
@@ -2793,6 +3198,32 @@
         await api("/registry/provider/test", { provider: id });
         renderConnectTab();
       };
+    }
+    // 🛟 Office-wide emergency fallback brain (opt-in). Only providers that are actually
+    // connected are offered, so failover can never be pointed at a dead brain. Claude is
+    // always usable (login/plan or key); the rest must show connected.
+    const fbProv = modalCard.querySelector("#fbProv");
+    const fbModel = modalCard.querySelector("#fbModel");
+    if (fbProv && fbModel) {
+      const LBL = { claude: "Claude · Anthropic", glm: "GLM · Z.AI", deepseek: "DeepSeek",
+        qwen: "Qwen", minimax: "MiniMax", moonshot: "Kimi · Moonshot", kimicode: "Kimi Code",
+        openai: "OpenAI", atlascloud: "Atlas Cloud", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA",
+        groq: "Groq", cerebras: "Cerebras", xai: "xAI · Grok", mistral: "Mistral",
+        together: "Together AI", fireworks: "Fireworks AI", ollama: "Ollama · local",
+        lmstudio: "LM Studio · local" };
+      const conn = Object.keys(pcAll).filter((id) => pcAll[id] && pcAll[id].connected && id !== "claude");
+      const opts = ["claude"].concat(conn);
+      // Keep the stored choice visible even if it's momentarily disconnected.
+      if (regAll.fallbackProvider && !opts.includes(regAll.fallbackProvider)) opts.push(regAll.fallbackProvider);
+      fbProv.innerHTML = `<option value="none">— ${tr("ไม่มี (ปิด)")} —</option>` +
+        opts.map((id) => `<option value="${id}">${esc(LBL[id] || id)}</option>`).join("");
+      fbProv.value = regAll.fallbackProvider || "none";
+      fbModel.value = regAll.fallbackModel || "";
+      fbModel.style.display = fbProv.value === "none" ? "none" : "";
+      const saveFb = () => api("/registry/fallback",
+        { provider: fbProv.value, model: fbProv.value === "none" ? "" : fbModel.value.trim() });
+      fbProv.onchange = () => { fbModel.style.display = fbProv.value === "none" ? "none" : ""; saveFb(); };
+      fbModel.onchange = saveFb;
     }
     // All sections filled — put the scrollbar back where the owner had it.
     modalCard.scrollTop = _wasScroll;
@@ -2836,7 +3267,7 @@
         </div>
         <div style="font-size:10.5px;color:var(--dim);margin-bottom:6px">${hint}</div>` +
         fields.map(([f, ph]) =>
-          `<input data-f="${f}" placeholder="${ph}" value="${(cfg[f] || "").replace(/"/g, "&quot;")}"
+          `<input data-f="${f}" placeholder="${ph}" value="${esc(cfg[f] || "")}"
             style="margin-bottom:5px" ${f === "token" || f === "secret" ? 'type="password"' : ""}>`).join("") +
         `<button class="bigbtn" style="margin-top:2px">💾 บันทึก + เชื่อมต่อ</button>`;
       const sw = card.querySelector(".switch");
@@ -2854,7 +3285,7 @@
   function openSettings(tab) {
     modal.classList.add("open");
     const T = (t, label) => `<div class="tab ${tab === t ? "on" : ""}" data-t="${t}">${label}</div>`;
-    const tabs = `<div class="tabs">${T("agents", "AGENTS")}${T("roles", "ROLES")}${T("skills", "SKILLS")}${T("tools", "TOOLS")}${T("connect", "CONNECT")}${T("channels", "CHANNELS")}${T("threads", "THREADS")}</div>`;
+    const tabs = `<div class="tabs">${T("agents", "AGENTS")}${T("roles", "ROLES")}${T("skills", "SKILLS")}${T("tools", "TOOLS")}${T("connect", "CONNECT")}${T("channels", "CHANNELS")}${T("notify", "🔔 NOTIFY")}${T("budget", "💸 BUDGET")}${T("codex", "🧑‍💻 CODEX")}${T("threads", "THREADS")}</div>`;
     let bodyHtml = "";
     if (tab === "agents") {
       bodyHtml = `<div class="switch ${SOUND ? "on" : ""}" id="sndSw">
@@ -2903,32 +3334,73 @@
         <input id="aFilter" class="filterbox" placeholder="🔍 ค้นหา agent…">
         <div id="alist" class="biglist"></div>
         <div id="staffCount" class="hint" style="text-align:center;margin:4px 0 6px;opacity:.75"></div>
-        <button class="bigbtn" id="newAgent">＋ Hire a new agent</button>`;
+        <button class="bigbtn" id="newAgent">＋ Hire a new agent</button>
+        <button class="bigbtn" id="hireTeam" style="margin-top:6px">👥 HIRE A TEAM — ทีมสำเร็จรูป (dev shop · research lab · content studio · support · solo)</button>
+        <div id="teamPick"></div>`;
     } else if (tab === "skills") {
       bodyHtml = `<div class="switch ${AUTOSKILLS ? "on" : ""}" id="autoSw">
           <div class="knob"></div> Auto-learn: agents distill finished work into new skills</div>
         <div class="switch ${VERIFY ? "on" : ""}" id="verifySw">
           <div class="knob"></div> ${tr("ตรวจงานก่อนส่ง CEO: reviewer เช็คงานที่มอบหมาย แล้วให้แก้ 1 รอบถ้าเจอปัญหา (ช้าลง+ใช้ token เพิ่ม)")}</div>
+        <div class="field"><label>🔎 SEMANTIC RECALL — ค้นความจำด้วยความหมาย ไม่ใช่แค่คำ</label>
+          <div style="font-size:11px;color:var(--dim);margin-bottom:8px">
+            ปกติออฟฟิศค้นความจำด้วย<b>คำ</b> — ถามว่า “ทำไมวอลเปเปอร์หาย” แล้วโน้ตที่เขียนว่า
+            “WorkerW teardown kills the embedded world” จะไม่ขึ้น เพราะไม่มีคำไหนตรงกันเลย<br>
+            เปิดอันนี้แล้วจะค้นด้วย<b>ความหมาย</b>เพิ่มอีกทาง แล้วรวมสองอันดับเข้าด้วยกัน<br>
+            ใส่ endpoint แบบ OpenAI — <code>http://localhost:11434/v1</code> (Ollama ในเครื่อง ฟรีและไม่ส่งข้อมูลออก)
+            หรือของเจ้าอื่นก็ได้ · โมเดลแนะนำ <code>nomic-embed-text</code></div>
+          <div class="assistrow" style="flex-wrap:wrap">
+            <input id="semUrl" placeholder="http://localhost:11434/v1" style="flex:1 1 100%">
+            <input id="semModel" placeholder="nomic-embed-text" style="flex:1 1 140px">
+            <input id="semKey" placeholder="ชื่อ key (ถ้าต้องใช้)" style="flex:1 1 120px">
+            <button class="sparkle" id="semSave">บันทึก</button>
+          </div>
+          <div id="semHint" style="font-size:10.5px;color:var(--dim);margin-top:6px"></div>
+        </div>
         <input id="sFilter" class="filterbox" placeholder="🔍 ค้นหา skill…">
         <div id="slist" class="biglist"></div><button class="bigbtn" id="newSkill">＋ New skill</button>`;
     } else if (tab === "tools") {
-      bodyHtml = `<input id="tFilter" class="filterbox" placeholder="🔍 ค้นหาเครื่องมือ / MCP server…">
+      bodyHtml = `<div class="switch ${AUTOPILOT ? "on" : ""}" id="autoPilotSw">
+          <div class="knob"></div> ${tr("🤖 ทำต่อเอง (AUTO): น้องๆ ตัดสินใจแทนคุณแล้วทำต่อจนจบ ไม่หยุดถามความเห็นกลางทาง — จะหยุดก็ต่อเมื่อติดจริง (ไม่มีสิทธิ์/key) หรือถึงขั้นที่ย้อนกลับไม่ได้ (push, deploy, ลบของ, จ่ายเงิน)")}</div>
+        <div class="hint" style="margin:-4px 0 12px 46px;opacity:.7;font-size:11px">${tr("ทำต่อเองได้สูงสุด %n รอบต่องาน แล้วหยุดรอคุณ · เปิดคู่กับ 🔓 ข้างล่างเพื่อไม่ให้ค้างรอกด Allow").replace("%n", AUTOPILOTMAX)}</div>
+        <div class="switch ${AUTOAPPROVE ? "on" : ""}" id="autoApproveSw">
+          <div class="knob"></div> ${tr("🔓 อนุมัติอัตโนมัติ: ให้ทุกคำขอใช้เครื่องมือผ่านเองโดยไม่ต้องกด Allow — เหมาะตอนสั่งงานทิ้งไว้แล้วไม่ได้เฝ้า (ยังเห็นใน feed ว่าอนุมัติอะไรบ้าง · ปิดไว้ = ปลอดภัยกว่า)")}</div>
+        <div class="switch ${GHOSTWT ? "on" : ""}" id="ghostWtSw">
+          <div class="knob"></div> ${tr("👻 GHOST ISOLATION — แยกที่ทำงานให้ร่างผี: ตอนแตกร่างทำงานขนาน ให้แต่ละตัวมี checkout ของ git เป็นของตัวเอง จะได้ไม่แก้ไฟล์ทับกัน — งานที่ทำเสร็จจะมาเป็น branch ให้ merge แทนที่จะแก้ลงในโฟลเดอร์ตรงๆ (ใช้ได้เฉพาะโปรเจกต์ที่เป็น git)")}</div>
+        <input id="tFilter" class="filterbox" placeholder="🔍 ค้นหาเครื่องมือ / MCP server…">
         <div class="field"><label>⚡ SYSTEM TOOLS — ความสามารถกลางของออฟฟิศ (agents เรียกใช้เองได้)</label>
           <div id="systools"></div></div>
         <div class="field"><label>🔧 BUILT-IN — เครื่องมือมาตรฐานของ Claude (ลบไม่ได้ · เปิด/ปิดรายตัวในหน้าแก้ไข agent)</label>
           <div id="tlist" class="biglist"></div></div>
         <div class="field"><label>🔌 MCP SERVERS — เพิ่มความสามารถใหม่ตามมาตรฐาน MCP</label>
           <div style="font-size:11px;color:var(--dim);margin-bottom:8px">
-            ใส่ชื่อ + คำสั่งรัน server แล้ว assign ให้ agent ในหน้าแก้ไข เช่น<br>
-            <b style="color:var(--text)">github</b> → <code>npx -y @modelcontextprotocol/server-github</code><br>
+            ใส่ชื่อ + คำสั่งรัน server (หรือ URL ของตัวที่เขาโฮสต์ให้) แล้ว assign ให้ agent ในหน้าแก้ไข เช่น<br>
             <b style="color:var(--text)">playwright</b> → <code>npx -y @playwright/mcp</code> (คุมเบราว์เซอร์)<br>
-            หาเพิ่มได้จาก github.com/modelcontextprotocol/servers</div>
+            <b style="color:var(--text)">blender</b> → <code>uvx blender-mcp</code> (ปั้นโมเดล/เรนเดอร์)<br>
+            <b style="color:var(--text)">linear</b> → <code>https://mcp.linear.app/mcp</code><br>
+            เลือกจากรายการพร้อมใช้ที่ 🧰 Tools Hub</div>
           <div id="mlist"></div>
           <div class="assistrow" style="margin-top:8px">
             <input id="mName" placeholder="ชื่อ เช่น github" style="flex:0 0 110px">
             <input id="mCmd" placeholder="คำสั่งรัน เช่น npx -y @modelcontextprotocol/server-github">
             <button class="sparkle" id="addMcp">＋</button>
-          </div></div>`;
+          </div></div>
+        <div class="field"><label>📦 RUN LOCATION — ที่ทำงานของน้องๆ: งานของ agent รันที่ไหน</label>
+          <div style="font-size:11px;color:var(--dim);margin-bottom:8px">
+            ปกติน้องรันบนเครื่องนี้ · ตั้งกล่องปิด (Docker) หรือเครื่องอื่น (SSH) ได้
+            แล้วเลือกให้ทั้งออฟฟิศ หรือตั้งรายคนในหน้าแก้ไข agent<br>
+            <b style="color:var(--text)">docker</b> → ใส่ชื่อ image เช่น <code>node:22-bookworm</code> · ตัวออฟฟิศ mount แบบอ่านอย่างเดียว<br>
+            <b style="color:var(--text)">ssh</b> → ใส่ host + path ของออฟฟิศบนเครื่องนั้น</div>
+          <div id="blist"></div>
+          <div class="assistrow" style="margin-top:8px;flex-wrap:wrap">
+            <select id="bKind" style="flex:0 0 92px"><option value="docker">docker</option><option value="ssh">ssh</option></select>
+            <input id="bName" placeholder="ชื่อ เช่น box" style="flex:1 1 96px">
+            <input id="bTarget" placeholder="image เช่น node:22-bookworm" style="flex:2 1 150px">
+            <input id="bDir" placeholder="path ออฟฟิศบนเครื่องนั้น" style="display:none;flex:2 1 150px">
+            <button class="sparkle" id="addBackend">＋</button>
+          </div>
+          <div id="bHint" style="font-size:10.5px;color:var(--dim);margin-top:6px"></div>
+        </div>`;
     } else if (tab === "connect") {
       bodyHtml = `
         <div class="field"><label>⭐ MAIN API KEYS — กุญแจหลักของโปรแกรม (ปลดล็อกฟีเจอร์เสียง · TTS · รูปภาพ · realtime)</label>
@@ -2941,12 +3413,81 @@
             <button class="sparkle" id="addKey">＋</button>
           </div></div>
         <div class="field"><label>🧠 MODELS / PROVIDERS — สมองของ agent (วาง key แล้วกด Connect · ตั้ง provider ต่อ agent ในหน้า AGENTS)</label>
-          <div id="provbox"></div></div>`;
+          <div class="assistrow" style="gap:8px;margin:0 0 7px">
+            <button class="send" id="refreshAllModels" type="button" style="flex:0 0 auto">↻ อัปเดตรายชื่อโมเดล</button>
+            <span id="modelsAllHint" style="color:var(--dim);font-size:10.5px;flex:1 1 auto"></span>
+          </div>
+          <div id="provbox"></div></div>
+        <div class="field"><label>🛟 สมองสำรอง (ทั้งออฟฟิศ) — ถ้าสมองของ agent ไหน overload ต่อเนื่อง จะสลับงานมารันบนตัวนี้ชั่วคราวอัตโนมัติ</label>
+          <div class="assistrow" style="gap:6px;flex-wrap:wrap">
+            <select id="fbProv" style="flex:1 1 150px;margin:0"></select>
+            <input id="fbModel" autocomplete="off" maxlength="60" placeholder="โมเดล (เว้นว่าง = ดีฟอลต์)" style="flex:1 1 150px;margin:0">
+          </div>
+          <div style="font-size:10.5px;color:var(--dim);margin-top:4px">ดีฟอลต์ = ปิด (ไม่มี) · เลือกได้เฉพาะ provider ที่เชื่อมต่อแล้ว · ใช้เฉพาะตอนสมองหลักล่มจริง (5xx) หลาย ๆ ครั้งติดกัน</div></div>`;
     } else if (tab === "channels") {
       bodyHtml = `<div style="font-size:11px;color:var(--dim);margin-bottom:10px">
           📡 คุยกับออฟฟิศจากภายนอกผ่าน Director (main) — เปิดช่องทางที่ต้องการ แล้วสั่งงานจากมือถือได้เลย<br>
           (Telegram ใช้ได้ทันที · ที่เหลือ ตั้ง webhook ผ่าน public HTTPS เช่น cloudflared)</div>
         <div id="chbox"></div>`;
+    } else if (tab === "notify") {
+      bodyHtml = `<div class="field"><label>🔔 NOTIFICATION RULES — แจ้งเตือนเรื่องไหน ทางไหน เมื่อไหร่</label>
+          <div style="font-size:11px;color:var(--dim);margin-bottom:8px">
+            ทุกเรื่องลงกล่อง 🔔 ในแถบข้างเสมอ · เลือกเพิ่มได้ว่าให้<b>เด้ง</b>ขึ้นมา ส่งไป<b>มือถือ</b> (Telegram/Discord/LINE…) หรือมี<b>เสียง</b>
+            และให้ทำ<b>เสมอ</b> / <b>เว้นช่วงเงียบ</b> / <b>เฉพาะตอนคุณไม่อยู่หน้าจอ</b> (ไม่มีการพิมพ์หรือขยับเมาส์ 5 นาที)</div>
+          <table id="ntfRules"><thead><tr><th>เรื่อง</th><th>🔔</th><th>เด้ง</th><th>มือถือ</th><th>เสียง</th><th>เมื่อ</th></tr></thead><tbody></tbody></table>
+        </div>
+        <div class="field"><label>🌙 QUIET HOURS — ช่วงเงียบ: เด้ง/เสียง/มือถือหยุด กล่อง 🔔 ยังรับตามปกติ</label>
+          <div class="assistrow" style="flex-wrap:wrap;align-items:center">
+            <div class="switch" id="qhSw" style="flex:1 1 160px"><div class="knob"></div> เปิดช่วงเงียบ</div>
+            <input id="qhStart" type="time" style="flex:0 0 110px"><span style="color:var(--dim)">→</span>
+            <input id="qhEnd" type="time" style="flex:0 0 110px">
+          </div>
+          <div id="ntfHint" style="font-size:10.5px;color:var(--dim);margin-top:6px"></div>
+        </div>
+        <div class="assistrow" style="margin-top:4px"><button class="sparkle" id="ntfTest">🔔 ทดสอบแจ้งเตือน</button></div>`;
+    } else if (tab === "budget") {
+      bodyHtml = `<div class="field"><label>💸 DAILY BUDGET — งบต่อวันของทั้งออฟฟิศ (USD)</label>
+          <div style="font-size:11px;color:var(--dim);margin-bottom:8px">
+            ถึง <b>80%</b> จะเตือนหนึ่งครั้ง · ถึง <b>100%</b> จะ<b>หยุดรับงานใหม่</b>จนถึงวันถัดไป (งานที่กำลังทำอยู่ทำต่อจนจบ) ·
+            ค่าใช้จ่ายของ Claude เป็นบิลจริง ส่วนสมองอื่นและเครื่องมือเสียง/รูป/วิดีโอเป็น<b>ค่าประมาณ</b>และจะติดป้ายไว้ · 0 = ไม่จำกัด</div>
+          <div class="assistrow"><input id="bgOffice" type="number" min="0" step="0.5" placeholder="0 = ไม่จำกัด" style="flex:0 0 140px">
+            <span id="bgToday" style="flex:1;color:var(--dim);font-size:11.5px;align-self:center"></span></div>
+        </div>
+        <div class="field"><label>👤 PER-AGENT CAPS — งบต่อวันรายคน (USD)</label>
+          <div id="bgAgents"></div></div>
+        <div class="field"><label>📁 PER-PROJECT CAPS — งบรวมทั้งโปรเจกต์ (USD)</label>
+          <div id="bgProjects"></div></div>
+        <div class="field"><label>🌅 MORNING DIGEST — สรุปตอนเช้า: เมื่อวานใช้ไปเท่าไร ทำอะไร มีอะไรรอคุณ</label>
+          <div class="assistrow" style="flex-wrap:wrap;align-items:center">
+            <div class="switch" id="bgDgSw" style="flex:1 1 160px"><div class="knob"></div> ส่งสรุปทุกเช้า</div>
+            <input id="bgDgTime" type="time" style="flex:0 0 110px">
+            <button class="sparkle" id="bgDgTest">ส่งตอนนี้</button>
+          </div>
+          <div id="bgHint" style="font-size:10.5px;color:var(--dim);margin-top:6px"></div>
+        </div>`;
+    } else if (tab === "codex") {
+      bodyHtml = `<div class="field"><label>🧑‍💻 CODEX — เพื่อนร่วมงานสายโค้ดที่เรียกมาช่วยได้ (ไม่ใช่สมองของออฟฟิศ)</label>
+          <div style="font-size:11px;color:var(--dim);margin-bottom:8px">
+            agents เรียก Codex ให้ทำงานย่อยที่ชัดเจนในโปรเจคได้เอง · Director ใช้บรรทัด <b>DELEGATE: codex @ โปรเจค :: งาน</b> · Workflow Builder มี node 🧑‍💻 Codex ·
+            ผลลัพธ์ diff และค่าใช้จ่ายถูกบันทึกไว้ (คิดตามแผน OpenAI ของคุณ ติดป้ายว่าเป็น<b>ค่าประมาณ</b>) · ต้องติดตั้ง <code>codex</code> และ login ก่อน</div>
+          <div id="cxStatus" style="font-size:12px;margin-bottom:8px"></div>
+          <div class="switch" id="cxSw"><div class="knob"></div> เปิดให้ agents เรียกใช้ Codex</div>
+          <div class="assistrow" style="margin-top:8px;flex-wrap:wrap">
+            <select id="cxSandbox" style="flex:1 1 220px" title="SANDBOX">
+              <option value="read-only">read-only — อ่านอย่างเดียว</option>
+              <option value="workspace-write">workspace-write — แก้ไฟล์ในโปรเจคได้ (แนะนำ)</option>
+              <option value="danger-full-access">danger-full-access — เข้าถึงทุกอย่าง (อันตราย)</option>
+            </select>
+            <input id="cxModel" placeholder="MODEL (ว่าง = ค่าเริ่มต้นของ Codex)" style="flex:1 1 160px">
+          </div>
+          <div class="assistrow" style="margin-top:6px;flex-wrap:wrap;align-items:center">
+            <div class="switch" id="cxOss" style="flex:1 1 200px"><div class="knob"></div> ใช้โมเดลในเครื่อง (--oss)</div>
+            <select id="cxLocal" style="flex:0 0 120px"><option value="ollama">ollama</option><option value="lmstudio">LM Studio</option></select>
+            <input id="cxMax" type="number" min="1" max="120" style="flex:0 0 80px" title="MAX MINUTES">
+          </div>
+          <div id="cxHint" style="font-size:10.5px;color:var(--dim);margin-top:6px"></div>
+        </div>
+        <div class="field"><label>🧾 RECENT RUNS — งานที่ Codex ทำล่าสุด</label><div id="cxRuns" style="font-size:11.5px"></div></div>`;
     } else if (tab === "threads") {
       bodyHtml = `<div style="font-size:11px;color:var(--dim);margin-bottom:8px">
           ความจำสนทนาแยกตามตัว agent — คำสั่งผ่าน CEO จะอยู่กับ Claude (Director)
@@ -2996,6 +3537,28 @@
       const nStaff = Object.keys(ROSTER).filter((x) => x !== "ceo").length;
       const scEl = modalCard.querySelector("#staffCount");
       if (scEl) scEl.textContent = `${nStaff} / ${MAXSTAFF} agents`;
+      // 👥 team templates (v1.5): a whole pre-built team in one click.
+      modalCard.querySelector("#hireTeam").onclick = async () => {
+        const pick = modalCard.querySelector("#teamPick");
+        if (pick.innerHTML) { pick.innerHTML = ""; return; }
+        const tj = await fetch("/teams").then((x) => x.json()).catch(() => ({ teams: [] }));
+        pick.innerHTML = "";
+        for (const t of tj.teams || []) {
+          const row = document.createElement("div"); row.className = "arow"; row.style.cursor = "default";
+          const missing = t.agents.filter((a) => !a.present).length;
+          row.innerHTML = `<div class="meta"><b>${esc(t.name)}</b><span>${esc(t.tagline)} · ${t.agents.map((a) => (a.present ? "✓ " : "") + a.name + " (" + a.role + ")").join(", ")}</span></div>` +
+            `<div class="winbtn" title="จ้างทีมนี้">${missing ? "👥" : "✓"}</div>`;
+          row.querySelector(".winbtn").onclick = async () => {
+            if (!missing) return addChip(tr("ทีมนี้อยู่ในออฟฟิศแล้ว"));
+            if (!(await askConfirm(tr("จ้างทีมนี้ทั้งชุด?") + " " + t.name + " — " + missing + " " + tr("คน")))) return;
+            const rr = await uiPost("/teams/hire", { id: t.id });
+            const j = await rr.json().catch(async () => ({ hired: [], error: await rr.text() }));
+            addChip(j.hired && j.hired.length ? `👥 ${tr("จ้างแล้ว")}: ${j.hired.join(", ")}` + (j.skipped && j.skipped.length ? ` · ${tr("ข้าม")} ${j.skipped.length}` : "") : tr("✗ จ้างไม่สำเร็จ") + ": " + String(j.error || "").slice(0, 80));
+            openSettings("agents");
+          };
+          pick.appendChild(row);
+        }
+      };
       const hireBtn = modalCard.querySelector("#newAgent");
       hireBtn.onclick = () => {
         if (nStaff >= MAXSTAFF) return addChip(`ออฟฟิศเต็มแล้ว — สูงสุด ${MAXSTAFF} คน (ใช้การแตกร่างผีสำหรับงานขนาน)`);
@@ -3052,6 +3615,30 @@
         await api("/registry/autoskills", { enabled: !AUTOSKILLS });
         e.currentTarget.classList.toggle("on", !AUTOSKILLS);
       };
+      const semUrl = modalCard.querySelector("#semUrl");
+      if (semUrl) {
+        semUrl.value = SEMANTIC.baseUrl || "";
+        modalCard.querySelector("#semModel").value = SEMANTIC.model || "";
+        modalCard.querySelector("#semKey").value = SEMANTIC.keyName || "";
+        const sh = modalCard.querySelector("#semHint");
+        sh.textContent = SEMANTIC.ready
+          ? tr("✓ เปิดอยู่ · จำได้แล้ว %n ชิ้น").replace("%n", SEMANTIC.vectors)
+          : (SEMANTIC.enabled ? tr("⚠ ตั้งไว้แล้วแต่ยังต่อไม่ได้") : tr("ปิดอยู่ — ค้นด้วยคำอย่างเดียว"));
+        modalCard.querySelector("#semSave").onclick = async () => {
+          const baseUrl = semUrl.value.trim();
+          const model = modalCard.querySelector("#semModel").value.trim();
+          const keyName = modalCard.querySelector("#semKey").value.trim();
+          sh.textContent = tr("กำลังทดสอบ…");
+          // Saving TESTS the endpoint. An embeddings endpoint that only fails
+          // later fails silently: recall quietly drops back to word matching
+          // and nothing says why.
+          const r = await api("/registry/semantic", { enabled: !!(baseUrl && model), baseUrl, model, keyName });
+          if (r && r.error) { sh.textContent = "⚠ " + r.error; return; }
+          sh.textContent = r && r.ready
+            ? tr("✓ ต่อได้ (%d มิติ) — กำลังทยอยจำความจำเดิมอยู่เบื้องหลัง").replace("%d", r.dims || "?")
+            : (baseUrl && model ? tr("⚠ ต่อไม่ได้ — เช็ค URL, ชื่อโมเดล และว่ามันรันอยู่ไหม") : tr("ปิดแล้ว"));
+        };
+      }
       modalCard.querySelector("#verifySw").onclick = async (e) => {
         await api("/registry/verify", { enabled: !VERIFY });
         VERIFY = !VERIFY;
@@ -3077,6 +3664,20 @@
       modalCard.querySelector("#newSkill").onclick = () => openSkillEditor(null);
       wireFilter(modalCard.querySelector("#sFilter"), list);
     } else if (tab === "tools") {
+      const apSw = modalCard.querySelector("#autoPilotSw");
+      if (apSw) apSw.onclick = async () => {
+        await api("/registry/autopilot", { enabled: !AUTOPILOT });
+        AUTOPILOT = !AUTOPILOT;
+        apSw.classList.toggle("on", AUTOPILOT);
+        addChip(AUTOPILOT ? tr("🤖 เปิดโหมดทำต่อเอง — น้องๆ จะไม่หยุดถามแล้ว")
+                          : tr("🤖 ปิดโหมดทำต่อเอง — กลับมาถามก่อนตัดสินใจใหญ่ๆ"));
+      };
+      const aaSw = modalCard.querySelector("#autoApproveSw");
+      if (aaSw) aaSw.onclick = async () => {
+        await api("/registry/autoapprove", { enabled: !AUTOAPPROVE });
+        AUTOAPPROVE = !AUTOAPPROVE;
+        aaSw.classList.toggle("on", AUTOAPPROVE);
+      };
       // ⚡ system tools — capability + which MAIN key unlocks it.
       const SYS = [
         ["🎤 ถอดเสียงพูด (voice → text)", "ปุ่มไมค์ / Right Ctrl", FEATURES.stt, "OPENAI หรือ GEMINI"],
@@ -3118,11 +3719,171 @@
         const c = modalCard.querySelector("#mCmd").value.trim();
         if (n && c) api("/registry/mcp", { name: n, command: c }).then(() => openSettings("tools"));
       };
+      // Where agents run. 'local' is always offered and is never stored as a
+      // backend of its own — it is the absence of one.
+      const bl = modalCard.querySelector("#blist");
+      const bHint = modalCard.querySelector("#bHint");
+      if (bl) {
+        const mkRow = (name, label, on) => {
+          const row = document.createElement("div");
+          row.className = "arow";
+          row.style.cursor = "pointer";
+          row.innerHTML = `<div class="meta"><b>${on ? "✅" : "▫️"} ${name}</b><span>${label}</span></div>` +
+            (name === "local" ? "" : `<div class="winbtn hide" title="Remove">✕</div>`);
+          row.onclick = (e) => {
+            if (e.target.classList.contains("winbtn")) return;
+            api("/registry/backend", { default: name }).then(() => openSettings("tools"));
+          };
+          const rm = row.querySelector(".winbtn");
+          if (rm) rm.onclick = () =>
+            api("/registry/backend", { name, remove: true }).then(() => openSettings("tools"));
+          bl.appendChild(row);
+        };
+        mkRow("local", tr("เครื่องนี้ — เหมือนที่เป็นมา"), REGBACKEND === "local" || !REGBACKEND);
+        for (const [n, b] of Object.entries(REGBACKENDS))
+          mkRow(n, b.kind === "docker" ? "🐳 " + (b.image || "") : "🌐 " + (b.host || ""),
+            REGBACKEND === n);
+      }
+      const bKind = modalCard.querySelector("#bKind");
+      if (bKind) {
+        const syncFields = () => {
+          const ssh = bKind.value === "ssh";
+          modalCard.querySelector("#bTarget").placeholder =
+            ssh ? tr("host เช่น build01") : tr("image เช่น node:22-bookworm");
+          modalCard.querySelector("#bDir").style.display = ssh ? "" : "none";
+        };
+        bKind.onchange = syncFields; syncFields();
+        modalCard.querySelector("#addBackend").onclick = () => {
+          const kind = bKind.value;
+          const name = modalCard.querySelector("#bName").value.trim();
+          const target = modalCard.querySelector("#bTarget").value.trim();
+          const dir = modalCard.querySelector("#bDir").value.trim();
+          if (!name || !target) { bHint.textContent = tr("ใส่ชื่อและปลายทางให้ครบก่อน"); return; }
+          const body = kind === "docker" ? { name, kind, image: target }
+                                         : { name, kind, host: target, officeDir: dir };
+          bHint.textContent = "…";
+          api("/registry/backend", body).then((r) => {
+            // The daemon builds the command once before saving, so a definition
+            // that could never run is refused here with the reason, not silently
+            // at 3am on somebody's task.
+            if (r && r.error) { bHint.textContent = "⚠ " + r.error; return; }
+            openSettings("tools");
+          });
+        };
+      }
+      const gsw = modalCard.querySelector("#ghostWtSw");
+      if (gsw) gsw.onclick = async (e) => {
+        await api("/registry/ghostworktrees", { enabled: !GHOSTWT });
+        GHOSTWT = !GHOSTWT;
+        e.currentTarget.classList.toggle("on", GHOSTWT);
+      };
       wireFilter(modalCard.querySelector("#tFilter"), list, ml);
     } else if (tab === "connect") {
       renderConnectTab();
     } else if (tab === "channels") {
       renderChannels();
+    } else if (tab === "codex") {
+      const hint = modalCard.querySelector("#cxHint");
+      const fill = (j) => {
+        if (!modalCard.querySelector("#cxStatus")) return;
+        const st = modalCard.querySelector("#cxStatus");
+        st.innerHTML = j.installed
+          ? `✅ <b>codex ${escN(j.version || "")}</b> ${tr("พร้อมใช้")}${j.running ? ` · 🔴 ${j.running} ${tr("กำลังทำงาน")}` : ""}`
+          : `⚠ ${tr("ยังไม่พบ codex ในเครื่อง")} — <code>npm i -g @openai/codex</code> ${tr("แล้ว")} <code>codex login</code>`;
+        const s = j.settings || {};
+        modalCard.querySelector("#cxSw").classList.toggle("on", s.enabled !== false);
+        modalCard.querySelector("#cxSandbox").value = s.sandbox || "workspace-write";
+        modalCard.querySelector("#cxModel").value = s.model || "";
+        modalCard.querySelector("#cxOss").classList.toggle("on", !!s.oss);
+        modalCard.querySelector("#cxLocal").value = s.localProvider || "ollama";
+        modalCard.querySelector("#cxMax").value = s.maxMinutes || 20;
+        const runs = modalCard.querySelector("#cxRuns"); runs.innerHTML = "";
+        if (!(j.runs || []).length) runs.innerHTML = `<div style="color:var(--dim)">${tr("ยังไม่มี")}</div>`;
+        for (const r of j.runs || []) {
+          const row = document.createElement("div"); row.className = "arow";
+          const icon = r.state === "running" ? "🔴" : r.state === "done" ? "✅" : "✗";
+          row.innerHTML = `<div class="meta"><b>${icon} ${escN(r.kind === "review" ? "review" : r.task || "")}</b>
+              <span>${escN(nameOf(r.agent))}${r.project ? " · 📁 " + escN(r.project) : ""}${r.diff && r.diff.files ? " · ✎ " + r.diff.files + " " + tr("ไฟล์") : ""}${r.usage ? " · " + ((r.usage.input_tokens || 0) + (r.usage.output_tokens || 0)) + " tok" : ""}${r.error ? " · ⚠ " + escN(r.error.slice(0, 80)) : ""} · ${new Date(r.startedAt).toLocaleTimeString()}</span></div>` +
+            (r.state === "running" ? `<div class="winbtn" title="${tr("หยุด")}">■</div>` : "");
+          const b = row.querySelector(".winbtn"); if (b) b.onclick = () => uiPost("/codex/cancel", { id: r.id }).then(() => openSettings("codex"));
+          row.title = (r.text || "").slice(0, 600);
+          runs.appendChild(row);
+        }
+      };
+      const save = () => uiPost("/codex/settings", {
+        enabled: modalCard.querySelector("#cxSw").classList.contains("on"), sandbox: modalCard.querySelector("#cxSandbox").value,
+        model: modalCard.querySelector("#cxModel").value.trim(), oss: modalCard.querySelector("#cxOss").classList.contains("on"),
+        localProvider: modalCard.querySelector("#cxLocal").value, maxMinutes: Number(modalCard.querySelector("#cxMax").value) || 20,
+      }).then(() => { if (hint) hint.textContent = tr("บันทึกแล้ว"); }).catch(() => { if (hint) hint.textContent = tr("บันทึกไม่สำเร็จ"); });
+      modalCard.querySelector("#cxSw").onclick = (e) => { e.currentTarget.classList.toggle("on"); save(); };
+      modalCard.querySelector("#cxOss").onclick = (e) => { e.currentTarget.classList.toggle("on"); save(); };
+      for (const id of ["cxSandbox", "cxModel", "cxLocal", "cxMax"]) modalCard.querySelector("#" + id).onchange = save;
+      fetch("/codex/status").then((x) => x.json()).then(fill).catch(() => {});
+    } else if (tab === "budget") {
+      const usd = (n) => "$" + (Math.round(Number(n || 0) * 100) / 100).toFixed(2);
+      const hint = modalCard.querySelector("#bgHint");
+      const save = (patch) => uiPost("/budget", patch).then((r) => r.json()).then(fill).catch(() => { if (hint) hint.textContent = tr("บันทึกไม่สำเร็จ"); });
+      const capRow = (box, id, name, cap, spent, unit, onSet) => {
+        const row = document.createElement("div"); row.className = "assistrow"; row.style.marginTop = "5px";
+        row.innerHTML = `<span style="flex:1;align-self:center;font-size:12px"><b>${escN(name)}</b> <span style="color:var(--dim);font-size:11px">· ${usd(spent)}${cap ? " / " + usd(cap) : ""}${unit}</span></span>` +
+          `<input type="number" min="0" step="0.5" value="${cap || ""}" placeholder="0" style="flex:0 0 96px">`;
+        row.querySelector("input").onchange = (e) => onSet(Number(e.target.value) || 0);
+        box.appendChild(row);
+      };
+      function fill(j) {
+        const off = modalCard.querySelector("#bgOffice"); if (!off) return;
+        off.value = j.office.cap || "";
+        modalCard.querySelector("#bgToday").textContent =
+          tr("วันนี้ใช้ไป") + " " + usd(j.office.spent) + (j.office.estimated ? " ≈" : "") + (j.office.cap ? "  (" + Math.round(j.office.spent / j.office.cap * 100) + "%)" : "");
+        const ab = modalCard.querySelector("#bgAgents"); ab.innerHTML = "";
+        const ids = Object.keys(ROSTER || {}).filter((id) => id !== "ceo");
+        for (const id of ids) capRow(ab, id, nameOf(id), (j.agents[id] || {}).cap, (j.agents[id] || {}).spent || 0, tr(" วันนี้"),
+          (v) => save({ agents: { [id]: { daily: v } } }));
+        const pb = modalCard.querySelector("#bgProjects"); pb.innerHTML = "";
+        const projs = (PROJECTS_CACHE || []).map((p) => p.id || p.name).filter(Boolean);
+        for (const pid of Object.keys(j.projects || {})) if (!projs.includes(pid)) projs.push(pid);
+        if (!projs.length) pb.innerHTML = `<div style="font-size:11px;color:var(--dim)">${tr("ยังไม่มีโปรเจกต์")}</div>`;
+        for (const pid of projs) capRow(pb, pid, pid, (j.projects[pid] || {}).cap, (j.projects[pid] || {}).total || 0, tr(" รวม"),
+          (v) => save({ projects: { [pid]: { total: v } } }));
+        const sw = modalCard.querySelector("#bgDgSw"), tm = modalCard.querySelector("#bgDgTime");
+        sw.classList.toggle("on", !!j.digest.enabled); tm.value = j.digest.time || "08:00";
+        sw.onclick = () => { sw.classList.toggle("on"); save({ digest: { enabled: sw.classList.contains("on"), time: tm.value } }); };
+        tm.onchange = () => save({ digest: { enabled: sw.classList.contains("on"), time: tm.value } });
+        if (hint) hint.textContent = j.note ? "≈ " + tr("รวมค่าประมาณของสมอง/เครื่องมือที่ไม่รายงานบิลจริง") : "";
+      }
+      modalCard.querySelector("#bgOffice").onchange = (e) => save({ office: { daily: Number(e.target.value) || 0 } });
+      modalCard.querySelector("#bgDgTest").onclick = () => uiPost("/budget/digest", {}).then((r) => r.json()).then((r) => { if (hint) hint.textContent = r.text; });
+      fetch("/budget").then((r) => r.json()).then(fill).catch(() => { if (hint) hint.textContent = tr("โหลดไม่สำเร็จ"); });
+    } else if (tab === "notify") {
+      const KIND_LBL = { approval: "📥 รออนุมัติ", blocked: "⛔ agent ติด", reminder: "⏰ เตือนนัด", budget: "💸 งบประมาณ",
+        done: "✅ งานเสร็จ", workflow: "🔀 workflow", proposal: "💡 ข้อเสนอ", mention: "💬 ถูกเอ่ยถึง", system: "ℹ️ ระบบ" };
+      const WHEN_LBL = { always: "เสมอ", quiet: "เว้นช่วงเงียบ", away: "เฉพาะตอนไม่อยู่" };
+      const tb = modalCard.querySelector("#ntfRules tbody");
+      const hint = modalCard.querySelector("#ntfHint");
+      const saveRules = (patch) => uiPost("/notify/rules", patch).catch(() => { if (hint) hint.textContent = tr("บันทึกไม่สำเร็จ"); });
+      fetch("/notify?limit=1").then((r) => r.json()).then((j) => {
+        const rules = j.rules || {}, q = j.quiet || {};
+        tb.innerHTML = "";
+        for (const [k, r] of Object.entries(rules)) {
+          const tr_ = document.createElement("tr");
+          const cell = (where) => `<td><input type="checkbox" data-k="${k}" data-w="${where}" ${r[where] ? "checked" : ""} ${where === "centre" ? "disabled" : ""}></td>`;
+          tr_.innerHTML = `<td>${tr(KIND_LBL[k] || k)}</td>${cell("centre")}${cell("toast")}${cell("channel")}${cell("sound")}` +
+            `<td><select data-k="${k}">${Object.entries(WHEN_LBL).map(([v, l]) => `<option value="${v}" ${r.when === v ? "selected" : ""}>${tr(l)}</option>`).join("")}</select></td>`;
+          tb.appendChild(tr_);
+        }
+        tb.querySelectorAll("input[type=checkbox]").forEach((cb) => cb.onchange = () =>
+          saveRules({ rules: { [cb.dataset.k]: { [cb.dataset.w]: cb.checked } } }));
+        tb.querySelectorAll("select").forEach((sl) => sl.onchange = () =>
+          saveRules({ rules: { [sl.dataset.k]: { when: sl.value } } }));
+        const sw = modalCard.querySelector("#qhSw"), st = modalCard.querySelector("#qhStart"), en = modalCard.querySelector("#qhEnd");
+        sw.classList.toggle("on", !!q.enabled); st.value = q.start || "22:00"; en.value = q.end || "08:00";
+        const saveQuiet = () => saveRules({ quiet: { enabled: sw.classList.contains("on"), start: st.value, end: en.value } });
+        sw.onclick = () => { sw.classList.toggle("on"); saveQuiet(); };
+        st.onchange = en.onchange = saveQuiet;
+      }).catch(() => { if (hint) hint.textContent = tr("โหลดกฎไม่สำเร็จ"); });
+      const tbtn = modalCard.querySelector("#ntfTest");
+      if (tbtn) tbtn.onclick = () => uiPost("/notify/send", { kind: "system", title: "🔔 ทดสอบการแจ้งเตือน", body: "ถ้าเห็นอันนี้ แปลว่ากล่องแจ้งเตือนทำงาน — ลองปิดหน้าต่างนี้แล้วดูที่แถบข้าง 🔔 ด้วย" })
+        .then(() => { if (hint) hint.textContent = tr("ส่งแล้ว — ดูที่แถบข้าง 🔔 (และมือถือ ถ้าเปิดไว้)"); });
     } else if (tab === "threads") {
       fetch("/sessions/all").then((x) => x.json()).then((r) => {
         const box = modalCard.querySelector("#thlist");
@@ -3241,6 +4002,7 @@
     let myAura = a.aura || "";
     const mySkills = new Set(a.skills || []);
     const myTools = new Set(a.tools || []);
+    const myMem = new Set(a.memoryPlugins || []);   // 🧠 memory plugins opted into (v1.4)
     const AURAS = [["", "✨ none", "#8294ab"], ["fire", "🔥 fire", "#ff9540"],
       ["ice", "❄ ice", "#6fd3ff"], ["nature", "🍃 nature", "#7be36b"],
       ["arcane", "🔮 arcane", "#cf7dff"], ["shadow", "🌑 shadow", "#6e7488"],
@@ -3254,6 +4016,10 @@
          <option value="2">หัวหน้าทีม (Lead)</option>
          <option value="3">ทีมงาน (Staff)</option>
        </select></div>
+       <div class="field"><label>📦 RUN LOCATION — คนนี้รันที่ไหน</label>
+         <select id="eBackend"></select>
+         <div style="font-size:10.5px;color:var(--dim);margin-top:4px">เว้นไว้ = ใช้ค่าของทั้งออฟฟิศ (ตั้งใน ⚙ → TOOLS)</div>
+       </div>
        <div class="field"><label>🧠 สมอง (โมเดล/ผู้ให้บริการ) — ดีฟอลต์คือ Claude</label>
          <select id="eProvider"></select>
          <div id="eModelWrap" style="position:relative;margin-top:6px">
@@ -3291,7 +4057,8 @@
            <button class="send" id="eVoicePlay" title="ฟังตัวอย่างเสียงนี้">▶</button>
          </div></div>
        <div class="field"><label>🎯 SKILLS</label><div class="checks" id="eSkills"></div></div>
-       <div class="field"><label>🔧 TOOLS (ว่าง = ชุดอ่านอย่างเดียว Read/Glob/Grep)</label><div class="checks" id="eTools"></div></div>`;
+       <div class="field"><label>🔧 TOOLS (ว่าง = ชุดอ่านอย่างเดียว Read/Glob/Grep)</label><div class="checks" id="eTools"></div></div>
+       <div class="field" id="eMemField" style="display:none"><label>🧠 MEMORY PLUGINS — ปลั๊กอินที่เติมบริบทให้คนนี้ตอนเริ่มทุกงาน (เลือกเปิดรายคน)</label><div class="checks" id="eMemory"></div></div>`;
     modalCard.innerHTML = hdr(isUser ? "👑 YOUR AVATAR" : (id ? "✏ EDIT AGENT" : "＋ HIRE AGENT")) +
       (isUser ? `<div style="font-size:11.5px;color:var(--dim);margin-bottom:10px">
          นี่คือตัวคุณเองในออฟฟิศ — ไม่มี prompt/skills เพราะคุณคือคนสั่ง ไม่ใช่ AI 😄
@@ -3470,7 +4237,7 @@
       const BUILTIN = [["claude", "Claude · Anthropic"], ["glm", "GLM · Z.AI"],
         ["deepseek", "DeepSeek"], ["qwen", "Qwen · Alibaba"], ["minimax", "MiniMax"],
         ["moonshot", "Kimi · Moonshot"], ["kimicode", "Kimi Code · coding plan"],
-        ["openai", "OpenAI · proxy"], ["gemini", "Gemini · proxy"],
+        ["openai", "OpenAI · proxy"], ["atlascloud", "Atlas Cloud · proxy"], ["gemini", "Gemini · proxy"],
         ["openrouter", "OpenRouter · proxy"], ["nvidia", "NVIDIA · proxy"],
         ["groq", "Groq · proxy"], ["cerebras", "Cerebras · proxy"], ["xai", "xAI · Grok · proxy"],
         ["mistral", "Mistral · proxy"], ["together", "Together AI · proxy"], ["fireworks", "Fireworks AI · proxy"],
@@ -3478,12 +4245,13 @@
       // FALLBACK ONLY — the authoritative curated list now comes from the backend
       // catalog (CATALOG, served by /registry from providers.js). These inline maps
       // are used only if that fetch fails; do not rely on them staying current.
-      const MODELS = { claude: ["", "opus", "sonnet", "haiku"], glm: ["glm-4.6", "glm-4.5"],
+      const MODELS = { claude: ["", "opus", "sonnet", "haiku", "claude-opus-5", "claude-sonnet-5"], glm: ["glm-4.6", "glm-4.5"],
         deepseek: ["deepseek-v4-pro", "deepseek-v4-flash"],
         qwen: ["qwen3-coder-plus", "qwen3-coder-next", "qwen3-coder-flash"],
         minimax: ["MiniMax-M3"], moonshot: ["kimi-k2.6", "kimi-k2.5", "kimi-k2", "kimi-latest"],
         kimicode: ["kimi-for-coding"],
         openai: ["gpt-4.1", "gpt-4o", "gpt-4o-mini"],
+        atlascloud: ["openai/gpt-4.1-mini"],
         gemini: ["gemini-2.5-pro", "gemini-2.5-flash"],
         openrouter: ["anthropic/claude-sonnet-4-6", "openai/gpt-4o"], nvidia: ["meta/llama-3.3-70b-instruct"],
         groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"], cerebras: ["llama-3.3-70b", "llama-3.1-8b"],
@@ -3495,9 +4263,9 @@
       // the user is nudged toward the latest (a quiet "there's a newer model" hint); they
       // can still drop back to an older one from the list.
       const BEST_MODEL = {
-        claude: "claude-opus-4-8", glm: "glm-4.6", deepseek: "deepseek-v4-pro",
+        claude: "claude-opus-5", glm: "glm-4.6", deepseek: "deepseek-v4-pro",
         qwen: "qwen3-coder-plus", minimax: "MiniMax-M3", moonshot: "kimi-k2.6",
-        kimicode: "kimi-for-coding", openai: "gpt-4.1", gemini: "gemini-2.5-pro",
+        kimicode: "kimi-for-coding", openai: "gpt-4.1", atlascloud: "openai/gpt-4.1-mini", gemini: "gemini-2.5-pro",
         xai: "grok-4", mistral: "mistral-large-latest",
         openrouter: "anthropic/claude-sonnet-4-6", nvidia: "meta/llama-3.3-70b-instruct",
         groq: "llama-3.3-70b-versatile", cerebras: "llama-3.3-70b",
@@ -3518,11 +4286,15 @@
       // Keep the model list current: silently re-pull a connected provider's live models
       // when it's picked (once per provider per open), without clobbering the field.
       const refreshModels = (p) => {
-        if (!p || p === "claude" || refreshed.has(p) || !(pcAll[p] && pcAll[p].connected)) return;
+        // claude included: its live list comes from api.anthropic.com via the
+        // machine's Claude auth, so a model released today shows up here too.
+        if (!p || refreshed.has(p)) return;
+        if (p !== "claude" && !(pcAll[p] && pcAll[p].connected)) return;
         refreshed.add(p);
-        api("/registry/provider/test", { provider: p }).then((r) => {
+        api("/registry/models/refresh", { provider: p }).then((r) => {
           if (!(r && r.models && r.models.length) || provSel.value !== p) return;
-          pcAll[p] = pcAll[p] || {}; pcAll[p].models = r.models; pcAll[p].connected = true;
+          pcAll[p] = pcAll[p] || {}; pcAll[p].models = r.models;
+          if (p !== "claude") pcAll[p].connected = true;
           const keep = modelInput.value;
           renderModels(false);
           if (keep) modelInput.value = keep;
@@ -3533,12 +4305,17 @@
       // always be made current. Feedback is symbolic (…/✓ N/⚠) — no new i18n strings.
       const setHint = (t) => { const h = modalCard.querySelector("#eModelHint"); if (h) h.textContent = t || ""; };
       const forceRefreshModels = (p) => {
-        if (!p || p === "claude") { setHint(""); return; }
+        if (!p) { setHint(""); return; }
         setHint("…"); refreshed.delete(p);
-        api("/registry/provider/test", { provider: p }).then((r) => {
+        api("/registry/models/refresh", { provider: p }).then(async (r) => {
           if (provSel.value !== p) return;
           if (r && r.models && r.models.length) {
-            pcAll[p] = pcAll[p] || {}; pcAll[p].models = r.models; pcAll[p].connected = true;
+            pcAll[p] = pcAll[p] || {}; pcAll[p].models = r.models;
+            if (p !== "claude") pcAll[p].connected = true;
+            // Re-pull the catalog so the ORDER and the pre-selected "best" model come
+            // from the backend (one source of truth), not a second copy of that logic.
+            try { const rg = await fetch("/registry").then((x) => x.json());
+                  pcAll = rg.providerConfig || pcAll; CATALOG = rg.providerCatalog || CATALOG; } catch {}
             const keep = modelInput.value; renderModels(false); if (keep) modelInput.value = keep;
             setHint("✓ " + r.models.length);
           } else { setHint(r && r.ok ? "✓" : ("⚠ " + ((r && r.msg) || ""))); }
@@ -3555,7 +4332,7 @@
         const f = modelInput.value.trim().toLowerCase();
         const opts = curModels.filter(Boolean).filter((m) => !f || m.toLowerCase().includes(f));
         modelMenu.innerHTML = opts.length
-          ? opts.map((m) => `<div class="cbopt">${String(m).replace(/</g, "&lt;")}</div>`).join("")
+          ? opts.map((m) => `<div class="cbopt">${esc(String(m))}</div>`).join("")
           : `<div class="cbopt" style="opacity:.55;cursor:default">${tr("พิมพ์ชื่อโมเดลเองได้")}</div>`;
         [...modelMenu.querySelectorAll(".cbopt")].forEach((o, i) => {
           if (opts[i] != null) o.onmousedown = (e) => { e.preventDefault(); modelInput.value = opts[i]; modelMenu.classList.remove("open"); };
@@ -3625,6 +4402,17 @@
         } finally { btn.disabled = false; btn.textContent = "✨ Draft"; }
       };
     }
+    // Where this teammate runs. The blank option is not 'local' — it means
+    // 'whatever the office is set to', so changing the office default moves
+    // everyone who never made their own choice.
+    const eBk = modalCard.querySelector("#eBackend");
+    if (eBk) {
+      const opts = [["", tr("(ตามออฟฟิศ)")], ["local", tr("เครื่องนี้")]]
+        .concat(Object.entries(REGBACKENDS).map(([n, b]) =>
+          [n, n + " · " + (b.kind === "docker" ? "🐳 " + (b.image || "") : "🌐 " + (b.host || ""))]));
+      eBk.innerHTML = opts.map(([v, l]) =>
+        `<option value="${v}"${(a.backend || "") === v ? " selected" : ""}>${l}</option>`).join("");
+    }
     modalCard.querySelector("#eName").value = a.name;
     modalCard.querySelector("#eCancel").onclick = () => openSettings("agents");
     modalCard.querySelector("#eSave").onclick = async () => {
@@ -3638,17 +4426,32 @@
             voice: (modalCard.querySelector("#eVoice") || {}).value || "",
             provider: (modalCard.querySelector("#eProvider") || {}).value || "claude",
             model: (modalCard.querySelector("#eModel") || {}).value || "",
+            backend: (modalCard.querySelector("#eBackend") || {}).value || "",
             persona: {
               expertise: modalCard.querySelector("#eExpertise").value,
               personality: modalCard.querySelector("#ePersonality").value,
               language: modalCard.querySelector("#eLanguage").value,
               rules: modalCard.querySelector("#eRules").value,
             },
-            skills: [...mySkills], tools: [...myTools] };
+            skills: [...mySkills], tools: [...myTools], memoryPlugins: [...myMem] };
       const r = await api("/registry/agent", payload);
       closeModal();
       if (r.id && !isUser) { ensureAgent(r.id); setTarget(r.id); }
     };
+    // 🧠 memory plugins (v1.4): shown only when a loaded plugin provides memory.
+    if (!isUser) Promise.all([fetch("/plugins").then((x) => x.json()), id ? fetch("/registry").then((x) => x.json()) : Promise.resolve({})]).then(([pj, rg]) => {
+      const cur = rg && rg.agents && rg.agents[id];
+      if (cur && Array.isArray(cur.memoryPlugins)) { myMem.clear(); cur.memoryPlugins.forEach((m) => myMem.add(m)); }
+      const provs = (pj.plugins || []).filter((p) => p.hooks && p.hooks.memory);
+      const f = modalCard.querySelector("#eMemField"), box = modalCard.querySelector("#eMemory");
+      if (!provs.length || !f || !box) return;
+      f.style.display = "";
+      for (const p of provs) {
+        const d = document.createElement("div"); d.className = "chk" + (myMem.has(p.id) ? " on" : ""); d.textContent = p.name || p.id;
+        d.onclick = () => { if (myMem.has(p.id)) myMem.delete(p.id); else myMem.add(p.id); d.classList.toggle("on", myMem.has(p.id)); };
+        box.appendChild(d);
+      }
+    }).catch(() => {});
     const del = modalCard.querySelector("#eDel");
     if (del) del.onclick = async () => {
       if (!await confirmDanger(`${t("ลบ agent")}: ${(a && a.name) || id}`,
@@ -3776,7 +4579,7 @@
   };
 
   // ---- 🗂 Office Ops: jobs / calendar / notes / org chart -------------------
-  document.getElementById("opsBtn").onclick = () => openOps("jobs");
+  document.getElementById("opsBtn").onclick = () => openOps("board");
 
   // ---- 🧩 plugins: list + open a plugin's panel inside the modal -----------
   document.getElementById("pluginBtn").onclick = () => openPlugins();
@@ -3789,6 +4592,13 @@
   document.getElementById("toolshubBtn").onclick = () => {
     document.getElementById("moreMenu").classList.remove("open");
     popWindow("/toolshub", "🧰 Tools Hub", "toolshub", { w: 860, h: 720 });
+  };
+  // 🎨 Media Studio — make a picture, change one, make it move. Its own window
+  // because the work is iterative: you look at the last result while writing
+  // the next instruction.
+  document.getElementById("studioBtn").onclick = () => {
+    document.getElementById("moreMenu").classList.remove("open");
+    popWindow("/studio", "🎨 Media Studio", "studio", { w: 880, h: 760 });
   };
   // 🧩 Plugins Hub — community plugin catalog, one-click install, its own window
   document.getElementById("pluginshubBtn").onclick = () => {
@@ -3816,6 +4626,8 @@
          <div style="font-size:10px;color:var(--dim);margin-top:5px">
            หรือวางโฟลเดอร์เองใน <code>plugins/</code> แล้วกด 🔄 · เขียน plugin เอง: docs/guide/plugins.md</div>
        </div>
+       <div class="field" style="margin-top:12px"><label>📦 OFFICIAL LIBRARY — plugins ที่มากับออฟฟิศ กดติดตั้งทีเดียว</label>
+         <div id="plgLib"><span style="font-size:11px;color:var(--dim)">…</span></div></div>
        <button class="bigbtn" id="plgReload">🔄 โหลด plugins ใหม่</button>`;
     modalCard.querySelector("#plgHub").onclick = () =>
       popWindow("/pluginshub", "🧩 Plugins Hub", "pluginshub", { w: 880, h: 720 });
@@ -3834,7 +4646,7 @@
       // author didn't include one, fall back to 🧩 so the row never looks empty.
       const pName = /^\p{Extended_Pictographic}/u.test(p.name || "") ? p.name : "🧩 " + (p.name || p.id);
       row.innerHTML = `<div class="meta"><b>${pName}</b>
-          <span>${(p.description || "").replace(/</g, "&lt;")} · v${p.version || "?"}` +
+          <span>${esc(p.description || "")} · v${p.version || "?"}` +
         (p.commands.length ? ` · ${p.commands.length} คำสั่ง` : "") + `</span></div>` +
         pinBtn("plugins", p.id) +
         (p.panel ? `<div class="winbtn" title="เปิดหน้าต่าง">⤢</div>` : "") +
@@ -3862,6 +4674,25 @@
     }
     wirePins(box, openPlugins);
     wireFilter(modalCard.querySelector("#plgFilter"), box);
+    // 📦 the library that ships with the office — one click, no clone.
+    fetch("/plugins/library").then((x) => x.json()).then((lj) => {
+      const lb = modalCard.querySelector("#plgLib"); if (!lb) return;
+      const avail = (lj.library || []).filter((p) => !p.installed);
+      lb.innerHTML = avail.length ? "" : `<span style="font-size:11px;color:var(--dim)">${tr("ติดตั้งครบแล้ว")}</span>`;
+      for (const p of avail) {
+        const row = document.createElement("div"); row.className = "arow"; row.style.cursor = "default";
+        row.innerHTML = `<div class="meta"><b>${esc(p.name)}</b><span>${esc(p.description || "")}${p.library && p.library.for ? " · " + esc(p.library.for) : ""}${p.library && p.library.needs ? " · ⚠ " + esc(p.library.needs) : ""}</span></div>` +
+          `<div class="winbtn" title="ติดตั้ง">⬇</div>`;
+        row.querySelector(".winbtn").onclick = async () => {
+          row.querySelector(".winbtn").textContent = "…";
+          const rr = await uiPost("/plugins/library/install", { id: p.id });
+          const j = await rr.json().catch(async () => ({ ok: false, error: await rr.text() }));
+          addChip(j.ok ? tr("📦 ติดตั้งแล้ว") + ": " + p.name : tr("✗ ติดตั้งไม่สำเร็จ") + ": " + String(j.error || "").slice(0, 100));
+          openPlugins();
+        };
+        lb.appendChild(row);
+      }
+    }).catch(() => {});
     // Async: ask the daemon which git-installed plugins are behind their repo,
     // then drop an "⬆ update" control onto those rows (read-only check; no fetch).
     fetch("/plugins/check-updates", { method: "POST", headers: { "x-bagidea-ui": "1" } })
@@ -4122,7 +4953,12 @@
     const ch = Object.entries(s.channels).filter(([, v]) => v !== "off")
       .map(([k, v]) => `${k} <span style="color:${v === "on" ? "#4ade80" : "#ffb054"}">●</span>`)
       .join(" · ") || "ยังไม่เชื่อมต่อ";
-    box.innerHTML =
+    const bg = s.budget || null;
+    const usdB = (n) => "$" + (Math.round(Number(n || 0) * 100) / 100).toFixed(2);
+    const budgetLine = bg ? `<div style="font-size:11.5px;margin:0 0 8px;padding:7px 10px;border-radius:9px;border:1px solid ${bg.office.cap && bg.office.spent >= bg.office.cap ? "#ff544888" : bg.office.cap && bg.office.spent >= bg.office.cap * bg.warnAt ? "#ffb05488" : "var(--line)"};background:rgba(255,255,255,0.03)">
+        💸 <b>${usdB(bg.office.spent)}</b>${bg.office.estimated ? " ≈" : ""} ${tr("วันนี้")}${bg.office.cap ? ` / ${usdB(bg.office.cap)} (${Math.round(bg.office.spent / bg.office.cap * 100)}%)` : ` <span style="color:var(--dim)">· ${tr("ยังไม่ตั้งงบ")} — ⚙ → 💸 BUDGET</span>`}
+      </div>` : "";
+    box.innerHTML = budgetLine +
       `<div class="statgrid">
         ${card("⚡", "งานวันนี้", today.runs, `✓ ${today.done} · ✗ ${today.failed}`)}
         ${(() => { const g = (today.aux && today.aux.gemini) || 0, o = (today.aux && today.aux.openai) || 0, c = today.cost || 0;
@@ -4162,7 +4998,7 @@
     modal.classList.add("open");
     const seq = ++opsSeq;
     const T = (t, label) => `<div class="tab ${tab === t ? "on" : ""}" data-t="${t}">${label}</div>`;
-    const tabs = `<div class="tabs">${T("proj", "📁 PROJECTS")}${T("jobs", "📋 TASKS")}${T("cal", "📅 CALENDAR")}${T("notes", "📝 NOTES")}${T("org", "🏢 ORG")}${T("dash", "📊 STATS")}</div>`;
+    const tabs = `<div class="tabs">${T("proj", "📁 PROJECTS")}${T("board", "📋 TASKS")}${T("jobs", "🔁 JOBS")}${T("cal", "📅 CALENDAR")}${T("notes", "📝 NOTES")}${T("org", "🏢 ORG")}${T("dash", "📊 STATS")}</div>`;
     let body = "";
     if (tab === "dash") {
       body = `<div id="dashBox" style="font-size:12px;color:var(--dim)">loading…</div>`;
@@ -4192,6 +5028,18 @@
             <button id="plBrowse" title="เลือกโฟลเดอร์">📂</button>
             <button class="primary" id="plAdd">＋</button>
           </div></div>`;
+    } else if (tab === "board") {
+      body = `<div id="bdSummary" style="font-size:11px;color:var(--dim);margin-bottom:6px"></div>
+        <div class="assistrow" style="margin-bottom:8px;flex-wrap:wrap">
+          <input id="bdTitle" placeholder="＋ งานใหม่… เช่น เขียนโพสต์เปิดตัว" maxlength="200" style="flex:1 1 180px">
+          <select id="bdOwner" style="flex:0 0 120px"></select>
+          <input id="bdDue" type="date" style="flex:0 0 130px" title="กำหนดส่ง">
+          <button class="primary" id="bdAdd">＋</button>
+        </div>
+        <div id="bdEdit"></div>
+        <div class="board" id="bdCols"></div>
+        <div style="font-size:10.5px;color:var(--dim);margin-top:8px">
+          ลากการ์ดข้ามคอลัมน์ได้ · คลิกการ์ดเพื่อแก้ไข · งานที่มอบหมาย งานตั้งเวลา action item จากประชุม และ workflow ที่รัน จะขึ้นเป็นการ์ดเอง · agents ย้ายการ์ดของตัวเองขณะทำงาน</div>`;
     } else if (tab === "jobs") {
       body = `<div id="jlist"></div>
         <div class="field" style="margin-top:10px"><label>＋ สั่งงานใหม่</label>
@@ -4220,12 +5068,28 @@
               <option value="10" selected>เตือนก่อน 10 นาที</option>
               <option value="30">เตือนก่อน 30 นาที</option>
               <option value="60">เตือนก่อน 1 ชม.</option>
+              <option value="1440">เตือนก่อน 1 วัน</option>
             </select>
+          </div>
+          <div class="assistrow" style="margin-top:6px;align-items:center">
+            <select id="cRepeat" style="flex:1" title="REPEAT">
+              <option value="">ไม่ซ้ำ</option>
+              <option value="daily">🔁 ทุกวัน</option>
+              <option value="weekdays">🔁 ทุกวันทำงาน (จ–ศ)</option>
+              <option value="weekly">🔁 ทุกสัปดาห์</option>
+              <option value="monthly">🔁 ทุกเดือน</option>
+            </select>
+            <div class="chk" id="cAllDay" title="ALL DAY">🗓 ทั้งวัน</div>
           </div>
           <button class="bigbtn" id="cAdd" style="margin-top:8px">📅 บันทึกนัด</button>
         </div>
+        <div class="assistrow" style="margin-top:8px">
+          <button class="sparkle" id="cExport" title="ICS EXPORT">📤 ส่งออก .ics</button>
+          <button class="sparkle" id="cImport" title="ICS IMPORT">📥 นำเข้า .ics</button>
+          <input id="cIcsFile" type="file" accept=".ics,text/calendar" style="display:none">
+        </div>
         <div style="font-size:10.5px;color:var(--dim);margin-top:8px">
-          🔔 Director จะเดินมาเตือนคุณก่อนถึงเวลา ตามที่ตั้งไว้</div>`;
+          🔔 Director จะเดินมาเตือนคุณก่อนถึงเวลา ตามที่ตั้งไว้ · นัดที่ซ้ำจะเตือนทุกครั้ง · agents จองนัดให้คุณได้ผ่าน API</div>`;
     } else if (tab === "notes") {
       body = `<div id="nlist"></div>
         <div class="assistrow" style="margin-top:10px">
@@ -4313,8 +5177,8 @@
             row.style.borderLeft = "3px solid #4ade80";
             row.style.background = "rgba(74,222,128,0.06)";
           }
-          row.innerHTML = `<div class="meta"><b>📁 ${p.name.replace(/</g, "&lt;")}</b>
-              <span>${p.dir.replace(/</g, "&lt;")} · ${st.join(" · ")}</span></div>` +
+          row.innerHTML = `<div class="meta"><b>📁 ${esc(p.name)}</b>
+              <span>${esc(p.dir)} · ${st.join(" · ")}</span></div>` +
             pinBtn("projects", projId(p)) + main +
             `<div class="winbtn" title="เทอร์มินัลเปล่า (ไม่นับว่าเปิดโปรเจค)">🖥</div>
             <div class="winbtn" title="เปิดโฟลเดอร์">📂</div>
@@ -4392,7 +5256,7 @@
               else {
                 row.dataset.del = "";
                 metaSpan().innerHTML =
-                  `<span style="color:#ff6258">${(await r.text()).replace(/</g, "&lt;")}</span>`;
+                  `<span style="color:#ff6258">${esc(await r.text())}</span>`;
                 setTimeout(opsRefresh, 6000);
               }
             } else {
@@ -4468,7 +5332,7 @@
       for (const n of placeNames) {
         const row = document.createElement("div");
         row.className = "arow";
-        row.innerHTML = `<div class="meta"><b>📍 ${n}</b><span>${r.places[n].replace(/</g, "&lt;")}</span></div>
+        row.innerHTML = `<div class="meta"><b>📍 ${n}</b><span>${esc(r.places[n])}</span></div>
           <div class="winbtn hide" title="ลบชื่อย่อ">✕</div>`;
         row.querySelector(".winbtn").onclick = () =>
           api("/places", { name: n, remove: true }).then(() => openOps("proj"));
@@ -4479,6 +5343,81 @@
         const f = modalCard.querySelector("#plFolder").value.trim();
         if (n && f) { await api("/places", { name: n, folder: f }); openOps("proj"); }
       };
+    } else if (tab === "board") {
+      const r = await fetch("/tasks/board").then((x) => x.json()).catch(() => null);
+      if (!r || seq !== opsSeq) return;
+      const agents = r.agents || {};
+      const who = (id) => id === "you" ? tr("ฉัน") : (agents[id] || id);
+      const sel = modalCard.querySelector("#bdOwner");
+      sel.innerHTML = `<option value="you">${tr("ฉัน")}</option>` +
+        Object.entries(agents).filter(([id]) => id !== "ceo").map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join("");
+      const sm = r.summary || {};
+      modalCard.querySelector("#bdSummary").textContent =
+        `${sm.open || 0} ${tr("ค้าง")} · ${sm.doing || 0} ${tr("กำลังทำ")} · ${sm.waiting || 0} ${tr("รอ")} · ${sm.overdue || 0} ${tr("เลยกำหนด")} · ${sm.doneToday || 0} ${tr("เสร็จวันนี้")}`;
+      const refresh = () => { if (modal.classList.contains("open") && modalCard.querySelector("#bdCols")) openOps("board"); };
+      modalCard.querySelector("#bdAdd").onclick = async () => {
+        const title = modalCard.querySelector("#bdTitle").value.trim(); if (!title) return;
+        await uiPost("/tasks", { title, owner: sel.value, due: modalCard.querySelector("#bdDue").value || "" });
+        refresh();
+      };
+      modalCard.querySelector("#bdTitle").onkeydown = (e) => { if (e.key === "Enter") modalCard.querySelector("#bdAdd").click(); };
+      const cols = modalCard.querySelector("#bdCols"); cols.innerHTML = "";
+      const KIND = { delegation: "🕊", job: "🔁", action: "🗣", workflow: "🔀", task: "" };
+      const openCards = [].concat(r.board.todo, r.board.doing, r.board.waiting);
+      const editCard = (t) => {
+        const ed = modalCard.querySelector("#bdEdit");
+        const toLocal = (ms) => ms ? new Date(ms - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+        const rec = t.recurrence ? (t.recurrence.every) : "";
+        ed.innerHTML = `<div class="field" style="margin-bottom:8px">
+            <input id="ce_title" maxlength="200" style="width:100%;margin-bottom:6px">
+            <textarea id="ce_detail" style="width:100%;min-height:48px;margin-bottom:6px" placeholder="${tr("รายละเอียด…")}"></textarea>
+            <div class="assistrow" style="flex-wrap:wrap">
+              <select id="ce_owner" style="flex:1 1 120px">${sel.innerHTML}</select>
+              <input id="ce_due" type="datetime-local" style="flex:1 1 150px" value="${toLocal(t.due)}">
+              <select id="ce_pri" style="flex:0 0 110px"><option value="1">🔴 P1</option><option value="2">🟡 P2</option><option value="3">⚪ P3</option><option value="4">⚫ P4</option></select>
+              <select id="ce_rec" style="flex:0 0 120px"><option value="">${tr("ไม่ซ้ำ")}</option><option value="day">${tr("ทุกวัน")}</option><option value="week">${tr("ทุกสัปดาห์")}</option><option value="month">${tr("ทุกเดือน")}</option></select>
+            </div>
+            <div class="assistrow" style="margin-top:6px;flex-wrap:wrap;align-items:center">
+              <span style="font-size:11px;color:var(--dim)">🔒 ${tr("รอให้เสร็จก่อน")}:</span>
+              <select id="ce_dep" multiple style="flex:1 1 200px;min-height:44px;font-size:11px">${openCards.filter((c) => c.id !== t.id).map((c) => `<option value="${c.id}"${(t.dependsOn || []).includes(c.id) ? " selected" : ""}>${esc(c.title)}</option>`).join("")}</select>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+              <button class="bigbtn" id="ce_save" style="flex:1;margin:0">💾 บันทึก</button>
+              <button class="sparkle" id="ce_done">✅ เสร็จแล้ว</button>
+              <button class="winbtn" id="ce_del" title="ลบ">✕</button>
+              <button class="winbtn" id="ce_x" title="ยกเลิก">↩</button>
+            </div></div>`;
+        ed.querySelector("#ce_title").value = t.title; ed.querySelector("#ce_detail").value = t.detail || "";
+        ed.querySelector("#ce_owner").value = t.owner; ed.querySelector("#ce_pri").value = String(t.priority); ed.querySelector("#ce_rec").value = rec;
+        ed.querySelector("#ce_x").onclick = () => { ed.innerHTML = ""; };
+        ed.querySelector("#ce_save").onclick = () => {
+          const dv = ed.querySelector("#ce_due").value;
+          uiPost("/tasks/update", { id: t.id, title: ed.querySelector("#ce_title").value, detail: ed.querySelector("#ce_detail").value,
+            owner: ed.querySelector("#ce_owner").value, due: dv ? new Date(dv).getTime() : 0, priority: Number(ed.querySelector("#ce_pri").value),
+            recurrence: ed.querySelector("#ce_rec").value ? { every: ed.querySelector("#ce_rec").value } : null,
+            dependsOn: [...ed.querySelector("#ce_dep").selectedOptions].map((o) => o.value) }).then(refresh);
+        };
+        ed.querySelector("#ce_done").onclick = () => uiPost("/tasks/move", { id: t.id, status: "done" }).then(refresh);
+        ed.querySelector("#ce_del").onclick = () => askConfirm(tr("ลบการ์ดนี้?")).then((ok) => ok && uiPost("/tasks/delete", { id: t.id }).then(refresh));
+        ed.scrollIntoView({ block: "nearest" });
+      };
+      for (const [st, label] of [["todo", "📝 TODO"], ["doing", "🔨 DOING"], ["waiting", "⏸ WAITING"], ["done", "✅ DONE"]]) {
+        const col = document.createElement("div"); col.className = "bcol";
+        col.innerHTML = `<h5>${label} <span style="opacity:.6">${r.board[st].length}</span></h5>`;
+        col.ondragover = (e) => { e.preventDefault(); col.classList.add("drop"); };
+        col.ondragleave = () => col.classList.remove("drop");
+        col.ondrop = (e) => { e.preventDefault(); col.classList.remove("drop"); const id = e.dataTransfer.getData("text/plain"); if (id) uiPost("/tasks/move", { id, status: st }).then(refresh); };
+        for (const t of r.board[st]) {
+          const c = document.createElement("div");
+          c.className = "card p" + t.priority + (t.overdue ? " over" : "") + (t.blocked ? " blocked" : ""); c.draggable = true;
+          c.ondragstart = (e) => e.dataTransfer.setData("text/plain", t.id);
+          const meta = [who(t.owner), t.project ? "📁 " + t.project : "", t.due ? "⏰ " + new Date(t.due).toLocaleDateString() : "", t.blocked ? "🔒" : "", t.recurrence ? "🔁" : ""].filter(Boolean).join(" · ");
+          c.innerHTML = `<div>${KIND[t.kind] ? KIND[t.kind] + " " : ""}${esc(t.title)}</div><div class="m">${esc(meta)}</div>`;
+          c.onclick = () => editCard(t);
+          col.appendChild(c);
+        }
+        cols.appendChild(col);
+      }
     } else if (tab === "jobs") {
       // 💡 team project proposals waiting for the CEO's verdict.
       fetch("/proposals").then((x) => x.json()).then((r) => {
@@ -4512,7 +5451,7 @@
             `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
                <label style="display:flex;align-items:flex-start;gap:7px;cursor:pointer;flex:1;min-width:0">
                  <input type="checkbox" class="prChk" style="margin-top:2px;cursor:pointer;flex:none">
-                 <b style="font-size:12.5px">💡 ${p.name.replace(/</g, "&lt;")}</b>
+                 <b style="font-size:12.5px">💡 ${esc(p.name)}</b>
                </label>
                <span style="display:flex;gap:6px;flex:none">
                  ${pinBtn("proposals", p.id)}
@@ -4521,7 +5460,7 @@
                </span>
              </div>
              <div style="font-size:10.5px;color:var(--dim);margin:3px 0 6px">เสนอโดย ${(p.agents || []).map(nameOf).join(", ")}</div>
-             <div style="white-space:pre-wrap;font-size:11.5px;line-height:1.55;max-height:40vh;overflow:auto;background:rgba(0,0,0,0.2);border:1px solid var(--line);border-radius:8px;padding:9px 11px">${(p.detail || "").replace(/</g, "&lt;")}</div>
+             <div style="white-space:normal;overflow-wrap:anywhere;font-size:11.5px;line-height:1.55;max-height:40vh;overflow:auto;background:rgba(0,0,0,0.2);border:1px solid var(--line);border-radius:8px;padding:9px 11px">${md(p.detail || "")}</div>
              <input class="prMsg" placeholder="ข้อความถึงทีม (ไม่บังคับ) — ใช้ทั้งตอนอนุมัติ/ไม่อนุมัติ"
                     style="width:100%;margin-top:7px;font:inherit;font-size:11px;color:var(--text);background:rgba(255,255,255,0.05);border:1px solid var(--line);border-radius:8px;padding:7px 9px;outline:none">`;
           const b = card.querySelectorAll(".winbtn:not(.pinbtn)");
@@ -4616,7 +5555,7 @@
             : j.mode === "at" ? `🕐 ${new Date(j.at).toLocaleString()}`
             : "⚡ ทันที";
           row.insertAdjacentHTML("beforeend",
-            `<div class="meta"><b>${j.prompt.slice(0, 56).replace(/</g, "&lt;")}</b>
+            `<div class="meta"><b>${esc(j.prompt.slice(0, 56))}</b>
                <span>${nameOf(j.agent)} · ${desc}${j.enabled === false ? " · ⏸ พัก" : ""}${(!j.running && j.lastRun) ? " · ล่าสุด " + new Date(j.lastRun).toLocaleTimeString() : ""}</span></div>` +
             (j.running ? "" :
               `<div class="winbtn" title="แก้ไข">✎</div>
@@ -4659,51 +5598,74 @@
         box.appendChild(row);
       }
     } else if (tab === "cal") {
+      const allDayChk = modalCard.querySelector("#cAllDay");
+      allDayChk.onclick = () => allDayChk.classList.toggle("on");
+      const REPEAT = { daily: { freq: "daily" }, weekdays: { freq: "weekly", byDay: ["MO", "TU", "WE", "TH", "FR"] }, weekly: { freq: "weekly" }, monthly: { freq: "monthly" } };
       modalCard.querySelector("#cAdd").onclick = async () => {
         const title = modalCard.querySelector("#cTitle").value.trim();
         const v = modalCard.querySelector("#cAt").value;
         if (!title || !v) return;
         await api("/calendar", { title, at: new Date(v).getTime(),
-          remindMin: Number(modalCard.querySelector("#cRemind").value) });
+          remindMin: Number(modalCard.querySelector("#cRemind").value),
+          recurrence: REPEAT[modalCard.querySelector("#cRepeat").value] || null,
+          allDay: allDayChk.classList.contains("on") });
         openOps("cal");
       };
-      const r = await fetch("/calendar").then((x) => x.json()).catch(() => ({ cal: [] }));
+      modalCard.querySelector("#cExport").onclick = () => { try { window.open("/calendar/ics", "_blank"); } catch {} };
+      const fileInp = modalCard.querySelector("#cIcsFile");
+      modalCard.querySelector("#cImport").onclick = () => fileInp.click();
+      fileInp.onchange = () => {
+        const f = fileInp.files && fileInp.files[0]; if (!f) return;
+        f.text().then((text) => fetch("/calendar/import", { method: "POST", headers: { "content-type": "text/calendar", "x-bagidea-ui": "1" }, body: text }))
+          .then((x) => x.json()).then((j) => { addChip(`📥 ${tr("นำเข้าแล้ว")} ${j.added} · ${tr("อัปเดต")} ${j.updated}`); openOps("cal"); })
+          .catch(() => addChip(tr("นำเข้าไม่สำเร็จ")));
+      };
+      const r = await fetch("/calendar").then((x) => x.json()).catch(() => ({ cal: [], upcoming: [] }));
+      if (seq !== opsSeq) return;
       const box = modalCard.querySelector("#clist");
-      const upcoming = (r.cal || []).sort((a, b) => a.at - b.at);
+      const byId = {}; for (const c of r.cal || []) byId[c.id] = c;
+      const upcoming = (r.upcoming || []).slice(0, 60);
       box.innerHTML = upcoming.length ? "" :
         `<div style="font-size:11.5px;color:var(--dim)">ยังไม่มีนัดหมาย</div>`;
-      for (const c of upcoming) {
-        const past = c.at < Date.now();
-        const reminded = c.notified && !past;   // alerted + time is near → urge
+      let lastDay = "";
+      for (const o of upcoming) {
+        const c = byId[o.eventId] || { id: o.eventId, title: o.title, at: o.at, remindMin: o.remindMin };
+        const day = new Date(o.at).toDateString();
+        if (day !== lastDay) { lastDay = day; box.insertAdjacentHTML("beforeend", `<div style="font-size:10.5px;color:var(--dim);margin:8px 0 3px;letter-spacing:.3px">${esc(new Date(o.at).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }))}</div>`); }
+        const soon = c.notifiedAt === o.at && o.at > Date.now();
         const row = document.createElement("div");
         row.className = "arow";
         const del = () => api("/calendar", { remove: c.id }).then(() => openOps("cal"));
         const view = () => {
-          row.style.display = ""; row.style.opacity = past ? "0.5" : "1";
-          row.style.borderLeft = reminded ? "3px solid #ffcf5e" : "";
-          row.style.background = reminded ? "rgba(255,207,94,0.08)" : "";
-          row.innerHTML = `<div class="meta"><b>${past ? "✓ " : reminded ? "🔔 " : "📅 "}${c.title.replace(/</g, "&lt;")}</b>
-              <span>${new Date(c.at).toLocaleString()} · เตือนก่อน ${c.remindMin} นาที${reminded ? " · ⚠ ใกล้ถึงแล้ว" : ""}</span></div>` +
-            (past ? "" : `<div class="winbtn" title="แก้ไข">✎</div>`) +
-            `<div class="winbtn hide" title="ลบ">✕</div>`;
+          row.style.display = ""; row.style.borderLeft = soon ? "3px solid #ffcf5e" : ""; row.style.background = soon ? "rgba(255,207,94,0.08)" : "";
+          const when = o.allDay ? tr("ทั้งวัน") : new Date(o.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + (o.end ? "–" + new Date(o.end).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "");
+          row.innerHTML = `<div class="meta"><b>${soon ? "🔔 " : o.recurring ? "🔁 " : "📅 "}${esc(c.title)}</b>
+              <span>${esc(when)}${c.remindMin ? " · " + tr("เตือนก่อน") + " " + c.remindMin + " " + tr("นาที") : ""}${c.agent ? " · " + esc(nameOf(c.agent)) : ""}${soon ? " · ⚠ " + tr("ใกล้ถึงแล้ว") : ""}</span></div>` +
+            `<div class="winbtn" title="แก้ไข">✎</div><div class="winbtn hide" title="ลบ">✕</div>`;
           const wb = row.querySelectorAll(".winbtn");
-          if (past) { wb[0].onclick = del; }
-          else { wb[0].onclick = edit; wb[1].onclick = del; }
+          wb[0].onclick = edit; wb[1].onclick = del;
         };
         const edit = () => {
           const toLocal = (ms) => ms ? new Date(ms - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
           row.style.display = "block"; row.style.borderLeft = ""; row.style.background = "";
           row.innerHTML =
             `<input id="ce_t" style="width:100%;margin-bottom:6px">
-             <input id="ce_at" type="datetime-local" value="${toLocal(c.at)}" style="margin-bottom:8px">
+             <div class="assistrow" style="margin-bottom:8px;flex-wrap:wrap">
+               <input id="ce_at" type="datetime-local" value="${toLocal(c.at)}" style="flex:1 1 170px">
+               <select id="ce_rep" style="flex:0 0 130px"><option value="">${tr("ไม่ซ้ำ")}</option><option value="daily">${tr("ทุกวัน")}</option><option value="weekdays">${tr("ทุกวันทำงาน")}</option><option value="weekly">${tr("ทุกสัปดาห์")}</option><option value="monthly">${tr("ทุกเดือน")}</option></select>
+               <input id="ce_rm" type="number" min="0" value="${c.remindMin || 0}" style="flex:0 0 70px" title="REMIND MIN">
+             </div>
              <div style="display:flex;gap:6px">
                <button class="bigbtn" id="ce_s" style="flex:1;margin:0">💾 บันทึก</button>
                <button class="winbtn" id="ce_x" title="ยกเลิก">✕</button></div>`;
           row.querySelector("#ce_t").value = c.title;
+          const rc = c.recurrence; row.querySelector("#ce_rep").value = !rc ? "" : (rc.freq === "weekly" && rc.byDay && rc.byDay.length === 5) ? "weekdays" : rc.freq;
           row.querySelector("#ce_x").onclick = view;
           row.querySelector("#ce_s").onclick = () => {
             const v = row.querySelector("#ce_at").value;
-            api("/calendar", { edit: c.id, title: row.querySelector("#ce_t").value, at: v ? new Date(v).getTime() : c.at })
+            api("/calendar", { edit: c.id, title: row.querySelector("#ce_t").value, at: v ? new Date(v).getTime() : c.at,
+              remindMin: Number(row.querySelector("#ce_rm").value) || 0,
+              recurrence: REPEAT[row.querySelector("#ce_rep").value] || null })
               .then(() => openOps("cal"));
           };
         };
@@ -4738,7 +5700,7 @@
       for (const n of (r.notes || []).slice().reverse()) {
         const row = document.createElement("div");
         row.className = "arow";
-        const safe = String(n.text).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+        const safe = esc(n.text);   // one-line preview - literal, not formatted (see /md.js)
         const del = (e) => { if (e) e.stopPropagation();
           api("/notes", { remove: n.id }).then(() => openOps("notes")); };
         // Collapsed: a one-line preview (long notes no longer overflow the row).
@@ -4822,7 +5784,8 @@
   let groupView = null;  // meeting key while reading/watching a group session
   function setThreadLabel(t) { document.getElementById("threadName").textContent = t; }
   function fmtTok(n) { n = +n || 0; return n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k" : String(n); }
-  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  // esc() and md() are provided globally by /md.js (loaded via <script src="/md.js"> above).
+  // All agent/user text renders through md() (prose) or esc() (inline labels) — see daemon/md.js.
   // The thread bar's brain + context-usage meter: which model, and how full its window
   // is (input tokens / context window). Updated live at end of each turn + on reload.
   function setThreadCtx(u) {
@@ -4885,7 +5848,7 @@
           if (actions && actions.length) {
             for (const a of actions) {
               const ownerName = (reg.agents[a.owner] || { name: a.owner }).name;
-              addMsg("you", null, `✅ <b>${ownerName}</b>: ${a.text}`, a.created, "· action item");
+              addMsg("you", null, `✅ **${esc(ownerName)}**: ${a.text}`, a.created, "· action item");
             }
           }
         }
@@ -5369,8 +6332,15 @@
       REGTOOLS = ev.tools || [];
       BUILTIN_DESC = ev.builtinTools || {};
       REGMCP = ev.mcp || {};
+      REGBACKENDS = ev.backends || {};
+      REGBACKEND = ev.backend || "local";
+      GHOSTWT = ev.ghostWorktrees === true;
+      SEMANTIC = ev.semantic || SEMANTIC;
       AUTOSKILLS = ev.autoSkills !== false;
       VERIFY = ev.verifyDelegated === true;
+      AUTOAPPROVE = ev.autoApprove === true;
+      AUTOPILOT = ev.autoPilot === true;
+      if (ev.autoPilotMax) AUTOPILOTMAX = ev.autoPilotMax;
       SOUND = ev.sound !== false;
       if (typeof ev.monitor === "number") monMode = ev.monitor;
       if (typeof ev.monitors === "number") monCount = Math.max(1, ev.monitors);
@@ -5589,6 +6559,19 @@
       ensureAgent(ev.agent, "working");
       if (!ev.replay) addLog(`🛡 ${ev.tool} — <b>${ev.type === "perm.approved" ? "allowed" : "denied"}</b> (${nameOf(ev.agent)})`);
     }
+    else if (ev.type === "trust.requested") {
+      // Replays are skipped like any other card: /project/trust is the source of
+      // truth for what's still waiting, and a fresh overlay pulls it on connect.
+      if (!ev.replay) { addTrustCard(ev); uiSnd("alert"); }
+    }
+    // Superseded card (the folder changed while it was up) — the replacement
+    // arrives right behind it, so drop this one without a verdict line.
+    else if (ev.type === "trust.withdrawn") removeTrustCard(ev.trust);
+    else if (ev.type === "trust.approved" || ev.type === "trust.denied") {
+      removeTrustCard(ev.trust);
+      if (!ev.replay) addLog(`🛡 ${tr("โปรเจค")} <b>${esc(ev.project || "")}</b> — <b>${
+        ev.type === "trust.approved" ? tr("อนุมัติ hook แล้ว") : tr("ไม่อนุมัติ hook")}</b>`);
+    }
     else if (ev.type === "ceo.summon") {
       // Direct feedback in the CEO pane (you just gave the order) — log otherwise.
       if (!ev.replay) {
@@ -5610,13 +6593,13 @@
     }
     else if (ev.type === "reminder") {
       if (!ev.replay) {
-        addChip(`🔔 <b>${tr("เตือนนัด:")}</b> ${String(ev.text).replace(/</g, "&lt;")} (${new Date(ev.at).toLocaleTimeString()})`);
-        addLog(`🔔 ${tr("เตือนนัด:")} <b>${String(ev.text).replace(/</g, "&lt;")}</b>`);
+        addChip(`🔔 <b>${tr("เตือนนัด:")}</b> ${esc(String(ev.text))} (${new Date(ev.at).toLocaleTimeString()})`);
+        addLog(`🔔 ${tr("เตือนนัด:")} <b>${esc(String(ev.text))}</b>`);
         uiSnd("alert");
       }
     }
     else if (ev.type === "job.started") {
-      if (!ev.replay) addLog(`📋 เริ่มงานที่สั่งไว้: <b>${String(ev.title || "").replace(/</g, "&lt;")}</b> — ${nameOf(ev.agent)}`);
+      if (!ev.replay) addLog(`📋 เริ่มงานที่สั่งไว้: <b>${esc(String(ev.title || ""))}</b> — ${nameOf(ev.agent)}`);
     }
     else if (ev.type === "notes.changed") {
       if (!ev.replay && ev.by === "agent") addLog(`📝 มี agent เขียนโน้ตบนกระดาน (${ev.count} ข้อ)`);
@@ -5676,7 +6659,14 @@
 
   function connect() {
     const ws = new WebSocket(`ws://${location.host}/ws`);
-    ws.onopen = () => document.getElementById("conn").classList.add("on");
+    ws.onopen = () => {
+      document.getElementById("conn").classList.add("on");
+      // Trust cards outlive a reload (work is parked on them), and they're skipped
+      // on replay like any other card — so ask the daemon what's still waiting.
+      fetch("/project/trust").then((r) => r.json())
+        .then((list) => (list || []).forEach(addTrustCard)).catch(() => {});
+      loadInbox();   // whatever waited while this window was closed
+    };
     ws.onclose = () => {
       document.getElementById("conn").classList.remove("on");
       setTimeout(connect, 2000);
@@ -5780,6 +6770,24 @@
       body: JSON.stringify({ path: realPath }) }).catch(() => {});
     tuckChat();  // the image now lives in its own OS window
   }
+  // 🔗 Any http(s) link — a PR URL an agent posted in chat, the changelog link in
+  // the update bar, a doc link in a card — must leave for the SYSTEM BROWSER.
+  // The office runs inside a webview with no window-open handler: target="_blank"
+  // is ignored and the click navigates the overlay itself, so clicking a PR link
+  // replaced the whole office with github.com (only a restart brought it back).
+  // Capture phase = this wins over any per-element onclick. Non-http hrefs
+  // (#anchors, javascript:) fall through untouched.
+  document.addEventListener("click", (e) => {
+    const a = e.target && e.target.closest && e.target.closest("a[href]");
+    if (!a) return;
+    const href = a.getAttribute("href") || "";
+    if (!/^https?:\/\//i.test(href)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    fetch("/open", { method: "POST",
+      headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
+      body: JSON.stringify({ path: href }) }).catch(() => {});
+  }, true);
   function mediaNode(url, kind, name, realPath) {
     let el;
     if (kind === "image") {
@@ -5794,8 +6802,13 @@
       el = document.createElement("audio");
       el.src = url; el.controls = true; el.preload = "metadata";
     } else {
+      // A doc (pdf…) — NOT an <a href> anymore: target="_blank" does nothing in a
+      // webview, so the click used to navigate the office away to the file. Open
+      // it in the OS default app (real window), same as the ⤢ button.
       el = document.createElement("a");
-      el.href = url; el.target = "_blank"; el.textContent = "📄 " + (name || url);
+      el.href = "javascript:void 0"; el.textContent = "📄 " + (name || url);
+      el.title = "เปิดด้วยโปรแกรมของเครื่อง (หน้าต่างใหม่)";
+      el.onclick = (e) => { e.preventDefault(); openExternal(realPath || url); };
     }
     el.className = "msgmedia";
     // No real filesystem path → nothing to reveal (return bare element).
@@ -5896,6 +6909,10 @@
   // NB: wry injects a global named `ipc` — never shadow it with const/let!
   const shellPost = window.ipc && window.ipc.postMessage
     ? (m) => window.ipc.postMessage(m) : null;
+  // Published so code defined earlier in the file (the feed's hover reporter) can
+  // reach it — it only ever runs after this line, but it can't close over a const
+  // that is declared below it.
+  window.__shellPost = shellPost;
   if (shellPost) {
     document.getElementById("titlebar").addEventListener("mousedown", (e) => {
       if (e.button === 0 && !e.target.closest("button") && !e.target.closest(".winbtn"))
@@ -5904,6 +6921,33 @@
     const miniBtn = document.getElementById("miniBtn");
     miniBtn.onclick = () => shellPost("mini");
     document.getElementById("hideBtn").onclick = () => shellPost("hide");
+    // Large mode: resizable big window (min = normal size, max = your screen).
+    // The shell drives the actual window; it reports state back via setLargeMode
+    // so the button reflects reality (e.g. feed mode force-exits large).
+    const largeBtn = document.getElementById("largeBtn");
+    const ICON_LARGE = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="1.6"/><path d="M9.5 6.5 12 4M4 12l2.5-2.5" /></svg>';
+    largeBtn.innerHTML = ICON_LARGE;
+    largeBtn.onclick = () => shellPost("large");
+    // Invisible edge/corner strips (see .rz-* CSS) — mousedown starts an OS
+    // resize drag in the shell. Only live while body.largemode is set.
+    const edges = document.createElement("div");
+    edges.id = "resizeEdges";
+    for (const d of ["n", "s", "e", "w", "ne", "nw", "se", "sw"]) {
+      const z = document.createElement("div");
+      z.className = "rz-" + d;
+      z.addEventListener("mousedown", (e) => {
+        e.preventDefault(); e.stopPropagation(); shellPost("resize:" + d);
+      });
+      edges.appendChild(z);
+    }
+    document.body.appendChild(edges);
+    window.setLargeMode = (on) => {
+      document.body.classList.toggle("largemode", on);
+      largeBtn.title = on ? "Back to normal window" : "Large window (resizable)";
+      largeBtn.style.color = on ? "var(--accent)" : "";
+      // Mini/restore makes no sense inside large — hidden until large is left.
+      miniBtn.style.display = on ? "none" : "";
+    };
     // The ◱/⛶ glyphs DON'T render on Windows 10 (no font coverage) — the restore
     // button showed up EMPTY there, so people couldn't find their way back from mini.
     // Use inline SVG icons (identical everywhere). State via the same media query the
@@ -5922,6 +6966,7 @@
   } else {
     // plain browser: the OS window has its own chrome
     document.getElementById("miniBtn").style.display = "none";
+    document.getElementById("largeBtn").style.display = "none";
     document.getElementById("hideBtn").style.display = "none";
     document.body.style.borderRadius = "0";
     document.body.style.border = "none";

@@ -69,7 +69,7 @@
   #side h3 { margin:0 0 2px; font-size:13px; }
   /* the plan/result takes the leftover height and scrolls inside itself, so long
      output never pushes the Run/Skill buttons off the panel */
-  #plan { white-space:pre-wrap; word-break:break-word; font-size:12.5px; color:#d6e2f0; background:#0a1020;
+  #plan { white-space:normal; overflow-wrap:anywhere; word-break:break-word; font-size:12.5px; color:#d6e2f0; background:#0a1020;
     border:1px solid var(--line); border-radius:10px; padding:11px; flex:1; min-height:80px; overflow:auto; }
   #side .muted { color:var(--dim); font-size:11px; }
   .acts { display:flex; gap:8px; margin-top:4px; } .acts button { flex:1; }
@@ -88,6 +88,28 @@
   @keyframes dlgin { from { opacity:0; transform:translateY(8px) scale(.98); } }
   .dlg .msg { font-size:13px; color:var(--text); line-height:1.55; margin-bottom:15px; white-space:pre-wrap; }
   .dlg .row { display:flex; gap:8px; justify-content:flex-end; }
+  /* ---- v1.3: live node states, run history, triggers ---- */
+  .node.st-running { border-color:#5ec8ff; box-shadow:0 0 0 2px rgba(94,200,255,.25), 0 8px 24px rgba(0,0,0,.4); }
+  .node.st-done { border-color:#4ade80; }
+  .node.st-failed { border-color:#ff5448; }
+  .node.st-waiting { border-color:#ffb054; }
+  .node.st-skipped { opacity:.45; }
+  .node .st { position:absolute; top:-9px; right:8px; font-size:10px; padding:1px 7px; border-radius:8px; background:#0e1626; border:1px solid var(--line); color:#8aa6c9; display:none; }
+  .node.st-running .st, .node.st-done .st, .node.st-failed .st, .node.st-waiting .st { display:block; }
+  #runsBox { max-height:200px; overflow-y:auto; flex:none; }
+  .runrow { display:flex; gap:6px; align-items:center; padding:5px 6px; border-radius:7px; cursor:pointer; font-size:11.5px; border:1px solid transparent; }
+  .runrow:hover { background:rgba(255,255,255,.04); border-color:var(--line); }
+  .runrow .dot { width:8px; height:8px; border-radius:50%; flex:none; }
+  .runrow.done .dot { background:#4ade80; } .runrow.failed .dot { background:#ff5448; } .runrow.running .dot { background:#5ec8ff; animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity:.3; } }
+  #trigBox { max-height:180px; overflow-y:auto; flex:none; }
+  .trow { display:flex; gap:6px; align-items:center; padding:5px 6px; font-size:11.5px; border-bottom:1px dashed rgba(255,255,255,.06); }
+  .trow .k { flex:none; color:#ffd28a; } .trow .d { flex:1; color:#d6e2f0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .trow button { padding:2px 6px; font-size:11px; }
+  .trow.off { opacity:.5; }
+  .trigadd { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; flex:none; }
+  .trigadd select, .trigadd input { font:inherit; font-size:11.5px; background:#0a1020; color:var(--text, #e8eef6); border:1px solid var(--line); border-radius:7px; padding:5px 7px; }
+  .trigadd select { flex:1 1 100%; } .trigadd input { flex:1 1 110px; min-width:0; }
 </style>
 </head>
 <body>
@@ -123,9 +145,23 @@
         <button onclick="makeSkill()" data-i18n="🧠 สร้างเป็น Skill">🧠 สร้างเป็น Skill</button>
       </div>
       <div class="muted" data-i18h="“<b>รันเลย</b>” = ให้ทีมทำตาม workflow นี้เดี๋ยวนี้ แล้วรายงานผล · “<b>สร้างเป็น Skill</b>” = บันทึกเป็นสกิลที่นำไปติ๊กให้ agent ในหน้าตั้งค่า เพื่อเรียกใช้ซ้ำเมื่อไหร่ก็ได้ (หรือพิมพ์สั่ง agent ให้ “รัน &lt;ชื่อ workflow&gt;”)">“<b>รันเลย</b>” = ให้ทีมทำตาม workflow นี้เดี๋ยวนี้ แล้วรายงานผล · “<b>สร้างเป็น Skill</b>” = บันทึกเป็นสกิลที่นำไปติ๊กให้ agent ในหน้าตั้งค่า เพื่อเรียกใช้ซ้ำเมื่อไหร่ก็ได้ (หรือพิมพ์สั่ง agent ให้ “รัน &lt;ชื่อ workflow&gt;”)</div>
+      <h3 style="margin-top:10px">▶ RUNS <span class="muted" id="runsHint"></span></h3>
+      <div id="runsBox" class="muted" data-i18n="— บันทึก workflow ก่อน แล้วประวัติการรันจะอยู่ตรงนี้ —">— บันทึก workflow ก่อน แล้วประวัติการรันจะอยู่ตรงนี้ —</div>
+      <h3 style="margin-top:10px">⚡ TRIGGERS</h3>
+      <div class="muted" data-i18n="ให้ workflow นี้เริ่มเองเมื่อ… (ต้องบันทึกก่อน)">ให้ workflow นี้เริ่มเองเมื่อ… (ต้องบันทึกก่อน)</div>
+      <div id="trigBox"></div>
+      <div id="trigAdd" class="trigadd">
+        <select id="trigKind">
+          <option value="schedule">⏰ ตามเวลา</option><option value="webhook">🌐 webhook</option>
+          <option value="event">📡 เหตุการณ์ในออฟฟิศ</option><option value="file">📁 ไฟล์ในโฟลเดอร์</option><option value="channel">💬 คีย์เวิร์ดในแชท</option>
+        </select>
+        <input id="trigA" placeholder=""><input id="trigB" placeholder="">
+        <button onclick="addTrigger()">＋</button>
+      </div>
     </div>
   </div>
 <script src="/winlang.js"></script>
+<script src="/md.js"></script>
 <script>
   // ---- i18n: Thai is the source. English offices use the TR map; OTHER
   //      languages auto-translate via the daemon (/i18n, shared with the main
@@ -137,6 +173,27 @@
     "⤢ พอดี":"⤢ Fit","▶️ รันเลย":"▶️ Run now","🧠 สร้างเป็น Skill":"🧠 Save as Skill",
     "🤖 แผนจาก Director":"🤖 Director's plan","— ยังไม่มีการวิเคราะห์ —":"— no analysis yet —",
     "⚡ เริ่มเมื่อ":"⚡ Trigger","⬇ ดึงข้อมูล":"⬇ Fetch","⚙ ทำงาน":"⚙ Action","◆ ตัดสินใจ":"◆ Decision","📤 ส่งผล":"📤 Output","📝 โน้ต":"📝 Note",
+    "✋ รออนุมัติ":"✋ Approval","🔔 แจ้งเตือน":"🔔 Notify","⏳ หน่วงเวลา":"⏳ Delay",
+    "เริ่มเมื่อ… (trigger ตั้งที่แถบขวา ⚡)":"Starts when… (set triggers in the ⚡ panel)",
+    "URL ที่จะดึง เช่น https://api.example.com/items":"URL to fetch, e.g. https://api.example.com/items",
+    "สิ่งที่อยากให้ทำ · ขึ้นต้น @ชื่อagent: เพื่อเจาะจงคน · ใช้ {{prev}} {{trigger.data.x}} ได้":"What to do · start with @agent: to pick who · {{prev}} and {{trigger.data.x}} work here",
+    "เงื่อนไข เช่น {{n2.output.status}} == 200 หรือคำถาม ให้ Director ตอบ YES/NO":"A condition like {{n2.output.status}} == 200, or a question the Director answers YES/NO",
+    "คำถามที่ให้คุณกดอนุมัติก่อนไปต่อ (ไปโผล่ที่ 📥 APPROVALS และมือถือ)":"What you must approve before it continues (lands in 📥 APPROVALS and on your phone)",
+    "ข้อความแจ้งเตือน (ผ่านกฎ 🔔 NOTIFY) · ใช้ {{prev}} ได้":"Notification text (through your 🔔 NOTIFY rules) · {{prev}} works",
+    "10m · 2h · 30s · until 09:00":"10m · 2h · 30s · until 09:00",
+    "ผลลัพธ์ · file:C:/path/out.md เขียนไฟล์ · channel: ส่งไปมือถือ":"The result · file:C:/path/out.md writes a file · channel: sends to your phone",
+    "โน้ตบนผืนผ้าใบ (ไม่รัน)":"A note on the canvas (not run)",
+    "— บันทึก workflow ก่อน แล้วประวัติการรันจะอยู่ตรงนี้ —":"— save the workflow; its run history appears here —",
+    "ให้ workflow นี้เริ่มเองเมื่อ… (ต้องบันทึกก่อน)":"Start this workflow by itself when… (save first)",
+    "⏰ ตามเวลา":"⏰ On a schedule","🌐 webhook":"🌐 Webhook","📡 เหตุการณ์ในออฟฟิศ":"📡 An office event","📁 ไฟล์ในโฟลเดอร์":"📁 A file in a folder","💬 คีย์เวิร์ดในแชท":"💬 A keyword in chat",
+    "ทุกกี่นาที (0 = ใช้เวลาแทน)":"Every N minutes (0 = use a time instead)","หรือทุกวันเวลา HH:MM":"or daily at HH:MM",
+    "secret (ไม่บังคับ — ใช้ HMAC-SHA256 เช่นของ GitHub)":"secret (optional — HMAC-SHA256, as GitHub sends)","ชื่อเหตุการณ์ เช่น task.completed":"event type, e.g. task.completed",
+    "โฟลเดอร์ที่จะเฝ้า":"folder to watch","รูปแบบไฟล์ เช่น *.pdf":"file pattern, e.g. *.pdf","คีย์เวิร์ดขึ้นต้นข้อความ เช่น standup":"keyword the message starts with, e.g. standup",
+    "รอ":"pending","กำลังทำ":"running","รอคุณ/รอเวลา":"waiting","เสร็จ":"done","ล้มเหลว":"failed","ข้าม":"skipped",
+    "⏳ กำลังรัน":"⏳ Running","✅ เสร็จแล้ว":"✅ Finished","✗ ล้มเหลว":"✗ Failed","⏳ เริ่มรัน…":"⏳ Starting…","— ยังไม่เคยรัน —":"— never run yet —","— ยังไม่มี trigger —":"— no triggers yet —",
+    "ทุก":"every","นาที":"min","ทุกวัน":"daily at","เปิด/ปิด":"enable / pause","ทดสอบยิงเลย":"fire it now","ลบ":"delete","ลบ trigger นี้?":"Delete this trigger?",
+    "บันทึก workflow ก่อนนะ":"Save the workflow first","📋 คัดลอก URL แล้ว — เปิดออกอินเทอร์เน็ตด้วย cloudflared/ngrok":"📋 URL copied — expose it with cloudflared or ngrok",
+    "manual":"manual","schedule":"schedule","webhook":"webhook","event":"event","file":"file","channel":"channel",
     "พิมพ์สิ่งที่อยากให้ทำ…":"Describe what to do…",
     "ลากพื้นที่ว่าง = เลื่อน · ล้อเมาส์ = ซูม · ลากจากจุดล่าง (●) ของ node ไปจุดบนของอีก node = เชื่อม · แตกหลายเส้น = ทำขนาน · หลายเส้นเข้า node เดียว = รอให้ครบก่อน · คลิกเส้นเพื่อลบ":
       "Drag empty space = pan · wheel = zoom · drag a node's bottom dot (●) onto another's top = connect · many arrows out = parallel · many arrows in = wait for all · click an edge to delete",
@@ -183,8 +240,27 @@
     if (WL) WL.ensure(Object.keys(TR), rerenderAll);   // fill gaps via Gemini, re-render live
   }).catch(()=>{});
 
-  const TYPES = [["trigger","⚡ เริ่มเมื่อ"],["fetch","⬇ ดึงข้อมูล"],["action","⚙ ทำงาน"],
-    ["decision","◆ ตัดสินใจ"],["output","📤 ส่งผล"],["note","📝 โน้ต"]];
+  let TYPES = [["trigger","⚡ เริ่มเมื่อ"],["fetch","⬇ ดึงข้อมูล"],["action","⚙ ทำงาน"],
+    ["decision","◆ ตัดสินใจ"],["approval","✋ รออนุมัติ"],["notify","🔔 แจ้งเตือน"],["delay","⏳ หน่วงเวลา"],
+    ["output","📤 ส่งผล"],["note","📝 โน้ต"]];
+  // What each type expects in its text box — shown as the placeholder.
+  const HINTS = { trigger:"เริ่มเมื่อ… (trigger ตั้งที่แถบขวา ⚡)", fetch:"URL ที่จะดึง เช่น https://api.example.com/items",
+    action:"สิ่งที่อยากให้ทำ · ขึ้นต้น @ชื่อagent: เพื่อเจาะจงคน · ใช้ {{prev}} {{trigger.data.x}} ได้",
+    decision:"เงื่อนไข เช่น {{n2.output.status}} == 200 หรือคำถาม ให้ Director ตอบ YES/NO",
+    approval:"คำถามที่ให้คุณกดอนุมัติก่อนไปต่อ (ไปโผล่ที่ 📥 APPROVALS และมือถือ)",
+    notify:"ข้อความแจ้งเตือน (ผ่านกฎ 🔔 NOTIFY) · ใช้ {{prev}} ได้", delay:"10m · 2h · 30s · until 09:00",
+    output:"ผลลัพธ์ · file:C:/path/out.md เขียนไฟล์ · channel: ส่งไปมือถือ", note:"โน้ตบนผืนผ้าใบ (ไม่รัน)" };
+  // Node types the office and plugins registered (🧑‍💻 Codex, a plugin's own) join the palette.
+  fetch("/workflows/types").then(r=>r.json()).then(j => {
+    for (const t of (j.types||[])) {
+      if (t.builtin || TYPES.some(([v]) => v === t.kind)) continue;
+      TYPES.push([t.kind, t.label || t.kind]); HINTS[t.kind] = t.hint || "";
+    }
+    document.querySelectorAll(".node select").forEach(sel => {
+      const cur = sel.value;
+      sel.innerHTML = TYPES.map(([v,l]) => `<option value="${v}"${v===cur?" selected":""}>${tr(l)}</option>`).join("");
+    });
+  }).catch(()=>{});
   const W = 230, NS = "http://www.w3.org/2000/svg";
   // ---- open tabs: each holds a full workflow; the live globals mirror the active one
   let tabs = [];          // {id,name,example,nodes,edges,pan,zoom}
@@ -223,11 +299,13 @@
     const host = document.getElementById("tabs");
     host.innerHTML = tabs.map((t,i)=>
       `<div class="tab${i===active?" active":""}" onclick="switchTab(${i})">
-         ${t.example?'<span class="ex">📄</span>':''}<span class="nm">${(t.name||tr("(ไม่มีชื่อ)")).replace(/</g,"&lt;")}</span>
+         ${t.example?'<span class="ex">📄</span>':''}<span class="nm">${esc(t.name||tr("(ไม่มีชื่อ)"))}</span>
          <span class="cl" onclick="event.stopPropagation();closeTab(${i})">✕</span></div>`).join("")
       + `<div class="newt" onclick="newTab()">＋</div>`;
   }
   function switchTab(i){ if(i===active)return; stash(); activate(i); }
+  // Every activation refreshes the run history and triggers of THAT workflow.
+  (function() { const orig = activate; activate = function(i) { orig(i); watchRun = null; clearTimeout(watchTimer); paintRun(null); loadRuns(); loadTriggers(); }; })();
   function newTab() {
     stash();
     tabs.push({ id:"", name:tr("Workflow ใหม่"), example:false, nodes:[], edges:[], pan:{x:60,y:40}, zoom:1 });
@@ -260,9 +338,9 @@
     const opts = TYPES.map(([v,l]) => `<option value="${v}"${v===n.type?" selected":""}>${tr(l)}</option>`).join("");
     el.innerHTML = `<div class="port in"></div>` +
       `<div class="head"><select>${opts}</select><span class="x">✕</span></div>` +
-      `<textarea placeholder="${tr("พิมพ์สิ่งที่อยากให้ทำ…")}">${(n.text||"").replace(/</g,"&lt;")}</textarea>` +
+      `<textarea placeholder="${tr(HINTS[n.type] || "พิมพ์สิ่งที่อยากให้ทำ…")}">${esc(n.text||"")}</textarea>` +
       `<div class="port out"></div>`;
-    el.querySelector("select").onchange = (e) => { n.type = e.target.value; };
+    el.querySelector("select").onchange = (e) => { n.type = e.target.value; el.querySelector("textarea").placeholder = tr(HINTS[n.type] || "พิมพ์สิ่งที่อยากให้ทำ…"); };
     el.querySelector("textarea").oninput = (e) => { n.text = e.target.value; drawEdges(); };
     el.querySelector(".x").onclick = (e) => { e.stopPropagation(); removeNode(n.id); };
     dragNode(el, n);
@@ -399,7 +477,7 @@
         document.getElementById("robadge").classList.remove("show");
         if (tabs[active]) { tabs[active].id = j.id; tabs[active].example = false; }
         try { localStorage.setItem("lastWf", curId); } catch {}
-        renderTabs(); flash(isExample?"💾 บันทึกเป็นสำเนาแล้ว":"💾 บันทึกแล้ว"); loadList();
+        renderTabs(); flash(isExample?"💾 บันทึกเป็นสำเนาแล้ว":"💾 บันทึกแล้ว"); loadList(); loadRuns(); loadTriggers();
       }).catch(()=>flash("บันทึกไม่สำเร็จ"));
   }
   async function deleteCurrent() {
@@ -413,14 +491,137 @@
     const plan = document.getElementById("plan"); plan.textContent = tr("⏳ Director กำลังวิเคราะห์…");
     fetch("/workflows/analyze", { method:"POST", headers:{"content-type":"application/json"},
       body: JSON.stringify({ name: nameInp.value, nodes, edges }) })
-      .then(r=>r.json()).then(j=>{ plan.textContent = j.analysis || "—"; }).catch(()=>{ plan.textContent=tr("วิเคราะห์ไม่สำเร็จ ลองใหม่"); });
+      .then(r=>r.json()).then(j=>{ plan.innerHTML = md(j.analysis || "—"); }).catch(()=>{ plan.textContent=tr("วิเคราะห์ไม่สำเร็จ ลองใหม่"); });
+  }
+  // ===== v1.3: the engine =====
+  const UI = { "content-type":"application/json", "x-bagidea-ui":"1" };
+  let watchRun = null, watchTimer = null;
+  const STATE_TH = { pending:"รอ", running:"กำลังทำ", waiting:"รอคุณ/รอเวลา", done:"เสร็จ", failed:"ล้มเหลว", skipped:"ข้าม" };
+  function paintRun(run) {
+    for (const el of world.querySelectorAll(".node")) {
+      el.className = el.className.replace(/\bst-\w+/g, "").trim();
+      let badge = el.querySelector(".st"); if (!badge) { badge = document.createElement("div"); badge.className = "st"; el.appendChild(badge); }
+      const st = run && run.nodes && run.nodes[el.dataset.id];
+      if (st) { el.classList.add("st-" + st.state); badge.textContent = tr(STATE_TH[st.state] || st.state); }
+    }
+  }
+  function describeRun(run) {
+    const lines = [];
+    for (const n of nodes) {
+      const st = run.nodes[n.id]; if (!st) continue;
+      const out = st.output == null ? "" : (typeof st.output === "string" ? st.output : JSON.stringify(st.output));
+      lines.push(`**${tr(STATE_TH[st.state]||st.state)}** · ${(n.text||n.type).split("\n")[0].slice(0,60)}` + (st.error ? `\n> ✗ ${st.error}` : out ? `\n> ${out.slice(0, 400)}` : ""));
+    }
+    const head = run.state === "running" ? tr("⏳ กำลังรัน") : run.state === "done" ? tr("✅ เสร็จแล้ว") : tr("✗ ล้มเหลว");
+    return `${head} · ${run.id}\n\n` + lines.join("\n\n");
+  }
+  function watch(runId) {
+    clearTimeout(watchTimer); watchRun = runId;
+    const tick = () => fetch("/workflows/run?id=" + encodeURIComponent(runId)).then(r=>r.json()).then(run => {
+      if (watchRun !== runId) return;
+      paintRun(run);
+      document.getElementById("plan").innerHTML = md(describeRun(run));
+      if (run.state === "running") watchTimer = setTimeout(tick, 2000); else loadRuns();
+    }).catch(()=>{});
+    tick();
   }
   function runWf() {
     if (!nodes.length) return flash("เพิ่ม node ก่อนนะ");
-    const plan = document.getElementById("plan"); plan.textContent = tr("⏳ ทีมกำลังทำงานตาม workflow…");
-    fetch("/workflows/run", { method:"POST", headers:{"content-type":"application/json"},
-      body: JSON.stringify({ name: nameInp.value, nodes, edges }) })
-      .then(r=>r.json()).then(j=>{ plan.textContent = tr("✅ ผลลัพธ์:")+"\n\n" + (j.result || "—"); }).catch(()=>{ plan.textContent=tr("รันไม่สำเร็จ ลองใหม่"); });
+    const plan = document.getElementById("plan"); plan.textContent = tr("⏳ เริ่มรัน…");
+    fetch("/workflows/run", { method:"POST", headers:UI,
+      body: JSON.stringify({ id: isExample ? "" : curId, name: nameInp.value, nodes, edges }) })
+      .then(r=>r.json()).then(j=>{ if (j.run && j.run.id) watch(j.run.id); else plan.innerHTML = md(String(j.result || "—")); })
+      .catch(()=>{ plan.textContent=tr("รันไม่สำเร็จ ลองใหม่"); });
+  }
+  function loadRuns() {
+    const box = document.getElementById("runsBox"); if (!box) return;
+    if (!curId || isExample) { box.textContent = tr("— บันทึก workflow ก่อน แล้วประวัติการรันจะอยู่ตรงนี้ —"); return; }
+    fetch("/workflows/runs?id=" + encodeURIComponent(curId) + "&limit=20").then(r=>r.json()).then(list => {
+      if (!list.length) { box.textContent = tr("— ยังไม่เคยรัน —"); return; }
+      box.innerHTML = "";
+      for (const r of list) {
+        const d = document.createElement("div"); d.className = "runrow " + r.state;
+        const t = new Date(r.startedAt); const hh = String(t.getHours()).padStart(2,"0"), mm = String(t.getMinutes()).padStart(2,"0");
+        const c = r.counts || {};
+        d.innerHTML = `<span class="dot"></span><span>${t.getMonth()+1}/${t.getDate()} ${hh}:${mm}</span><span class="muted">${tr(r.trigger && r.trigger.source || "manual")}</span>` +
+          `<span class="muted" style="margin-left:auto">✓${c.done||0} ✗${c.failed||0}${c.waiting?" ⏳"+c.waiting:""}</span>`;
+        d.onclick = () => watch(r.id);
+        box.appendChild(d);
+      }
+    }).catch(()=>{});
+  }
+  // ---- triggers ----
+  const TRIG_FIELDS = { schedule:["ทุกกี่นาที (0 = ใช้เวลาแทน)","หรือทุกวันเวลา HH:MM"], webhook:["secret (ไม่บังคับ — ใช้ HMAC-SHA256 เช่นของ GitHub)",""],
+    event:["ชื่อเหตุการณ์ เช่น task.completed",""], file:["โฟลเดอร์ที่จะเฝ้า","รูปแบบไฟล์ เช่น *.pdf"], channel:["คีย์เวิร์ดขึ้นต้นข้อความ เช่น standup",""] };
+  function trigForm() {
+    const k = document.getElementById("trigKind").value, f = TRIG_FIELDS[k] || ["",""];
+    const a = document.getElementById("trigA"), b = document.getElementById("trigB");
+    a.placeholder = tr(f[0]); b.placeholder = tr(f[1]); b.style.display = f[1] ? "" : "none";
+  }
+  document.getElementById("trigKind").onchange = trigForm; trigForm();
+  function trigCfg(k, a, b) {
+    if (k === "schedule") return Number(a) > 0 ? { everyMin: Number(a) } : { at: b || "09:00" };
+    if (k === "webhook") return a ? { secret: a } : {};
+    if (k === "event") return { type: a };
+    if (k === "file") return { dir: a, glob: b || "*" };
+    if (k === "channel") return { keyword: a };
+    const ck = CUSTOM_KINDS[k];
+    if (ck) { const o = {}; if (ck.fields[0]) o[ck.fields[0].key] = a; if (ck.fields[1]) o[ck.fields[1].key] = b; return o; }
+    return {};
+  }
+  function trigLabel(t) {
+    const k = CUSTOM_KINDS[t.kind];
+    if (k) return (k.label || t.kind) + " · " + Object.entries(t.cfg || {}).map(([a, b]) => a + "=" + b).join(", ");
+    return trigLabelBuiltin(t);
+  }
+  function trigLabelBuiltin(t) {
+    const c = t.cfg || {};
+    if (t.kind === "schedule") return c.everyMin ? tr("ทุก") + " " + c.everyMin + " " + tr("นาที") : tr("ทุกวัน") + " " + c.at;
+    if (t.kind === "webhook") return location.origin + "/hook/" + c.token;
+    if (t.kind === "event") return c.type;
+    if (t.kind === "file") return c.dir + " · " + c.glob;
+    if (t.kind === "channel") return "“" + c.keyword + "…”";
+    return "";
+  }
+  const TRIG_ICON = { schedule:"⏰", webhook:"🌐", event:"📡", file:"📁", channel:"💬" };
+  // Trigger kinds a plugin contributed: they get a select option, their first two
+  // fields map onto the A/B inputs, and their label shows in the list.
+  const CUSTOM_KINDS = {};
+  fetch("/triggers").then(r=>r.json()).then(j => {
+    const sel = document.getElementById("trigKind");
+    for (const k of (j.kinds||[])) {
+      if (k.builtin || CUSTOM_KINDS[k.kind]) continue;
+      CUSTOM_KINDS[k.kind] = k;
+      TRIG_FIELDS[k.kind] = [(k.fields[0] && (k.fields[0].label || k.fields[0].key)) || "", (k.fields[1] && (k.fields[1].label || k.fields[1].key)) || ""];
+      const o = document.createElement("option"); o.value = k.kind; o.textContent = "🧩 " + (k.label || k.kind); sel.appendChild(o);
+    }
+  }).catch(()=>{});
+  function loadTriggers() {
+    const box = document.getElementById("trigBox"); if (!box) return;
+    if (!curId || isExample) { box.innerHTML = ""; return; }
+    fetch("/triggers").then(r=>r.json()).then(j => {
+      const mine = (j.triggers||[]).filter(t => t.workflowId === curId);
+      box.innerHTML = mine.length ? "" : `<div class="muted">${tr("— ยังไม่มี trigger —")}</div>`;
+      for (const t of mine) {
+        const d = document.createElement("div"); d.className = "trow" + (t.enabled ? "" : " off");
+        d.innerHTML = `<span class="k">${TRIG_ICON[t.kind]||"🧩"}</span><span class="d" title="${esc(trigLabel(t))}">${esc(trigLabel(t))}</span>` +
+          `<button title="${tr("เปิด/ปิด")}">${t.enabled ? "⏸" : "▶"}</button><button title="${tr("ทดสอบยิงเลย")}">🔥</button><button title="${tr("ลบ")}">✕</button>`;
+        const [tog, fire, del] = d.querySelectorAll("button");
+        tog.onclick = () => fetch("/triggers", { method:"POST", headers:UI, body: JSON.stringify({ id: t.id, enabled: !t.enabled }) }).then(loadTriggers);
+        fire.onclick = () => fetch("/triggers/fire", { method:"POST", headers:UI, body: JSON.stringify({ id: t.id }) }).then(r=>r.json()).then(j => { if (j.run) watch(j.run.id); });
+        del.onclick = () => askConfirm(tr("ลบ trigger นี้?")).then(ok => ok && fetch("/triggers/delete", { method:"POST", headers:UI, body: JSON.stringify({ id: t.id }) }).then(loadTriggers));
+        if (t.kind === "webhook") d.querySelector(".d").onclick = () => { navigator.clipboard && navigator.clipboard.writeText(trigLabel(t)); flash("📋 คัดลอก URL แล้ว — เปิดออกอินเทอร์เน็ตด้วย cloudflared/ngrok"); };
+        box.appendChild(d);
+      }
+    }).catch(()=>{});
+  }
+  function addTrigger() {
+    if (!curId || isExample) return flash("บันทึก workflow ก่อนนะ");
+    const k = document.getElementById("trigKind").value, a = document.getElementById("trigA").value.trim(), b = document.getElementById("trigB").value.trim();
+    fetch("/triggers", { method:"POST", headers:UI, body: JSON.stringify({ kind: k, workflowId: curId, cfg: trigCfg(k, a, b) }) })
+      .then(r => r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t))))
+      .then(() => { document.getElementById("trigA").value = ""; document.getElementById("trigB").value = ""; loadTriggers(); })
+      .catch(e => flash(String(e.message || "เพิ่มไม่สำเร็จ")));
   }
   function makeSkill() {
     if (!nodes.length) return flash("เพิ่ม node ก่อนนะ");

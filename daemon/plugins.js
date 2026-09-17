@@ -13,9 +13,14 @@
 //     "needsKeys": []            // main keys this plugin requires (optional)
 //   }
 //
-// index.js exports: (ctx) => ({ routes?, onCommand?(cmd, args, reply) })
+// index.js exports: (ctx) => ({ routes?, onCommand?(cmd, args, reply), onEvent?(type, evt) })
 //   ctx = { broadcast, feed, reg, saveReg, workspace, daemonDir,
-//           dataDir, pluginDir, manifest, log, runClaude }
+//           dataDir, pluginDir, manifest, log, runClaude,
+//           // v1.4 hooks (design H) — every one optional, every old plugin keeps working:
+//           notify(item), approvals.ask(item) → promise, tasks, calendar, schedule(job),
+//           triggers.register(kind, { start(trigger, fire), stop?(handle) }),
+//           workflow.node(kind, impl(node, helpers) → output, { label, hint }),
+//           memory.provider(fn(agentId, info) → string | string[]) }
 // Built-in plugins ship enabled; users drop new folders in plugins/ and
 // restart (or call /plugins/reload). See docs/guide/plugins.md.
 
@@ -52,11 +57,54 @@ module.exports = function initPlugins(ctx) {
   const DIR = (ctx && ctx.pluginsDir) || path.join(__dirname, "..", "plugins");
   fs.mkdirSync(DIR, { recursive: true });
   let plugins = {};   // id -> { manifest, mod, dir, dataDir }
+  const memoryProviders = new Map();   // plugin id -> fn(agentId, info) => lines
+  const hookNames = new Map();         // plugin id -> { triggers: [], nodes: [] }
+  // The scoped hooks a plugin gets: registrations are tagged with the plugin id so
+  // a reload (or a failed load) drops exactly that plugin's contributions.
+  function scopedCtx(base, id) {
+    const names = { triggers: [], nodes: [] };
+    hookNames.set(id, names);
+    return {
+      ...base,
+      triggers: {
+        register: (kind, def) => {
+          if (!ctx.triggers || !ctx.triggers.registerKind) throw new Error("triggers are not available to plugins here");
+          ctx.triggers.registerKind(kind, def, id); names.triggers.push(kind);
+        },
+        fire: (kindOrId, data) => ctx.triggers && ctx.triggers.fireKind ? ctx.triggers.fireKind(kindOrId, data, id) : 0,
+        // the trigger records themselves (a plugin can wire its own workflow up)
+        add: (spec) => ctx.triggers.add({ ...spec, by: id }), update: (tid, patch) => ctx.triggers.update(tid, patch),
+        remove: (tid) => ctx.triggers.remove(tid), list: () => ctx.triggers.list(), get: (tid) => ctx.triggers.get(tid),
+      },
+      workflow: {
+        node: (kind, impl, meta) => {
+          if (!ctx.workflows || !ctx.workflows.registerNode) throw new Error("the workflow engine is not available to plugins here");
+          ctx.workflows.registerNode(kind, impl, { ...(meta || {}), owner: id }); names.nodes.push(kind);
+        },
+        start: (wfOrId, o) => ctx.workflows && ctx.workflows.start ? ctx.workflows.start(wfOrId, o) : null,
+        // templates: save (once, with ifMissing) / load / runs
+        save: (wf, o) => ctx.workflows.save(wf, o), exists: (wid) => ctx.workflows.exists(wid), load: (wid) => ctx.workflows.load(wid),
+        runs: (o) => ctx.workflows.runs(o || {}), getRun: (rid) => ctx.workflows.getRun(rid), getRunFull: (rid) => ctx.workflows.getRunFull(rid),
+      },
+      memory: { provider: (fn) => { if (typeof fn !== "function") throw new Error("memory.provider needs a function"); memoryProviders.set(id, fn); } },
+    };
+  }
+  function dropHooks(id) {
+    memoryProviders.delete(id);
+    const names = hookNames.get(id);
+    if (names) {
+      if (ctx.triggers && ctx.triggers.unregisterOwner) ctx.triggers.unregisterOwner(id);
+      if (ctx.workflows && ctx.workflows.unregisterOwner) ctx.workflows.unregisterOwner(id);
+    }
+    hookNames.delete(id);
+  }
   // Result of the most recent load(): { loaded, failed:[{id,file,error}] }.
   // Exposed so /plugins/reload can report a clear failure instead of "ok".
   let lastLoad = { loaded: 0, failed: [] };
 
   function load() {
+    for (const id of Object.keys(plugins)) dropHooks(id);
+    for (const id of [...hookNames.keys()]) dropHooks(id);
     plugins = {};
     const failed = [];
     let loadedCount = 0;
@@ -90,8 +138,9 @@ module.exports = function initPlugins(ctx) {
         try {
           delete require.cache[require.resolve(idx)];
           const factory = require(idx);
-          mod = factory({ ...ctx, dataDir, pluginDir: dir, manifest });
+          mod = factory(scopedCtx({ ...ctx, dataDir, pluginDir: dir, manifest }, manifest.id));
         } catch (err) {
+          dropHooks(manifest.id);
           // Same anti-mask rule as the syntax check above: a plugin whose
           // factory throws at load time must be skipped and reported, not
           // registered as mod:null and logged "loaded".
@@ -190,12 +239,58 @@ module.exports = function initPlugins(ctx) {
     res.writeHead(404); res.end("no such plugin route"); return true;
   }
 
+  // ---- v1.4 hooks -----------------------------------------------------------
+  // Office events reach plugins that export onEvent(type, evt). One plugin's
+  // throw never reaches another, and the world's position spam is skipped.
+  function onEvent(evt) {
+    if (!evt || !evt.type || evt.type === "world.pos") return 0;
+    let n = 0;
+    for (const p of Object.values(plugins)) {
+      if (!p.mod || typeof p.mod.onEvent !== "function") continue;
+      n++;
+      try { p.mod.onEvent(evt.type, evt); }
+      catch (e) { ctx.log("[plugin] " + p.manifest.id + " onEvent: " + (e && e.message)); }
+    }
+    return n;
+  }
+  // Lines a plugin contributes at prompt-assembly time (the narrow hook agreed in
+  // #42): opt-in per agent (reg.agents[id].memoryPlugins lists the plugin ids),
+  // the core owns the timeout and the character budget, and a throw yields zero
+  // lines — a plugin can add context, never break a turn.
+  const MEMORY_BUDGET = 1500, MEMORY_TIMEOUT_MS = 800;
+  async function memoryLines(agentId, info) {
+    if (!memoryProviders.size) return "";
+    const agent = (ctx.reg && ctx.reg.agents && ctx.reg.agents[agentId]) || {};
+    const wanted = Array.isArray(agent.memoryPlugins) ? agent.memoryPlugins : [];
+    const picks = [...memoryProviders.entries()].filter(([id]) => wanted.includes(id));
+    if (!picks.length) return "";
+    const results = await Promise.all(picks.map(([id, fn]) =>
+      Promise.race([
+        Promise.resolve().then(() => fn(agentId, info || {})),
+        new Promise((res) => setTimeout(() => res(null), MEMORY_TIMEOUT_MS)),
+      ]).then((r) => ({ id, lines: Array.isArray(r) ? r.map(String) : (r == null ? [] : String(r).split("\n")) }))
+        .catch((e) => { ctx.log("[plugin] " + id + " memory: " + (e && e.message)); return { id, lines: [] }; })));
+    let budget = MEMORY_BUDGET; const out = [];
+    for (const r of results) {
+      for (const l of r.lines) {
+        const s = l.trim(); if (!s) continue;
+        if (s.length + 1 > budget) break;
+        out.push(s); budget -= s.length + 1;
+      }
+    }
+    if (!out.length) return "";
+    return `\n<plugin-memory>\nContext contributed by your memory plugins (${picks.map(([id]) => id).join(", ")}):\n${out.join("\n")}\n</plugin-memory>`;
+  }
+  function memoryPlugins() { return [...memoryProviders.keys()]; }
+
   function list() {
     return Object.values(plugins).map((p) => ({
       id: p.manifest.id, name: p.manifest.name, version: p.manifest.version,
       description: p.manifest.description, panel: !!p.manifest.panel,
       commands: p.manifest.commands || [], needsKeys: p.manifest.needsKeys || [],
       core: !!p.manifest.core,
+      hooks: { onEvent: !!(p.mod && typeof p.mod.onEvent === "function"), memory: memoryProviders.has(p.manifest.id),
+               triggers: (hookNames.get(p.manifest.id) || { triggers: [] }).triggers, nodes: (hookNames.get(p.manifest.id) || { nodes: [] }).nodes },
       // Optional pop-out window hints: { w, h, resizable } (see plugin template).
       window: p.manifest.window || null,
     }));
@@ -207,5 +302,5 @@ module.exports = function initPlugins(ctx) {
   // assume plugins/<id>. Returns null if no loaded plugin has that id.
   function dirOf(id) { return plugins[id] ? plugins[id].dir : null; }
 
-  return { load, list, handleHttp, agentNote, dirOf, lastLoad: () => lastLoad };
+  return { load, list, handleHttp, agentNote, dirOf, lastLoad: () => lastLoad, onEvent, memoryLines, memoryPlugins };
 };

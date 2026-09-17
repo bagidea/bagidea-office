@@ -1,0 +1,16 @@
+{
+  "id": "weekly-report",
+  "name": "📊 Weekly Report",
+  "version": "1.0.0",
+  "description": "Every Monday morning (or whenever you say): gather what the office did — cards done, spend, workflow runs, meetings — have the Director write the report, and deliver it to your channel and a file.",
+  "panel": "panel.html",
+  "window": { "w": 620, "h": 680, "resizable": true },
+  "commands": [
+    { "name": "setup", "args": "[weekday HH:MM] e.g. mon 09:00", "desc": "Install the report workflow and schedule it (default Monday 09:00)" },
+    { "name": "run", "args": "[days]", "desc": "Write a report now, covering the last N days (default 7)" },
+    { "name": "gather", "args": "[days]", "desc": "Just the raw numbers, as text" },
+    { "name": "last", "args": "", "desc": "The most recent report" }
+  ],
+  "needsKeys": [],
+  "library": { "for": "management · every team", "hooks": ["workflow.node", "workflow.save", "triggers.add"] }
+}

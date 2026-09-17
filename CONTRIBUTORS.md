@@ -33,6 +33,28 @@ early macOS support, when the project was Windows-only:
   the whole status string before splitting, a `loadTR()` priority fix so the dictionary
   wins over a stale cache, and the missing status-label seed entries
   ([#35](https://github.com/bagidea/bagidea-office/pull/35)).
+- **[@bmdy5](https://github.com/bmdy5)** — unified agent-text rendering: a shared
+  vendored `md.js` (marked + DOMPurify) served at `/md.js`, so agent output (chat,
+  feed, workflow analysis/results, proposals, notes) renders as real markdown through
+  one XSS-safe path instead of showing raw markdown and stray `<b>` tags as literal
+  text ([#36](https://github.com/bagidea/bagidea-office/pull/36)).
+- **[@anupamme](https://github.com/anupamme)** — TLS-hardened the npm bootstrapper:
+  the installer fetch now forces HTTPS + TLS 1.2 (`curl --proto '=https' --tlsv1.2`),
+  so the install script can't be pulled over a downgraded channel
+  ([#37](https://github.com/bagidea/bagidea-office/pull/37)).
+- **[@lyfer-bob](https://github.com/lyfer-bob)** — pinpointed the silent macOS install
+  failure with a full root-cause: on system bash 3.2 `.`/`source` is a POSIX *special*
+  builtin, so `source ~/.cargo/env || true` on the prebuilt-shell path (where Rust is
+  never installed) aborts the whole installer before `|| true` can run — plus the exact
+  version-independent fix ([#38](https://github.com/bagidea/bagidea-office/issues/38),
+  a bug report + diagnosis).
+- **[@kmmao](https://github.com/kmmao)** (allen) — unpinned the macOS wallpaper from
+  2 fps *while it was fully visible*, with two independent root causes found on their
+  own hardware: the occlusion monitor matched the Dock by its **localized** process
+  name, so on a non-English system it never matched and the Dock's own full-screen
+  window counted as occlusion on every poll; and coverage was judged on
+  `CGMainDisplayID()`, so a fullscreen app on the primary throttled a wallpaper living
+  on a second monitor ([#43](https://github.com/bagidea/bagidea-office/pull/43)).
 
 > Want to be on this list? Open a PR — see [docs/guide/plugin-hub.md](docs/guide/plugin-hub.md)
 > for plugins, or fix anything in the repo. Every merged contribution is credited here
@@ -55,6 +77,8 @@ Your plugin's own code lives in your own repo, where you're of course the author
   [#26](https://github.com/bagidea/bagidea-office/pull/26)) — the **first community plugin**
   in the Hub: test & benchmark agents — run prompts, capture responses, measure token usage,
   and save runs as reusable regression test cases.
+- **[@binyangzhu000-sudo](https://github.com/binyangzhu000-sudo)** — the Atlas Cloud model provider, routed through the built-in proxy ([#54](https://github.com/bagidea/bagidea-office/pull/54)).
+- **[@sbrasesco](https://github.com/sbrasesco)** (Sergio Brasesco) — found and first fixed the report-back that landed in the wrong thread, and the security probing behind it ([#41](https://github.com/bagidea/bagidea-office/pull/41)).
 
 ## Built with Claude Code
 

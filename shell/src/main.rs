@@ -93,7 +93,14 @@ const ORB_SIZE: f64 = 78.0;  // window; the orb art is inset ~3px so a thin tran
                              // clip then cuts empty space, not the glow against the wallpaper.
 const FULL: (f64, f64) = (560.0, 700.0);
 const MINI: (f64, f64) = (390.0, 430.0);
+// Large mode: free-resizable reading/working window. Opens at ~86% of the
+// screen, centered; can never shrink below FULL (that's what MINI is for).
+const LARGE_FRAC: f64 = 0.86;
 const FEED_W: f64 = 330.0;
+// 📡 feed mode's window alpha. Resting is the house translucency the mode has
+// always had; pointing at the strip means you are reading it, so it firms up.
+const FEED_ALPHA: u8 = 196;
+const FEED_ALPHA_READ: u8 = 245;
 const PARK: (f64, f64) = (-9000.0, 100.0);
 const SPLASH_SIZE: f64 = 210.0;
 
@@ -104,13 +111,21 @@ enum UserEvent {
     DragOverlay,
     HideOverlay,
     MiniToggle,
+    LargeToggle, // big resizable window (min size = FULL) for reading / real work
+    ResizeDrag(String), // large mode: JS edge-zones start an OS resize drag (the
+                        // webview covers the whole window, so native borders never
+                        // see the mouse — "resize:<n|s|e|w|ne|nw|se|sw>")
     FeedToggle,
+    FeedHover(bool), // pointer entered/left the feed strip → firm it up for reading
     SetHotkey(String),
     PttKey(bool), // global voice hotkey: true = pressed, false = released
     WorldReady,
     EditorOpening, // show the logo splash + launch the 3D editor tiny behind it
     EditorReady,   // the editor window is on screen → drop the splash
     OpenWindow(String), // pop a custom-chrome window onto a daemon URL (plugin / viewer)
+    Toast(String, String),             // show an OS-level notification: (title, body)
+    ToastClose(tao::window::WindowId), // its timer ran out, or it was clicked
+    Badge(u32),                        // things waiting for the owner → tray icon dot + tooltip
     PopupDrag(tao::window::WindowId),  // a pop-out's title bar is being dragged
     PopupClose(tao::window::WindowId), // a pop-out asked to close itself
     PopupMin(tao::window::WindowId),   // minimize (พัก)
@@ -262,6 +277,70 @@ fn daemon_running() -> bool {
     .is_ok()
 }
 
+// Give the daemon a fair chance to come up before deciding it is unreachable.
+// Node's boot is not instant on a cold or busy machine, and calling it dead too
+// early would be its own bug — so poll, and only give up after a long wait.
+fn wait_for_daemon(max: std::time::Duration) -> bool {
+    let start = std::time::Instant::now();
+    loop {
+        if daemon_running() {
+            return true;
+        }
+        if start.elapsed() >= max {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+}
+
+// What the chat window shows when it cannot reach the daemon at all.
+//
+// It used to show nothing: a blank window, no text, no error, no hint. On a
+// customer's machine where something was blocking loopback, that is exactly
+// what they got — and the person who installed it had to go through the
+// firewall and the proxy by hand to work out why, while the customer sat in
+// front of a window that told them nothing.
+//
+// Embedded, not fetched: the one thing we know in this state is that we cannot
+// fetch anything. It re-tries on its own, so a daemon that is merely slow heals
+// without anyone touching it.
+const OFFLINE_HTML: &str = r#"<!doctype html><html><head><meta charset="utf-8"><style>
+ html,body{margin:0;height:100%;font:13px/1.6 system-ui,Segoe UI,sans-serif;
+   background:linear-gradient(160deg,#15203a 0%,#0c1322 70%);color:#dbe6f5}
+ .w{height:100%;display:flex;flex-direction:column;justify-content:center;padding:0 26px;box-sizing:border-box}
+ h1{font-size:14px;letter-spacing:2px;color:#5ec8ff;margin:0 0 10px}
+ p{margin:0 0 10px;color:#9fb2cc}
+ code{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
+   border-radius:6px;padding:2px 7px;color:#ffd28a;font-size:12.5px}
+ ul{margin:0 0 12px 18px;padding:0;color:#9fb2cc} li{margin:3px 0}
+ .r{margin-top:4px;font-size:11.5px;color:#6b7a92}
+ button{font:inherit;font-weight:600;color:#ffd28a;background:rgba(255,210,138,.08);
+   border:1px solid rgba(255,210,138,.35);border-radius:10px;padding:7px 15px;cursor:pointer;
+   align-self:flex-start}
+</style></head><body><div class="w">
+ <h1>&#9888; CAN'T REACH THE OFFICE</h1>
+ <p>The office runs on <code>127.0.0.1:8787</code> and this window can't get to it.
+    That is almost never the office itself &mdash; it is something on this machine
+    standing between the two.</p>
+ <ul>
+   <li>a <b>proxy</b> that doesn't exempt local addresses</li>
+   <li>a <b>firewall</b> or antivirus blocking loopback</li>
+   <li>the daemon didn't start</li>
+ </ul>
+ <p>Run this in a terminal &mdash; it checks all three and prints the fix:</p>
+ <p><code>bagidea doctor</code></p>
+ <button onclick="go()">Try again</button>
+ <div class="r" id="r"></div>
+</div><script>
+ var n=0;
+ function go(){ location.href='http://127.0.0.1:8787/'; }
+ // Heal on its own if the daemon was merely slow, backing off so a genuinely
+ // blocked machine isn't hammered.
+ function tick(){ n++; document.getElementById('r').textContent='retrying automatically… ('+n+')';
+   go(); setTimeout(tick, Math.min(30000, 3000*n)); }
+ setTimeout(tick, 3000);
+</script></body></html>"#;
+
 fn spawn_daemon(root: &PathBuf) -> Option<Child> {
     if daemon_running() {
         return None;
@@ -401,6 +480,51 @@ fn tray_app_icon() -> Option<tray_icon::Icon> {
     tray_icon::Icon::from_rgba(rgba, w, h).ok()
 }
 
+// The app icon with a red dot in the corner while `n` things wait for the owner.
+// Drawn straight into the RGBA buffer — no font, no extra crate; the number goes
+// in the tooltip.
+fn tray_badge_icon(n: u32) -> Option<tray_icon::Icon> {
+    let (mut rgba, w, h) = icon_rgba()?;
+    if n > 0 {
+        let r = (w.min(h) as f32 * 0.22).max(3.0);
+        let (cx, cy) = (w as f32 - r - 1.0, h as f32 - r - 1.0);
+        for y in 0..h {
+            for x in 0..w {
+                let dx = x as f32 + 0.5 - cx;
+                let dy = y as f32 + 0.5 - cy;
+                let d = (dx * dx + dy * dy).sqrt();
+                if d <= r + 0.5 {
+                    let i = ((y * w + x) * 4) as usize;
+                    // a thin white rim so the dot reads on dark and light trays
+                    let (cr, cg, cb) = if d > r - 1.2 { (255u8, 255u8, 255u8) } else { (255u8, 70u8, 60u8) };
+                    rgba[i] = cr; rgba[i + 1] = cg; rgba[i + 2] = cb; rgba[i + 3] = 255;
+                }
+            }
+        }
+    }
+    tray_icon::Icon::from_rgba(rgba, w, h).ok()
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+}
+
+// The toast page. Embedded: it must render with the daemon unreachable too.
+const TOAST_HTML: &str = r#"<!doctype html><html><head><meta charset="utf-8"><style>
+ html,body{margin:0;height:100%;background:transparent;font:12.5px/1.45 system-ui,Segoe UI,sans-serif;color:#dbe6f5;overflow:hidden}
+ .t{box-sizing:border-box;height:100%;margin:0;padding:11px 14px;border-radius:14px;cursor:pointer;
+   background:linear-gradient(160deg,#1a2740 0%,#0e1526 70%);border:1px solid rgba(125,205,255,.4);
+   box-shadow:0 10px 30px rgba(0,0,0,.55);display:flex;flex-direction:column;justify-content:center}
+ .h{display:flex;align-items:center;gap:8px}
+ .h b{color:#cfe3ff;font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .h .x{color:#6b7a92;font-size:13px;padding:0 2px;cursor:pointer}
+ .b{color:#9fb2cc;margin-top:3px;max-height:40px;overflow:hidden;white-space:pre-wrap;word-break:break-word}
+ .k{position:absolute;left:18px;bottom:6px;font-size:10px;color:#3f4d66;letter-spacing:1.5px}
+</style></head><body><div class="t" onclick="window.ipc.postMessage('toast-open')">
+ <div class="h"><b>__TITLE__</b><span class="x" onclick="event.stopPropagation();window.ipc.postMessage('toast-close')">✕</span></div>
+ <div class="b">__BODY__</div><div class="k">BAGIDEA OFFICE</div>
+</div></body></html>"#;
+
 // =====================================================================
 //  Windows platform implementation
 // =====================================================================
@@ -419,9 +543,9 @@ mod platform {
         EnumWindows, FindWindowExW, FindWindowW, GetAncestor, GetClassNameW, GetWindowLongW,
         GetWindowThreadProcessId, GetWindowRect, IsIconic, IsWindow,
         IsWindowVisible, SendMessageTimeoutW, SetLayeredWindowAttributes, SetParent,
-        SetWindowLongW, ShowWindow, SystemParametersInfoW, GA_PARENT, GWL_EXSTYLE, LWA_ALPHA,
-        SMTO_NORMAL, SPI_SETDESKWALLPAPER, SW_HIDE, SW_SHOW, WS_EX_LAYERED,
-        WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+        SetWindowLongW, ShowWindow, SystemParametersInfoW, GA_PARENT, GWL_EXSTYLE,
+        LWA_ALPHA, SMTO_NORMAL, SPI_SETDESKWALLPAPER, SW_HIDE, SW_SHOW,
+        WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
     };
     use std::io::Write;
 
@@ -514,8 +638,23 @@ mod platform {
         if branded.exists() {
             return branded.to_string_lossy().into_owned();
         }
-        std::env::var("BAGIDEA_GODOT")
-            .unwrap_or_else(|_| r"E:\Tools\Godot\Godot_v4.6.3-stable_win64.exe".into())
+        // BAGIDEA_GODOT only counts when it actually points at a file — the
+        // installer used to set it even when the Godot download failed.
+        if let Ok(g) = std::env::var("BAGIDEA_GODOT") {
+            if std::path::Path::new(&g).exists() {
+                return g;
+            }
+        }
+        // Installer's real download location (branding step may have been skipped).
+        if let Ok(la) = std::env::var("LOCALAPPDATA") {
+            let p = std::path::PathBuf::from(la)
+                .join("BagIdeaOffice").join("tools").join("godot")
+                .join("Godot_v4.6.3-stable_win64.exe");
+            if p.exists() {
+                return p.to_string_lossy().into_owned();
+            }
+        }
+        r"E:\Tools\Godot\Godot_v4.6.3-stable_win64.exe".into()
     }
 
     pub fn office_args(c: &mut Command, root: &PathBuf, cx: i32, cy: i32) {
@@ -1151,12 +1290,58 @@ mod platform {
     pub fn region_round(window: &Window, w: f64, h: f64, radius: f64) {
         let sf = window.scale_factor();
         unsafe {
+            // CreateRoundRectRgn takes the ELLIPSE size, not the radius — so the
+            // corner it cuts is half of what you pass. Feeding it the CSS radius
+            // straight left the window silhouette squarer than the border-radius the
+            // page draws, and the opaque nub between the two arcs is what made the
+            // corners look mismatched. Double it so region and CSS agree.
             let rgn = CreateRoundRectRgn(
                 0, 0,
                 (w * sf) as i32 + 1, (h * sf) as i32 + 1,
-                (radius * sf) as i32, (radius * sf) as i32,
+                (radius * 2.0 * sf) as i32, (radius * 2.0 * sf) as i32,
             );
             SetWindowRgn(window.hwnd() as _, rgn, 1);
+        }
+    }
+
+    /// 📡 feed mode's ghost-over-your-desktop look, done the only way that actually
+    /// produces it on Windows: one uniform alpha over the finished window.
+    ///
+    /// v0.9.51 moved this into the page (CSS on a per-pixel-transparent window) on the
+    /// theory that WS_EX_LAYERED was what wedged the WebView2 host. Measuring the
+    /// result killed that idea: on a transparent overlay the page's own layers do NOT
+    /// all reach the desktop. The area under the promoted feed list composited at true
+    /// alpha while everything else — the 6px gutter, the title bar, the rounded corners
+    /// — landed on an opaque backing surface, so the edge lit up as a pale frame, the
+    /// header washed out, and the bottom corners grew white fringes. A red-canvas probe
+    /// over black and white full-screen backdrops returned the identical pixel both
+    /// times, which is the whole story: that surface is not see-through.
+    ///
+    /// So the alpha comes back, and the overlay is an opaque window again. The freeze
+    /// this was removed for was never reproduced in ~30 scripted transitions, the other
+    /// two v0.9.51 changes (never flipping `resizable`, clearing the stale size floor)
+    /// stay, and tray → "Reload chat window" is there if it ever does come back.
+    /// `Some(a)` = layer the window and hold it at that alpha; `None` = fully opaque
+    /// and the layered style comes back off. While feed mode is on the style stays
+    /// put and only the VALUE moves (hover), so the ex-style is flipped exactly twice
+    /// per feed session — the fewer times that happens around a WebView2 host, the
+    /// better (see the doc comment above).
+    pub fn set_feed_alpha(window: &Window, alpha: Option<u8>) {
+        unsafe {
+            let hwnd = window.hwnd() as HWND;
+            let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+            match alpha {
+                Some(a) => {
+                    if ex & WS_EX_LAYERED == 0 {
+                        SetWindowLongW(hwnd, GWL_EXSTYLE, (ex | WS_EX_LAYERED) as i32);
+                    }
+                    SetLayeredWindowAttributes(hwnd, 0, a, LWA_ALPHA);
+                }
+                None => {
+                    SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+                    SetWindowLongW(hwnd, GWL_EXSTYLE, (ex & !WS_EX_LAYERED) as i32);
+                }
+            }
         }
     }
 
@@ -1186,20 +1371,6 @@ mod platform {
             let (left, top) = ((w - n) / 2, (h - n) / 2);
             let rgn = CreateEllipticRgn(left, top, left + n + 1, top + n + 1);
             SetWindowRgn(hwnd, rgn, 1);
-        }
-    }
-
-    pub fn set_feed_alpha(window: &Window, feed: bool) {
-        unsafe {
-            let hwnd = window.hwnd() as HWND;
-            let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
-            if feed {
-                SetWindowLongW(hwnd, GWL_EXSTYLE, (ex | WS_EX_LAYERED) as i32);
-                SetLayeredWindowAttributes(hwnd, 0, 196, LWA_ALPHA);
-            } else {
-                SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
-                SetWindowLongW(hwnd, GWL_EXSTYLE, (ex & !WS_EX_LAYERED) as i32);
-            }
         }
     }
 
@@ -1396,15 +1567,21 @@ mod platform {
     /// Background monitor: writes /tmp/bagidea_occ when the wallpaper is
     /// invisible so Godot throttles to 2 fps and stops wasting GPU.
     ///
-    /// Two conditions signal invisibility:
-    ///   1. Display asleep (lid closed / display off) — CGDisplayIsAsleep.
-    ///   2. A window at a layer ABOVE the wallpaper level (–2147483622) covers
-    ///      ≥ 95 % of the main screen — e.g. a fullscreen app, a screensaver, or
-    ///      any maximised window filling the screen.
+    /// Two conditions signal invisibility, both judged on the display the
+    /// wallpaper is actually on rather than on the primary one:
+    ///   1. That display asleep (lid closed / display off) — CGDisplayIsAsleep.
+    ///   2. An ORDINARY window (layer >= 0, so never the desktop or the icon
+    ///      layer) with alpha >= 0.1 covers >= 90 % of that display — a
+    ///      fullscreen app, a screensaver, or any maximised window filling it.
+    ///      System chrome that covers the screen without hiding it (the Dock,
+    ///      matched by bundle id) does not count.
     ///
     /// Uses CGWindowListCopyWindowInfo via toll-free-bridged NSArray/NSDictionary
     /// so we can use msg_send! without adding extra crates.
-    pub fn spawn_occlusion_monitor() {
+    ///
+    /// `office_pid` is the world (Godot) process, used to find which display the
+    /// wallpaper is on. Pass 0 to fall back to the main display.
+    pub fn spawn_occlusion_monitor(office_pid: u32) {
         use std::ffi::c_void;
 
         #[repr(C)] struct OccPoint  { x: f64, y: f64 }
@@ -1416,6 +1593,7 @@ mod platform {
             fn CGMainDisplayID() -> u32;
             fn CGDisplayIsAsleep(d: u32) -> u32;
             fn CGDisplayBounds(d: u32) -> OccRect;
+            fn CGGetActiveDisplayList(max: u32, list: *mut u32, count: *mut u32) -> i32;
             fn CGWindowListCopyWindowInfo(opt: u32, rel: u32) -> *mut AnyObject;
         }
         #[link(name = "CoreFoundation", kind = "framework")]
@@ -1424,6 +1602,7 @@ mod platform {
         const OCC_FLAG: &str = "/private/tmp/bagidea_occ";
         const ON_SCREEN_ONLY: u32 = 1;
         const NULL_WINDOW:    u32 = 0;
+        const MAX_DISPLAYS:   u32 = 8;
 
         std::thread::spawn(move || {
             // Require 2 consecutive "covered" readings before writing the flag.
@@ -1440,30 +1619,98 @@ mod platform {
                 let pool: *mut AnyObject = unsafe { msg_send![class!(NSAutoreleasePool), new] };
 
                 let covered_now = unsafe {
-                    let display = CGMainDisplayID();
-                    if CGDisplayIsAsleep(display) != 0 {
-                        true
+                    let list: *mut AnyObject =
+                        CGWindowListCopyWindowInfo(ON_SCREEN_ONLY, NULL_WINDOW);
+                    if list.is_null() {
+                        // No window list, so no way to tell which display the world
+                        // is on — but sleep is the one condition that should never
+                        // need one. Fall back to the main display for it rather than
+                        // reporting "visible" while the machine is dark.
+                        CGDisplayIsAsleep(CGMainDisplayID()) != 0
                     } else {
-                        let screen: OccRect = CGDisplayBounds(display);
+                        let count: usize = msg_send![list, count];
+                        let mut found = false;
 
-                        let list: *mut AnyObject =
-                            CGWindowListCopyWindowInfo(ON_SCREEN_ONLY, NULL_WINDOW);
-                        if list.is_null() {
-                            false
+                        // Hoist dictionary keys outside the per-window loops so they
+                        // are created once per poll, not once per window.
+                        let lk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowLayer\0".as_ptr()];
+                        let ak: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowAlpha\0".as_ptr()];
+                        let pk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowOwnerPID\0".as_ptr()];
+                        let bk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowBounds\0".as_ptr()];
+                        let xk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"X\0".as_ptr()];
+                        let yk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Y\0".as_ptr()];
+                        let wk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Width\0".as_ptr()];
+                        let hk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Height\0".as_ptr()];
+
+                        // Judge occlusion on the display the wallpaper is ACTUALLY on,
+                        // not on CGMainDisplayID(). With a second monitor the world
+                        // frequently lives on the secondary display, where a fullscreen
+                        // app on the primary hides nothing — checking the primary pins a
+                        // wallpaper that is in plain sight at 2 fps, which is exactly how
+                        // this reads to the user: the agents crawl while the desktop they
+                        // are drawn on is fully visible.
+                        //
+                        // Locate the world's own desktop-level window by pid, then take
+                        // the active display it overlaps most. Falls back to the main
+                        // display when the window is not up yet (early boot) or the pid
+                        // is unknown, which reproduces the previous behaviour.
+                        let display = {
+                            let (mut wx, mut wy, mut ww, mut wh) = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
+                            let mut got = false;
+                            for i in 0..count {
+                                let dict: *mut AnyObject = msg_send![list, objectAtIndex: i];
+                                if dict.is_null() { continue; }
+                                let pn: *mut AnyObject = msg_send![dict, objectForKey: pk];
+                                if pn.is_null() { continue; }
+                                let owner_pid: u32 = msg_send![pn, unsignedIntValue];
+                                if office_pid == 0 || owner_pid != office_pid { continue; }
+                                // The world sits at the desktop level (deeply negative);
+                                // ignore any ordinary window the same process may own.
+                                let ln: *mut AnyObject = msg_send![dict, objectForKey: lk];
+                                if ln.is_null() { continue; }
+                                let layer: i64 = msg_send![ln, longLongValue];
+                                if layer >= 0 { continue; }
+                                let bd: *mut AnyObject = msg_send![dict, objectForKey: bk];
+                                if bd.is_null() { continue; }
+                                let xn: *mut AnyObject = msg_send![bd, objectForKey: xk];
+                                let yn: *mut AnyObject = msg_send![bd, objectForKey: yk];
+                                let wn: *mut AnyObject = msg_send![bd, objectForKey: wk];
+                                let hn: *mut AnyObject = msg_send![bd, objectForKey: hk];
+                                if wn.is_null() || hn.is_null() { continue; }
+                                let x: f64 = if xn.is_null() { 0.0 } else { msg_send![xn, doubleValue] };
+                                let y: f64 = if yn.is_null() { 0.0 } else { msg_send![yn, doubleValue] };
+                                let w: f64 = msg_send![wn, doubleValue];
+                                let h: f64 = msg_send![hn, doubleValue];
+                                wx = x; wy = y; ww = w; wh = h;
+                                got = true;
+                                break;
+                            }
+
+                            let mut chosen = CGMainDisplayID();
+                            if got {
+                                let mut ids = [0u32; MAX_DISPLAYS as usize];
+                                let mut n: u32 = 0;
+                                if CGGetActiveDisplayList(MAX_DISPLAYS, ids.as_mut_ptr(), &mut n) == 0 {
+                                    let mut best = 0.0f64;
+                                    for k in 0..(n as usize).min(MAX_DISPLAYS as usize) {
+                                        let db: OccRect = CGDisplayBounds(ids[k]);
+                                        let ix = ((db.origin.x + db.size.w).min(wx + ww)
+                                            - db.origin.x.max(wx)).max(0.0);
+                                        let iy = ((db.origin.y + db.size.h).min(wy + wh)
+                                            - db.origin.y.max(wy)).max(0.0);
+                                        let area = ix * iy;
+                                        if area > best { best = area; chosen = ids[k]; }
+                                    }
+                                }
+                            }
+                            chosen
+                        };
+
+                        if CGDisplayIsAsleep(display) != 0 {
+                            CFRelease(list as *const c_void);
+                            true
                         } else {
-                            let count: usize = msg_send![list, count];
-                            let mut found = false;
-
-                            // Hoist dictionary keys outside the per-window loop so they
-                            // are created once per poll, not once per window.
-                            let lk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowLayer\0".as_ptr()];
-                            let ak: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowAlpha\0".as_ptr()];
-                            let ok: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowOwnerName\0".as_ptr()];
-                            let bk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"kCGWindowBounds\0".as_ptr()];
-                            let xk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"X\0".as_ptr()];
-                            let yk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Y\0".as_ptr()];
-                            let wk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Width\0".as_ptr()];
-                            let hk: *mut AnyObject = msg_send![class!(NSString), stringWithUTF8String: b"Height\0".as_ptr()];
+                            let screen: OccRect = CGDisplayBounds(display);
 
                             for i in 0..count {
                                 let dict: *mut AnyObject = msg_send![list, objectAtIndex: i];
@@ -1490,15 +1737,35 @@ mod platform {
                                 }
 
                                 // Owner check: skip known system chrome that covers the screen
-                                // but doesn't hide content — the Dock creates a full-screen
-                                // opaque event-capture window (layer 20, alpha 1.0, cov 100%)
-                                // during auto-hide reveal; this is not a real occlusion.
-                                let on: *mut AnyObject = msg_send![dict, objectForKey: ok];
-                                if !on.is_null() {
-                                    let owner_ptr: *const i8 = msg_send![on, UTF8String];
-                                    if !owner_ptr.is_null() {
-                                        let owner = std::ffi::CStr::from_ptr(owner_ptr).to_string_lossy();
-                                        if owner == "Dock" { continue; }
+                                // but doesn't hide content — the Dock owns a full-screen opaque
+                                // window (layer 20, alpha 1.0, cov 100%); this is not a real
+                                // occlusion.
+                                //
+                                // Identify it by BUNDLE ID, not by kCGWindowOwnerName: that key
+                                // carries the *localized* process name, so matching the literal
+                                // "Dock" silently fails on every non-English system (it reads
+                                // "程序坞" on a Chinese one). When the match fails, the Dock's
+                                // own window counts as an app covering 100 % of the screen, so
+                                // the flag is written on every poll and the wallpaper is pinned
+                                // at 2 fps forever, whatever is actually on screen.
+                                let pn: *mut AnyObject = msg_send![dict, objectForKey: pk];
+                                if !pn.is_null() {
+                                    let pid: i32 = msg_send![pn, intValue];
+                                    let app: *mut AnyObject = msg_send![
+                                        class!(NSRunningApplication),
+                                        runningApplicationWithProcessIdentifier: pid
+                                    ];
+                                    if !app.is_null() {
+                                        let bid: *mut AnyObject = msg_send![app, bundleIdentifier];
+                                        if !bid.is_null() {
+                                            let b_ptr: *const i8 = msg_send![bid, UTF8String];
+                                            if !b_ptr.is_null()
+                                                && std::ffi::CStr::from_ptr(b_ptr).to_bytes()
+                                                    == b"com.apple.dock"
+                                            {
+                                                continue;
+                                            }
+                                        }
                                     }
                                 }
 
@@ -1655,11 +1922,12 @@ mod platform {
         round_corners(window, d / 2.0);
     }
 
-    pub fn set_feed_alpha(window: &Window, feed: bool) {
+    /// 📡 feed translucency — the window's own alpha, same scale as Windows' 0-255.
+    pub fn set_feed_alpha(window: &Window, alpha: Option<u8>) {
         unsafe {
             let w = window.ns_window() as *mut AnyObject;
             if !w.is_null() {
-                let a: f64 = if feed { 0.77 } else { 1.0 };
+                let a: f64 = alpha.map(|a| a as f64 / 255.0).unwrap_or(1.0);
                 let _: () = msg_send![w, setAlphaValue: a];
             }
         }
@@ -1905,7 +2173,7 @@ mod platform {
     pub fn suppress_nc(_w: &Window) {}
     pub fn region_round(_w: &Window, _a: f64, _b: f64, _r: f64) {}
     pub fn region_circle(_w: &Window, _d: f64) {}
-    pub fn set_feed_alpha(_w: &Window, _f: bool) {}
+    pub fn set_feed_alpha(_w: &Window, _a: Option<u8>) {}
     pub fn webview_extras<'a>(b: wry::WebViewBuilder<'a>) -> wry::WebViewBuilder<'a> { b }
     pub fn is_autostart() -> bool { false }
     pub fn set_autostart(_on: bool) {}
@@ -1926,13 +2194,14 @@ fn chrome_window(
     y: f64,
     icon: Option<Icon>,
     transparent: bool,
+    resizable: bool,
 ) -> Window {
     let mut b = WindowBuilder::new()
         .with_title(title)
         .with_inner_size(LogicalSize::new(w, h))
         .with_position(LogicalPosition::new(x, y))
         .with_decorations(false)
-        .with_resizable(false)
+        .with_resizable(resizable)
         .with_always_on_top(true);
     // Per-pixel alpha so a rounded/circular shape comes from the page's anti-aliased
     // CSS border-radius — NOT a hard-edged SetWindowRgn clip (which looks jagged).
@@ -2101,19 +2370,28 @@ fn main() {
     // ---- system tray: the only true exit
     let tray_menu = Menu::new();
     let open_item = MenuItem::new("Open Office Chat", true, None);
-    let hide_item = CheckMenuItem::new("Hide office (agents keep working)", true, false, None);
+    // Two hide levels — the office keeps WORKING under both; only visibility changes:
+    //   hide_item     = everything gone (wallpaper + chat + chat-head)
+    //   hidechat_item = chat + chat-head gone, wallpaper stays alive
+    let hide_item = CheckMenuItem::new("Hide everything (agents keep working)", true, false, None);
+    let hidechat_item = CheckMenuItem::new("Hide chat + button (wallpaper stays)", true, false, None);
+    // First aid before the sledgehammer: reloading the page brings a wedged chat
+    // window back WITHOUT touching the daemon, so nobody's agent loses its run.
+    let reload_item = MenuItem::new("Reload chat window", true, None);
     let restart_item = MenuItem::new("Restart office", true, None);
     let autostart_item = CheckMenuItem::new(platform::AUTOSTART_LABEL, true, platform::is_autostart(), None);
     let exit_item = MenuItem::new("Exit BagIdea Office", true, None);
     let _ = tray_menu.append_items(&[
         &open_item,
         &hide_item,
+        &hidechat_item,
+        &reload_item,
         &restart_item,
         &autostart_item,
         &PredefinedMenuItem::separator(),
         &exit_item,
     ]);
-    let _tray = TrayIconBuilder::new()
+    let tray = TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))
         .with_tooltip("BagIdea Office")
         .with_icon(tray_app_icon().expect("tray icon"))
@@ -2121,20 +2399,24 @@ fn main() {
         .expect("tray");
     let open_id = open_item.id().clone();
     let hide_id = hide_item.id().clone();
+    let hidechat_id = hidechat_item.id().clone();
+    let reload_id = reload_item.id().clone();
     let restart_id = restart_item.id().clone();
     let autostart_id = autostart_item.id().clone();
     let exit_id = exit_item.id().clone();
 
     platform::spawn_hotkey_thread(event_loop.create_proxy());
 
+    let office_pid = office_child.as_ref().map(|c| c.id()).unwrap_or(0);
+
     // macOS only: poll CGWindowList for full-screen windows / display sleep
     // and write /tmp/bagidea_occ so Godot throttles to 2 fps when invisible.
+    // The pid lets the monitor judge occlusion on the display the wallpaper is
+    // actually on rather than always on the primary one.
     #[cfg(target_os = "macos")]
     if office_child.is_some() {
-        platform::spawn_occlusion_monitor();
+        platform::spawn_occlusion_monitor(office_pid);
     }
-
-    let office_pid = office_child.as_ref().map(|c| c.id()).unwrap_or(0);
 
     // ---- screen-aware default positions
     let (screen_w, screen_h, sf) = event_loop
@@ -2154,7 +2436,7 @@ fn main() {
     // ---- boot splash: a pulsing circular logo, centered
     let splash = chrome_window(
         &event_loop, "BagIdea", SPLASH_SIZE, SPLASH_SIZE,
-        (logical_w - SPLASH_SIZE) / 2.0, (logical_h - SPLASH_SIZE) / 2.0 - 30.0, None, true,
+        (logical_w - SPLASH_SIZE) / 2.0, (logical_h - SPLASH_SIZE) / 2.0 - 30.0, None, true, false,
     );
     platform::set_no_activate(&splash);
     let _splash_view = WebViewBuilder::new()
@@ -2165,21 +2447,57 @@ fn main() {
     let _splash_id = splash.id();
 
     // ---- overlay (born visible but parked off-screen)
+    // BORN RESIZABLE and never flipped back. The mode toggles used to restyle this
+    // window's frame (WS_THICKFRAME on for ⛶ large, off again on the way out) —
+    // restyling the frame of a live WebView2 host is not a supported thing to do,
+    // and it sat right in the path where a window came back from large/feed DEAD:
+    // drawing its last frame forever while the window resized underneath it.
+    // Never reproduced on demand, so this is removing a hazard rather than a proven
+    // cause. Nothing is lost by staying resizable: the webview covers the whole
+    // frameless window, so the OS resize handles are unreachable and large mode's
+    // JS edge strips remain the only way to drag an edge.
+    // OPAQUE — unlike the orb and the splash, which are small shaped windows whose
+    // whole surface the page paints. A full WebView2 host does not honour per-pixel
+    // alpha across all of its layers (see set_feed_alpha): the promoted feed list
+    // reached the desktop, the gutter, the header and the rounded corners landed on
+    // an opaque backing and read as a pale frame. 📡 feed's see-through is the
+    // window's own alpha instead, which covers every pixel equally.
     let overlay = chrome_window(
-        &event_loop, "BagIdea Office", FULL.0, FULL.1, PARK.0, PARK.1, app_icon(), false,
+        &event_loop, "BagIdea Office", FULL.0, FULL.1, PARK.0, PARK.1, app_icon(), false, true,
     );
     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
     let overlay_id = overlay.id();
     let p_overlay = proxy.clone();
+    // If the daemon cannot be reached, say so IN the window instead of showing an
+    // empty one. Waiting first, generously: a slow boot must not be reported as
+    // a blocked machine.
+    let daemon_reachable = wait_for_daemon(std::time::Duration::from_secs(25));
     let overlay_view = platform::webview_extras(
-        WebViewBuilder::new()
-            .with_url("http://127.0.0.1:8787/")
+        (if daemon_reachable {
+            WebViewBuilder::new().with_url("http://127.0.0.1:8787/")
+        } else {
+            WebViewBuilder::new().with_html(OFFLINE_HTML)
+        })
             .with_devtools(true)
             .with_ipc_handler(move |req| {
                 let _ = match req.body().as_str() {
                     "drag-overlay" => p_overlay.send_event(UserEvent::DragOverlay),
                     "hide" => p_overlay.send_event(UserEvent::HideOverlay),
                     "mini" => p_overlay.send_event(UserEvent::MiniToggle),
+                    "large" => p_overlay.send_event(UserEvent::LargeToggle),
+                    "feed-hover:1" => p_overlay.send_event(UserEvent::FeedHover(true)),
+                    "feed-hover:0" => p_overlay.send_event(UserEvent::FeedHover(false)),
+                    // "notify:<title>\x1f<body>" — the rules already decided this one
+                    // deserves a pop-up; the shell only draws it where it can be seen.
+                    s if s.starts_with("notify:") => {
+                        let rest = &s[7..];
+                        let (t, b) = match rest.split_once('\x1f') { Some((t, b)) => (t, b), None => (rest, "") };
+                        p_overlay.send_event(UserEvent::Toast(t.to_string(), b.to_string()))
+                    }
+                    s if s.starts_with("badge:") =>
+                        p_overlay.send_event(UserEvent::Badge(s[6..].trim().parse::<u32>().unwrap_or(0))),
+                    s if s.starts_with("resize:") =>
+                        p_overlay.send_event(UserEvent::ResizeDrag(s[7..].to_string())),
                     s if s.starts_with("hotkey:") =>
                         p_overlay.send_event(UserEvent::SetHotkey(s[7..].to_string())),
                     s if s.starts_with("open-window:") =>
@@ -2201,7 +2519,7 @@ fn main() {
 
     // ---- circular chat head
     let orb = chrome_window(
-        &event_loop, "BagIdea", ORB_SIZE, ORB_SIZE, orb_x, orb_y, app_icon(), true,
+        &event_loop, "BagIdea", ORB_SIZE, ORB_SIZE, orb_x, orb_y, app_icon(), true, false,
     );
     platform::set_no_activate(&orb);
     platform::suppress_nc(&orb);   // swallow non-client paint → no white caption bar on click
@@ -2239,14 +2557,22 @@ fn main() {
     // overlay. Held here so their Window + WebView stay alive; dropped on close.
     // Tuple: (window id, single-instance key, window, webview).
     let mut popups: Vec<(tao::window::WindowId, String, Window, wry::WebView)> = Vec::new();
+    // Toasts: small always-on-top windows in the corner of the primary monitor.
+    // Drawn by us, not by the OS: an unpackaged app's OS toasts on Windows show
+    // up attributed to PowerShell (or not at all without an AppUserModelID), and
+    // a window we own looks the same on all three platforms and costs no crate.
+    let mut toasts: Vec<(tao::window::WindowId, Window, wry::WebView)> = Vec::new();
     let mut mini = false;
     let mut feed = false;
+    let mut large = false;
     let mut editor_pid: u32 = 0;
+    let mut editor_child: Option<Child> = None; // reaped on reopen → kills the PID-recycling focus bug
     let mut world_ready = false;
     // Tracks whether the wallpaper is believed visible (30 fps) vs throttled
     // (2 fps). Driven by the manual "Hide office" tray item AND auto-occlusion.
     let mut vis_on = true;
     let mut last_watch = std::time::Instant::now();
+    let mut last_alive = std::time::Instant::now();
     event_loop.run(move |event, target, control_flow| {
         // Unix signal (SIGTERM/SIGINT) → same cleanup as tray Exit.
         if SIGNAL_SHUTDOWN.load(Ordering::Relaxed) {
@@ -2266,11 +2592,19 @@ fn main() {
         *control_flow = ControlFlow::WaitUntil(
             std::time::Instant::now() + std::time::Duration::from_millis(250),
         );
+        // Freshness heartbeat: the daemon trusts bagidea_shell_alive only while
+        // its mtime is recent — a crash leaves a STALE flag, and the daemon's
+        // own editor-launch fallback takes over instead of waiting forever on a
+        // shell that isn't there. (The flag used to be written once at boot.)
+        if last_alive.elapsed().as_secs() >= 5 {
+            last_alive = std::time::Instant::now();
+            let _ = std::fs::write(std::env::temp_dir().join("bagidea_shell_alive"), "1");
+        }
         // Chat-head watchdog — THROTTLED. Re-asserting window state every tick
         // pins a CPU core on macOS (each level/visibility poke wakes the loop),
         // so we only check every ~2s and only touch the window when the orb has
         // genuinely drifted off-screen after the world is up.
-        if world_ready && !hide_item.is_checked()
+        if world_ready && !hide_item.is_checked() && !hidechat_item.is_checked()
             && last_watch.elapsed().as_millis() >= 2000
         {
             last_watch = std::time::Instant::now();
@@ -2302,12 +2636,41 @@ fn main() {
                 if hidden {
                     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
                     orb.set_outer_position(LogicalPosition::new(PARK.0, PARK.1 + 200.0));
-                } else {
+                } else if !hidechat_item.is_checked() {
+                    // Don't resurrect the orb if the chat-only hide still wants it gone.
                     orb.set_outer_position(LogicalPosition::new(orb_x, orb_y));
                     raise_orb(&orb);
                 }
                 vis_on = !hidden;
                 post_visibility(!hidden);
+            } else if ev.id == hidechat_id {
+                // Level 2: chat + chat-head vanish, the wallpaper world keeps
+                // rendering (and the office keeps working either way).
+                if hidechat_item.is_checked() {
+                    overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
+                    orb.set_outer_position(LogicalPosition::new(PARK.0, PARK.1 + 200.0));
+                } else if !hide_item.is_checked() {
+                    orb.set_outer_position(LogicalPosition::new(orb_x, orb_y));
+                    raise_orb(&orb);
+                }
+            } else if ev.id == reload_id {
+                // Re-navigate rather than reload(): a fresh document is built even if
+                // the current one is the thing that got stuck. A fresh page has no mode
+                // classes, so put the WINDOW back to the plain one as well — otherwise
+                // the shell would still think it is in feed/large while the page no
+                // longer is. Rescue lands you in the normal window, on screen, in front.
+                feed = false;
+                large = false;
+                mini = false;
+                overlay.set_min_inner_size(None::<LogicalSize<f64>>);
+                overlay.set_inner_size(LogicalSize::new(FULL.0, FULL.1));
+                overlay.set_outer_position(LogicalPosition::new(overlay_x, overlay_y));
+                platform::region_round(&overlay, FULL.0, FULL.1, 18.0);
+                platform::set_feed_alpha(&overlay, None);
+                let _ = overlay.set_ignore_cursor_events(false);
+                let _ = overlay_view.load_url("http://127.0.0.1:8787/");
+                overlay.set_focus();
+                raise_orb(&orb);
             } else if ev.id == restart_id {
                 // The daemon does a detached relaunch that outlives us being killed.
                 post_restart();
@@ -2322,12 +2685,12 @@ fn main() {
             }
         }
 
-        let do_toggle = |feed_now: bool| {
+        let do_toggle = |feed_now: bool, large_now: bool| {
             // Browser-chat mode (Linux/ARM64): the embedded overlay is blank here,
             // so open/focus the chat in an external browser instead of toggling it.
             if browser_chat() {
                 open_chat_browser();
-                let _ = feed_now;
+                let _ = (feed_now, large_now);
                 return;
             }
             let hidden = overlay
@@ -2335,7 +2698,11 @@ fn main() {
                 .map(|p| p.x < -2000)
                 .unwrap_or(true);
             if hidden {
-                let (px, py) = if feed_now { (feed_x, feed_y) } else { (overlay_x, overlay_y) };
+                let (px, py) = if large_now {
+                    // Large keeps whatever size the user stretched it to — re-center that.
+                    let s = overlay.inner_size().to_logical::<f64>(overlay.scale_factor());
+                    (((logical_w - s.width) / 2.0).max(0.0), (((logical_h - s.height) / 2.0) - 20.0).max(10.0))
+                } else if feed_now { (feed_x, feed_y) } else { (overlay_x, overlay_y) };
                 overlay.set_outer_position(LogicalPosition::new(px, py));
                 overlay.set_focus();
                 raise_orb(&orb);
@@ -2346,7 +2713,7 @@ fn main() {
         };
 
         if toggle {
-            do_toggle(feed);
+            do_toggle(feed, large);
         }
 
         match event {
@@ -2365,8 +2732,18 @@ fn main() {
             }
             Event::WindowEvent { window_id, event: WindowEvent::Resized(_), .. } => {
                 if window_id == overlay_id {
-                    let (w, h) = if feed { (FEED_W, feed_h) } else if mini { MINI } else { FULL };
-                    platform::region_round(&overlay, w, h, if feed { 14.0 } else { 18.0 });
+                    // Large is free-resizable — clip to the ACTUAL size, not a mode
+                    // constant, or the rounded region crops the stretched window.
+                    let (w, h) = if large {
+                        let s = overlay.inner_size().to_logical::<f64>(overlay.scale_factor());
+                        (s.width, s.height)
+                    } else if feed { (FEED_W, feed_h) } else if mini { MINI } else { FULL };
+                    // Fullscreen large = square corners (rounded ones would nick the
+                    // screen edges); anything smaller keeps the house radius.
+                    let r = if feed { 18.0 }
+                        else if large && w >= logical_w - 2.0 && h >= logical_h - 2.0 { 0.0 }
+                        else { 18.0 };
+                    platform::region_round(&overlay, w, h, r);
                 } else if window_id == orb_id {
                     // Re-clip the orb to its circle on any DPI / monitor change so the
                     // transparent corners keep falling through to the desktop.
@@ -2388,7 +2765,16 @@ fn main() {
                     }
                 }
                 UserEvent::EditorOpening => {
-                    if platform::focus_pid(editor_pid) {
+                    // PID-recycling guard: if our last editor child has exited, forget
+                    // its pid — else focus_pid() may "focus" whatever unrelated process
+                    // Windows handed that number to, and the editor never opens again.
+                    if let Some(c) = editor_child.as_mut() {
+                        if c.try_wait().ok().flatten().is_some() {
+                            editor_pid = 0;
+                            editor_child = None;
+                        }
+                    }
+                    if editor_pid != 0 && platform::focus_pid(editor_pid) {
                         let _ = std::fs::write(std::env::temp_dir().join("bagidea_editor_ready"), "focused");
                     } else {
                         editor_pid = 0;
@@ -2396,18 +2782,25 @@ fn main() {
                         splash.set_always_on_top(true);
                         if let Some(child) = spawn_editor(&root, phys_w / 2, phys_h / 2 - 30) {
                             editor_pid = child.id();
+                            editor_child = Some(child);
+                        } else {
+                            // No Godot exe found → resolve the handshake NOW instead of
+                            // leaving the splash hanging for the 60s watcher timeout.
+                            eprintln!("[shell] editor: godot exe not found (see BAGIDEA_GODOT)");
+                            let _ = std::fs::write(std::env::temp_dir().join("bagidea_editor_ready"), "no-exe");
+                            splash.set_visible(false);
                         }
                     }
                 }
                 UserEvent::EditorReady => {
                     splash.set_visible(false);
                 }
-                UserEvent::Toggle => do_toggle(feed),
+                UserEvent::Toggle => do_toggle(feed, large),
                 UserEvent::HideOverlay => {
                     overlay.set_outer_position(LogicalPosition::new(PARK.0, PARK.1));
                 }
                 UserEvent::MiniToggle => {
-                    if !feed {
+                    if !feed && !large {
                         mini = !mini;
                         let (w, h) = if mini { MINI } else { FULL };
                         overlay.set_inner_size(LogicalSize::new(w, h));
@@ -2415,16 +2808,66 @@ fn main() {
                         raise_orb(&orb);
                     }
                 }
+                UserEvent::LargeToggle => {
+                    if !feed {
+                        large = !large;
+                        if large {
+                            mini = false;
+                            // Owner's call: large OPENS FULLSCREEN — whoever wants it
+                            // smaller drags an edge down (never below FULL, the floor).
+                            // (The window is always resizable — see the overlay's
+                            // construction; only the size floor moves with the mode.)
+                            overlay.set_min_inner_size(Some(LogicalSize::new(FULL.0, FULL.1)));
+                            overlay.set_inner_size(LogicalSize::new(logical_w, logical_h));
+                            overlay.set_outer_position(LogicalPosition::new(0.0, 0.0));
+                            overlay.set_focus();
+                            // Resized fires next and clips the region to the real size.
+                        } else {
+                            // Drop the large-mode floor first: mini (390×430) and the
+                            // feed strip (330 wide) are both below it, and a stale
+                            // minimum silently clamps whatever comes next.
+                            overlay.set_min_inner_size(None::<LogicalSize<f64>>);
+                            overlay.set_inner_size(LogicalSize::new(FULL.0, FULL.1));
+                            overlay.set_outer_position(LogicalPosition::new(overlay_x, overlay_y));
+                            platform::region_round(&overlay, FULL.0, FULL.1, 18.0);
+                        }
+                        let _ = overlay_view.evaluate_script(&format!(
+                            "window.setLargeMode && setLargeMode({})", large));
+                        raise_orb(&orb);
+                    }
+                }
+                UserEvent::ResizeDrag(d) => {
+                    if large {
+                        use tao::window::ResizeDirection as RD;
+                        let dir = match d.as_str() {
+                            "n" => RD::North, "s" => RD::South, "e" => RD::East, "w" => RD::West,
+                            "ne" => RD::NorthEast, "nw" => RD::NorthWest, "sw" => RD::SouthWest,
+                            _ => RD::SouthEast,
+                        };
+                        let _ = overlay.drag_resize_window(dir);
+                    }
+                }
                 UserEvent::FeedToggle => {
+                    if large {
+                        // Feed replaces large — drop the FULL size floor before
+                        // shrinking to a 330px strip.
+                        large = false;
+                        overlay.set_min_inner_size(None::<LogicalSize<f64>>);
+                        let _ = overlay_view.evaluate_script("window.setLargeMode && setLargeMode(false)");
+                    }
                     feed = !feed;
                     let _ = overlay_view.evaluate_script(&format!(
                         "window.setFeedMode && setFeedMode({})", feed));
                     let _ = overlay.set_ignore_cursor_events(false);
-                    platform::set_feed_alpha(&overlay, feed);
+                    // Feed translucency is an OS window alpha again — see the note on
+                    // set_feed_alpha for why the CSS version had to be given up.
+                    // Enter at the resting alpha: the page re-reports hover on its own
+                    // if the pointer happens to already be over the strip.
+                    platform::set_feed_alpha(&overlay, if feed { Some(FEED_ALPHA) } else { None });
                     if feed {
                         overlay.set_inner_size(LogicalSize::new(FEED_W, feed_h));
                         overlay.set_outer_position(LogicalPosition::new(feed_x, feed_y));
-                        platform::region_round(&overlay, FEED_W, feed_h, 14.0);
+                        platform::region_round(&overlay, FEED_W, feed_h, 18.0);
                     } else {
                         let (w, h) = if mini { MINI } else { FULL };
                         overlay.set_inner_size(LogicalSize::new(w, h));
@@ -2432,6 +2875,16 @@ fn main() {
                         platform::region_round(&overlay, w, h, 18.0);
                     }
                     raise_orb(&orb);
+                }
+                UserEvent::FeedHover(over) => {
+                    // Only meaningful in feed mode — chat and large are opaque, and a
+                    // stale hover report must never leave the window half-faded.
+                    if feed {
+                        platform::set_feed_alpha(
+                            &overlay,
+                            Some(if over { FEED_ALPHA_READ } else { FEED_ALPHA }),
+                        );
+                    }
                 }
                 UserEvent::DragOrb => { let _ = orb.drag_window(); }
                 UserEvent::DragOverlay => { let _ = overlay.drag_window(); }
@@ -2444,7 +2897,10 @@ fn main() {
                             .map(|p| p.x < -2000)
                             .unwrap_or(true);
                         if hidden {
-                            let (px, py) = if feed {
+                            let (px, py) = if large {
+                                let s = overlay.inner_size().to_logical::<f64>(overlay.scale_factor());
+                                (((logical_w - s.width) / 2.0).max(0.0), (((logical_h - s.height) / 2.0) - 20.0).max(10.0))
+                            } else if feed {
                                 (feed_x, feed_y)
                             } else {
                                 (overlay_x, overlay_y)
@@ -2528,6 +2984,70 @@ fn main() {
                     if let Some((_, _, win, _)) = popups.iter().find(|(i, _, _, _)| *i == id) {
                         let _ = win.drag_window();
                     }
+                }
+                UserEvent::Toast(title, body) => {
+                    // Stack from the bottom-right corner up; at most three on screen.
+                    while toasts.len() >= 3 { toasts.remove(0); }
+                    let (tw, th) = (300.0_f64, 96.0_f64);
+                    let win = WindowBuilder::new()
+                        .with_title("BagIdea Office")
+                        .with_inner_size(LogicalSize::new(tw, th))
+                        .with_decorations(false)
+                        .with_resizable(false)
+                        .with_always_on_top(true)
+                        .with_transparent(true)
+                        .with_window_icon(app_icon())
+                        .build(target)
+                        .expect("toast window");
+                    if let Some(m) = win.primary_monitor() {
+                        let ms = m.size();
+                        let mp = m.position();
+                        let sf = m.scale_factor();
+                        let ws = win.outer_size();
+                        let slot = toasts.len() as i32;
+                        let x = mp.x + ms.width as i32 - ws.width as i32 - (16.0 * sf) as i32;
+                        let y = mp.y + ms.height as i32 - (ws.height as i32 + (12.0 * sf) as i32) * (slot + 1) - (48.0 * sf) as i32;
+                        win.set_outer_position(tao::dpi::PhysicalPosition::new(x, y.max(mp.y)));
+                    }
+                    let id = win.id();
+                    let html = TOAST_HTML
+                        .replace("__TITLE__", &html_escape(&title))
+                        .replace("__BODY__", &html_escape(&body));
+                    let tproxy = proxy.clone();
+                    let oproxy = proxy.clone();
+                    match platform::webview_extras(
+                        WebViewBuilder::new()
+                            .with_html(html)
+                            .with_transparent(true)
+                            .with_ipc_handler(move |req| {
+                                let _ = match req.body().as_str() {
+                                    // click → bring the chat window up, then dismiss
+                                    "toast-open" => { let _ = oproxy.send_event(UserEvent::Toggle); oproxy.send_event(UserEvent::ToastClose(id)) }
+                                    _ => oproxy.send_event(UserEvent::ToastClose(id)),
+                                };
+                            }))
+                        .build(&win)
+                    {
+                        Ok(view) => {
+                            toasts.push((id, win, view));
+                            std::thread::spawn(move || {
+                                std::thread::sleep(std::time::Duration::from_millis(9000));
+                                let _ = tproxy.send_event(UserEvent::ToastClose(id));
+                            });
+                        }
+                        Err(e) => eprintln!("[shell] toast webview: {e}"),
+                    }
+                }
+                UserEvent::ToastClose(id) => {
+                    toasts.retain(|(i, _, _)| *i != id);
+                }
+                UserEvent::Badge(n) => {
+                    // A red dot on the tray icon while anything waits, and the count
+                    // in the tooltip — the one place you can see it with every window
+                    // closed.
+                    let _ = tray.set_icon(tray_badge_icon(n));
+                    let _ = tray.set_tooltip(Some(if n == 0 { "BagIdea Office".to_string() }
+                        else { format!("BagIdea Office — {n} waiting for you") }));
                 }
                 UserEvent::PopupClose(id) => {
                     popups.retain(|(i, _, _, _)| *i != id);

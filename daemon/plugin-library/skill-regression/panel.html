@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🧪 Skill Regression</title>
+<style>
+  :root { --bg:#0c1322; --fg:#dbe7ff; --dim:#7e8db0; --accent:#5ec8ff; --card:#13203a; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI','Leelawadee UI',Tahoma,'Noto Sans Thai',system-ui,sans-serif; }
+  body { background:var(--bg); color:var(--fg); padding:14px; font-size:12.5px; }
+  h1 { font-size:15px; margin-bottom:6px; }
+  .dim { color:var(--dim); font-size:11px; }
+  .s { background:var(--card); border-radius:10px; padding:10px; margin:8px 0; }
+  .s h3 { font-size:13px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .pill { font-size:10px; padding:2px 7px; border-radius:999px; background:rgba(255,255,255,.08); }
+  .pill.ok { background:rgba(74,222,128,.18); } .pill.bad { background:rgba(255,107,107,.2); }
+  .case { display:grid; grid-template-columns: 1fr 200px 30px; gap:6px; margin-top:6px; }
+  input { background:#0a1020; color:var(--fg); border:1px solid rgba(255,255,255,.12); border-radius:7px; padding:6px 8px; font:inherit; width:100%; }
+  button { background:rgba(94,200,255,.12); border:1px solid rgba(94,200,255,.4); color:var(--fg); border-radius:8px; padding:5px 9px; cursor:pointer; font:inherit; font-size:11.5px; }
+  .res { font-size:11px; margin-top:6px; white-space:pre-wrap; color:var(--dim); }
+  .res .ok { color:#4ade80; } .res .bad { color:#ff8a8a; }
+</style></head><body>
+<h1>🧪 Skill Regression</h1>
+<div class="dim">A skill that corrects itself can correct itself wrong. Give a skill test cases — a task and what the answer must (or, with <code>!</code>, must not) match — and every self-correction is run against them first. A correction that breaks a case is refused. Cases are judged by a real model turn, so keep them few and sharp.</div>
+<div id="list"></div>
+<script>
+  const BASE = "/plugin/skill-regression";
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const post = (route, body) => fetch(BASE + "/" + route, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(async (r) => { if (!r.ok) throw new Error(await r.text()); return r.json(); });
+  async function load() {
+    const j = await fetch(BASE + "/skills").then((r) => r.json());
+    const box = document.getElementById("list"); box.innerHTML = "";
+    const rows = j.skills.filter((s) => !s.builtin).sort((a, b) => (b.cases - a.cases) || (b.auto - a.auto));
+    if (!rows.length) box.innerHTML = '<div class="dim" style="margin-top:10px">No self-written or edited skills yet — the office writes them as agents finish real work (⚙ → SKILLS).</div>';
+    for (const s of rows) {
+      const cases = j.cases[s.id] || [];
+      const el = document.createElement("div"); el.className = "s";
+      el.innerHTML = `<h3>${esc(s.name)} <span class="pill">${s.auto ? "self-written" : "edited"}${s.revs ? " · " + s.revs + " revision(s)" : ""}</span>
+          ${s.lastTest ? `<span class="pill ${s.lastTest.ok ? "ok" : "bad"}">${s.lastTest.ok ? "passed" : "FAILED"} ${s.lastTest.passed}/${s.lastTest.total}${s.lastTest.candidate ? " (a correction was refused)" : ""} · ${new Date(s.lastTest.at).toLocaleString()}</span>` : ""}
+          <span style="flex:1"></span><button data-run="${s.id}" ${cases.length ? "" : "disabled"}>▶ Run ${cases.length} case(s)</button></h3>
+        <div class="cases">${cases.map((c, i) => `<div class="case"><input data-p="${s.id}:${i}" value="${esc(c.prompt)}" placeholder="task"><input data-e="${s.id}:${i}" value="${esc(c.expect)}" placeholder="expect (regex, or !regex)"><button data-x="${s.id}:${i}" title="remove">✕</button></div>`).join("")}
+          <div class="case"><input data-np="${s.id}" placeholder="new task prompt…"><input data-ne="${s.id}" placeholder="must match (regex) · !must-not"><button data-add="${s.id}">＋</button></div></div>
+        <div class="res" id="res-${esc(s.id)}"></div>`;
+      box.appendChild(el);
+    }
+    const collect = (id) => [...box.querySelectorAll(`[data-p^="${CSS.escape(id)}:"]`)].map((inp) => ({ prompt: inp.value, expect: box.querySelector(`[data-e="${inp.dataset.p}"]`).value }));
+    box.querySelectorAll("[data-add]").forEach((b) => b.onclick = () => { const id = b.dataset.add; const p = box.querySelector(`[data-np="${CSS.escape(id)}"]`).value.trim(), e = box.querySelector(`[data-ne="${CSS.escape(id)}"]`).value.trim(); if (!p || !e) return; post("set", { id, cases: collect(id).concat([{ prompt: p, expect: e }]) }).then(load).catch((err) => alert(err.message)); });
+    box.querySelectorAll("[data-x]").forEach((b) => b.onclick = () => { const [id, i] = b.dataset.x.split(":"); const cs = collect(id); cs.splice(Number(i), 1); post("set", { id, cases: cs }).then(load).catch((err) => alert(err.message)); });
+    box.querySelectorAll("[data-p],[data-e]").forEach((inp) => inp.onchange = () => { const id = (inp.dataset.p || inp.dataset.e).split(":")[0]; post("set", { id, cases: collect(id) }).catch((err) => alert(err.message)); });
+    box.querySelectorAll("[data-run]").forEach((b) => b.onclick = () => { const id = b.dataset.run; const out = document.getElementById("res-" + id); out.textContent = "running… (one model turn per case)"; b.disabled = true;
+      post("run", { id }).then((r) => { out.innerHTML = r.results.map((x) => `<div class="${x.pass ? "ok" : "bad"}">${x.pass ? "✓" : "✗"} ${esc(x.prompt.slice(0, 80))} → ${esc(x.expect)}${x.error ? " · " + esc(x.error) : ""}<br><span class="dim">${esc((x.answer || "").slice(0, 240))}</span></div>`).join(""); load(); }).catch((err) => { out.textContent = err.message; b.disabled = false; }); });
+  }
+  load();
+</script></body></html>
