@@ -4,7 +4,9 @@
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-source "$HOME/.cargo/env" 2>/dev/null || true
+# Test-then-source: `.`/`source` is a POSIX special builtin whose missing-file
+# failure can abort under `set -e`; `|| true` doesn't reliably catch it (#38).
+if [ -f "$HOME/.cargo/env" ]; then . "$HOME/.cargo/env"; fi
 
 echo "  ===== BagIdea Office - UPDATE (Linux) ====="
 

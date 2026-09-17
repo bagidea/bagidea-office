@@ -1,0 +1,18 @@
+{
+  "id": "campaign-board",
+  "name": "📣 Campaign Board",
+  "version": "1.0.0",
+  "description": "A marketing calendar the office runs: posts as cards with a channel and a date, copy drafted by an agent in your voice, an approval before anything is published, publishing through the tools your agents have (X, Bluesky, LinkedIn, a blog…).",
+  "panel": "panel.html",
+  "window": { "w": 760, "h": 700, "resizable": true },
+  "commands": [
+    { "name": "add", "args": "<YYYY-MM-DD> :: <channel> :: <title> [:: brief]", "desc": "Plan a post (a card on the board, due that day)" },
+    { "name": "draft", "args": "<post id> [:: instructions]", "desc": "Have an agent write the copy" },
+    { "name": "approve", "args": "<post id>", "desc": "Ask the owner to approve the copy (📥 APPROVALS / phone)" },
+    { "name": "publish", "args": "<post id>", "desc": "Publish an approved post through the agent's tools" },
+    { "name": "list", "args": "[week|month|all]", "desc": "The calendar" },
+    { "name": "voice", "args": "<how we sound>", "desc": "Set the brand voice every draft follows" }
+  ],
+  "needsKeys": [],
+  "library": { "for": "marketing · social · founders", "hooks": ["tasks", "approvals.ask", "runClaude", "workflow.node", "onEvent"] }
+}

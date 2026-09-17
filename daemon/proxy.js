@@ -27,6 +27,8 @@ function plog(line) {
 const UPSTREAM = {
   openai: { url: "https://api.openai.com/v1/chat/completions", key: "OPENAI_API_KEY",
             fallbackModel: "gpt-4o-mini" },
+  atlascloud: { url: "https://api.atlascloud.ai/v1/chat/completions",
+                fallbackModel: "openai/gpt-4.1-mini" },
   gemini: { url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
             key: "GEMINI_API_KEY", fallbackModel: "gemini-2.5-flash" },
   openrouter: { url: "https://openrouter.ai/api/v1/chat/completions", fallbackModel: "" },
@@ -60,17 +62,80 @@ function upstreamFor(provider, reg) {
 
 const STOP = { stop: "end_turn", length: "max_tokens", tool_calls: "tool_use", content_filter: "end_turn" };
 
+// --- Gemini thought signatures --------------------------------------------
+// Gemini thinking models attach a `thought_signature` to each tool call
+// (tool_calls[].extra_content.google.thought_signature on the OpenAI-compat
+// endpoint) and REQUIRE it echoed back on that tool call when the conversation
+// history returns — otherwise the next turn 400s with "Function call is
+// missing a thought_signature in functionCall parts". The signature can't ride
+// through claude's Anthropic-format history (unknown fields don't round-trip),
+// so we remember it here keyed by tool_call id and re-attach on the way out.
+// For history whose signature we never saw (daemon restart, pre-fix session),
+// Google documents the dummy `skip_thought_signature_validator` as the escape
+// hatch. Only used when talking to Gemini — other providers reject unknown
+// message fields.
+const SIG_DUMMY = "skip_thought_signature_validator";
+const SIG_MAX = 4000;                 // ids are ~short; this is a few hundred KB worst-case
+const SIG_CACHE = new Map();          // tool_call id → thought_signature (insertion-ordered)
+function sigRemember(id, sig, cache) {
+  if (!id || !sig) return;
+  const c = cache || SIG_CACHE;
+  if (c.size >= SIG_MAX && !c.has(id)) c.delete(c.keys().next().value); // drop oldest
+  c.set(id, sig);
+}
+
+// Flatten an Anthropic system value (string, or [{type:"text",text}] blocks) to text.
+function sysText(c) {
+  if (typeof c === "string") return c;
+  if (Array.isArray(c)) return c.map((b) => (b && b.type === "text" && b.text) || "").filter(Boolean).join("\n");
+  return "";
+}
+// A system message that arrives mid-conversation is context, not the user
+// speaking — wrap it the way claude itself wraps user-turn context.
+function foldSys(text) { return `<system-reminder>\n${text}\n</system-reminder>`; }
+function appendText(msg, text) {
+  if (Array.isArray(msg.content)) msg.content.push({ type: "text", text });
+  else msg.content = (msg.content ? msg.content + "\n\n" : "") + text;
+}
+function prependText(msg, text) {
+  if (Array.isArray(msg.content)) msg.content.unshift({ type: "text", text });
+  else msg.content = text + (msg.content ? "\n\n" + msg.content : "");
+}
+
 // --- Anthropic request → OpenAI Chat Completions request (pure, testable) ----
-function toOpenAI(a, model) {
+// opts.gemini: attach remembered (or dummy) thought signatures to tool_calls.
+// opts.sigs:   signature cache override (tests) — defaults to the module cache.
+//
+// System placement: the result has AT MOST ONE system message, always at index 0.
+// Claude Code (≥ 2.1.2xx) puts reminder/context entries with role "system" INSIDE
+// messages[] (agent-type list, <total_tokens>, …). OpenAI tolerates that, but
+// strict chat templates (Qwen3.5+ and friends) raise "System message must be at
+// the beginning." for any system message past index 0 — on LM Studio / llama.cpp
+// / Ollama / vLLM that's a hard 500 on every turn after the first tool call.
+// Leading system entries join the top system prompt; later ones fold into the
+// nearest user turn (previous user if adjacent, else the next one, else a final
+// user message) so message ORDER is untouched and the upstream's KV-prefix cache
+// keeps working across turns.
+function toOpenAI(a, model, opts) {
   const msgs = [];
-  if (a.system) {
-    const sys = typeof a.system === "string"
-      ? a.system
-      : a.system.map((b) => (b && b.text) || "").join("\n");
-    if (sys) msgs.push({ role: "system", content: sys });
-  }
+  const sysParts = [];
+  const top = sysText(a.system);
+  if (top) sysParts.push(top);
+  let pending = [];   // folded system text waiting for the next user turn
   for (const m of a.messages || []) {
-    if (typeof m.content === "string") { msgs.push({ role: m.role, content: m.content }); continue; }
+    if (m.role === "system") {
+      const s = sysText(m.content).trim();
+      if (!s) continue;
+      if (!msgs.length) sysParts.push(s);
+      else if (msgs[msgs.length - 1].role === "user") appendText(msgs[msgs.length - 1], foldSys(s));
+      else pending.push(foldSys(s));
+      continue;
+    }
+    if (typeof m.content === "string") {
+      const om = { role: m.role, content: m.content };
+      if (om.role === "user" && pending.length) { prependText(om, pending.join("\n\n")); pending = []; }
+      msgs.push(om); continue;
+    }
     const parts = [], toolCalls = [], toolResults = [];
     for (const b of m.content || []) {
       if (b.type === "text") parts.push({ type: "text", text: b.text || "" });
@@ -79,8 +144,13 @@ function toOpenAI(a, model) {
         const url = s.type === "base64" ? `data:${s.media_type};base64,${s.data}` : s.url;
         if (url) parts.push({ type: "image_url", image_url: { url } });
       } else if (b.type === "tool_use") {
-        toolCalls.push({ id: b.id, type: "function",
-          function: { name: b.name, arguments: JSON.stringify(b.input || {}) } });
+        const tc = { id: b.id, type: "function",
+          function: { name: b.name, arguments: JSON.stringify(b.input || {}) } };
+        if (opts && opts.gemini) {
+          const sig = (opts.sigs || SIG_CACHE).get(b.id) || SIG_DUMMY;
+          tc.extra_content = { google: { thought_signature: sig } };
+        }
+        toolCalls.push(tc);
       } else if (b.type === "tool_result") {
         let c = b.content;
         if (Array.isArray(c)) c = c.map((x) => (x && x.type === "text" ? x.text : JSON.stringify(x))).join("\n");
@@ -92,7 +162,9 @@ function toOpenAI(a, model) {
       for (const tr of toolResults) msgs.push(tr);          // tool replies first
       if (parts.length) {
         const onlyText = parts.every((p) => p.type === "text");
-        msgs.push({ role: "user", content: onlyText ? parts.map((p) => p.text).join("\n") : parts });
+        const um = { role: "user", content: onlyText ? parts.map((p) => p.text).join("\n") : parts };
+        if (pending.length) { prependText(um, pending.join("\n\n")); pending = []; }
+        msgs.push(um);
       }
     } else {
       const am = { role: "assistant" };
@@ -103,6 +175,10 @@ function toOpenAI(a, model) {
       msgs.push(am);
     }
   }
+  // System context that arrived after the last user turn (typically right after a
+  // tool result) has no user message to ride on → becomes the final user turn.
+  if (pending.length) msgs.push({ role: "user", content: pending.join("\n\n") });
+  if (sysParts.length) msgs.unshift({ role: "system", content: sysParts.join("\n\n") });
   const out = { model, messages: msgs, stream: !!a.stream };
   if (a.max_tokens) out.max_tokens = a.max_tokens;
   if (a.stream) out.stream_options = { include_usage: true };
@@ -120,7 +196,8 @@ function toOpenAI(a, model) {
 }
 
 // --- OpenAI non-streaming response → Anthropic message (pure, testable) ------
-function toAnthropic(o, model) {
+// opts.sigs: signature cache override (tests) — defaults to the module cache.
+function toAnthropic(o, model, opts) {
   const choice = (o.choices || [])[0] || {};
   const msg = choice.message || {};
   const content = [];
@@ -128,6 +205,11 @@ function toAnthropic(o, model) {
   for (const tc of msg.tool_calls || []) {
     let input = {};
     try { input = JSON.parse((tc.function && tc.function.arguments) || "{}"); } catch {}
+    // Gemini thinking models sign each tool call; remember the signature so the
+    // history echo (toOpenAI) can re-attach it — required, or next turn 400s.
+    const sig = tc.extra_content && tc.extra_content.google &&
+                tc.extra_content.google.thought_signature;
+    if (sig) sigRemember(tc.id, sig, opts && opts.sigs);
     content.push({ type: "tool_use", id: tc.id, name: tc.function && tc.function.name, input });
   }
   return {
@@ -210,7 +292,10 @@ async function handle(req, res, provider, reg, raw) {
       `no model set for "${provider}" — pick or type a model in the agent's 🧠 BRAIN field` +
       (provider === "openrouter" || provider === "nvidia" ? ` (use vendor/model form, e.g. openai/gpt-4o)` : ""));
 
-  const body = toOpenAI(a, model);
+  // Built-in gemini provider OR a custom provider pointed at Google's endpoint —
+  // both need thought signatures round-tripped (and reject nothing extra).
+  const isGemini = provider === "gemini" || /generativelanguage\.googleapis\.com/.test(chat);
+  const body = toOpenAI(a, model, { gemini: isGemini });
   // Buffer the upstream (no live SSE translation) for reliability across providers.
   body.stream = false;
   delete body.stream_options;
@@ -326,4 +411,4 @@ async function fetchWithTimeout(url, opts, timeoutMs) {
   }
 }
 
-module.exports = { handle, streamAnthropic, toOpenAI, toAnthropic, pickModel, cleanModels, upstreamFor, UPSTREAM, fetchWithTimeout };
+module.exports = { handle, streamAnthropic, toOpenAI, toAnthropic, pickModel, cleanModels, upstreamFor, UPSTREAM, fetchWithTimeout, SIG_DUMMY };

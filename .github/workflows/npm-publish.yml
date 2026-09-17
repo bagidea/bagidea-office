@@ -1,14 +1,24 @@
 name: Publish to npm
 
-# Auto-publish the `bagidea-office` npm bootstrapper on each release, via npm
-# Trusted Publishing (OIDC) — NO long-lived token stored anywhere. Only publishes
+# Auto-publish the `bagidea-office` npm bootstrapper on each release. Only publishes
 # when npm/package.json carries a version that isn't on the registry yet, so a
 # release that didn't bump the bootstrapper is a clean no-op.
 #
-# PREREQUISITE (one-time, on npmjs.com): configure a Trusted Publisher for the
-# `bagidea-office` package → GitHub Actions → repo bagidea/bagidea-office →
-# workflow file `npm-publish.yml`. Until that's set up, only bump
-# npm/package.json AFTER configuring it (otherwise this job fails on auth).
+# ── AUTH: token in a GitHub secret ───────────────────────────────────────────
+# The job is GATED behind the repo variable `ENABLE_NPM_PUBLISH` (set to `true`)
+# and authenticates with the `NPM_TOKEN` secret (a granular npm token with
+# read+write on this package). If the secret is ever removed the publish step
+# errors clearly rather than pretending to work.
+#
+# Turn OFF cleanly: set repo variable ENABLE_NPM_PUBLISH to anything but `true`
+# (or delete it) → the job skips grey, never a red ✗.
+# Rotate the token: `gh secret set NPM_TOKEN --repo bagidea/bagidea-office`
+# (or repo Settings → Secrets and variables → Actions), paste the new token.
+#
+# More secure alternative (no stored token): npm Trusted Publishing (OIDC).
+# Configure a Trusted Publisher for the package on npmjs.com (repo + this workflow
+# file), give the job `permissions: id-token: write`, drop the NODE_AUTH_TOKEN env,
+# and revoke NPM_TOKEN. Left as token auth per the owner's choice.
 
 on:
   push:
@@ -17,10 +27,12 @@ on:
 
 permissions:
   contents: read
-  id-token: write   # required for OIDC trusted publishing
 
 jobs:
   publish:
+    # Clean skip (not a red ✗) unless explicitly enabled. Flip the repo variable
+    # ENABLE_NPM_PUBLISH to turn publishing on/off.
+    if: ${{ vars.ENABLE_NPM_PUBLISH == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -31,8 +43,6 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - name: Upgrade npm (trusted publishing needs npm >= 11.5)
-        run: npm install -g npm@latest
       - name: Skip if this version is already on npm
         id: check
         run: |
@@ -44,6 +54,8 @@ jobs:
             echo "already=false" >> "$GITHUB_OUTPUT"
             echo "Will publish bagidea-office@$V."
           fi
-      - name: Publish (OIDC trusted publishing — no token)
+      - name: Publish
         if: steps.check.outputs.already == 'false'
         run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -10,6 +10,8 @@
 const https = require("https");
 const tls = require("tls");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 
 // ---- tiny https JSON request ------------------------------------------------
 function jreq(method, host, path, headers, body, cb, timeoutMs) {
@@ -131,6 +133,19 @@ module.exports = function initChannels(ctx) {
           state.telegram = "on";
           for (const u of j.result || []) {
             offset = u.update_id + 1;
+            // A tap on an approval button arrives as a callback_query, not a message.
+            const cq = u.callback_query;
+            if (cq && cq.data && typeof ctx.onCallback === "function") {
+              if (cfg.chat && cq.message && String(cq.message.chat.id) !== String(cfg.chat)) continue;
+              ctx.onCallback("telegram", cq.data, (answer) => {
+                jreq("POST", "api.telegram.org", `/bot${cfg.token}/answerCallbackQuery`, null,
+                  { callback_query_id: cq.id, text: String(answer || "").slice(0, 200) }, () => {});
+                // and settle the card so it can't be tapped twice
+                if (cq.message) jreq("POST", "api.telegram.org", `/bot${cfg.token}/editMessageReplyMarkup`, null,
+                  { chat_id: cq.message.chat.id, message_id: cq.message.message_id, reply_markup: { inline_keyboard: [] } }, () => {});
+              });
+              continue;
+            }
             const m = u.message;
             if (!m || !m.text) continue;
             // Optional allowlist: a chat id pins the office to YOUR chat.
@@ -149,12 +164,58 @@ module.exports = function initChannels(ctx) {
     poll();
     log("telegram poller started");
   }
-  function sendTelegram(token, chatId, text) {
+  // Image paths an agent mentioned in its reply (server-side twin of the
+  // overlay's MEDIA_RE, images only). "/uploads/x.png" is a daemon URL, not a
+  // disk path — resolve it via ctx.uploadsDir so the bytes can be uploaded.
+  function imagePaths(text) {
+    const re = /((?:[A-Za-z]:[\\/]|\/(?:uploads|Users|home|Volumes|mnt|media|tmp|data|opt|srv|var|root|workspace)\/)[^\r\n"'`<>|?*]+?\.(?:png|jpe?g|gif|webp|bmp))/gi;
+    const out = [];
+    let m;
+    while ((m = re.exec(String(text))) && out.length < 3) {
+      let p = m[1];
+      if (/^\/uploads\//.test(p) && ctx.uploadsDir) p = path.join(ctx.uploadsDir, p.slice("/uploads/".length));
+      try {
+        if (fs.existsSync(p) && fs.statSync(p).size < 10 * 1048576 && !out.includes(p)) out.push(p);
+      } catch {}
+    }
+    return out;
+  }
+  // Telegram's URL form of sendPhoto needs a PUBLIC url — ours are localhost —
+  // so upload the actual bytes as multipart/form-data.
+  function sendTelegramPhoto(token, chatId, file, cb) {
+    let buf;
+    try { buf = fs.readFileSync(file); } catch { return cb && cb(); }
+    const name = file.replace(/^.*[\\/]/, "");
+    const ext = (name.match(/\.(\w+)$/) || [, "png"])[1].toLowerCase();
+    const boundary = "----bagidea" + Date.now();
+    const head = Buffer.from(
+      `--${boundary}\r\ncontent-disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n` +
+      `--${boundary}\r\ncontent-disposition: form-data; name="photo"; filename="${name}"\r\n` +
+      `content-type: image/${ext === "jpg" ? "jpeg" : ext}\r\n\r\n`);
+    const body = Buffer.concat([head, buf, Buffer.from(`\r\n--${boundary}--\r\n`)]);
+    const r = https.request({ host: "api.telegram.org", path: `/bot${token}/sendPhoto`, method: "POST",
+      headers: { "content-type": "multipart/form-data; boundary=" + boundary, "content-length": body.length } },
+      (res) => { res.resume(); res.on("end", () => cb && cb()); });
+    r.on("error", () => cb && cb());
+    r.end(body);
+  }
+  // `item` (optional) is an inbox item: when it carries options, the last text
+  // part gets an inline keyboard so the owner can answer with one tap.
+  function sendTelegram(token, chatId, text, item) {
     const parts = chunk(String(text), 3900);
+    const keyboard = item && Array.isArray(item.options) && item.link && String(item.link).startsWith("approval:")
+      ? { inline_keyboard: [item.options.map((o) => ({ text: o.label || o.value,
+          callback_data: "apv:" + String(item.link).slice(9) + ":" + o.value }))] }
+      : null;
+    // Any preview image the message references rides along as a real photo
+    // (after the text, so the caption context arrives first).
+    const photos = imagePaths(text);
+    const sendPhotos = (i) => { if (i < photos.length) sendTelegramPhoto(token, chatId, photos[i], () => sendPhotos(i + 1)); };
     const sendNext = (i) => {
-      if (i >= parts.length) return;
-      jreq("POST", "api.telegram.org", `/bot${token}/sendMessage`, null,
-        { chat_id: chatId, text: parts[i] }, () => sendNext(i + 1));
+      if (i >= parts.length) return sendPhotos(0);
+      const msg = { chat_id: chatId, text: parts[i] };
+      if (keyboard && i === parts.length - 1) msg.reply_markup = keyboard;
+      jreq("POST", "api.telegram.org", `/bot${token}/sendMessage`, null, msg, () => sendNext(i + 1));
     };
     sendNext(0);
   }
@@ -355,11 +416,11 @@ module.exports = function initChannels(ctx) {
   // Push an office-originated line OUT to every connected channel that has a
   // known target — so a conversation held at the CEO seat in the app also
   // mirrors to Telegram/Discord/LINE. No-op for a channel without a target.
-  function relay(text) {
+  function relay(text, item) {
     const t = String(text);
     if (!t.trim()) return;
     const tg = (ctx.getConfig().telegram) || {};
-    if (state.telegram === "on" && tg.token && tg.chat) sendTelegram(tg.token, tg.chat, t);
+    if (state.telegram === "on" && tg.token && tg.chat) sendTelegram(tg.token, tg.chat, t, item);
     const dc = (ctx.getConfig().discord) || {};
     if (state.discord === "on" && dc.token && dc.channel) sendDiscord(dc.token, dc.channel, t);
     if (lastLine && lastLine.token) {

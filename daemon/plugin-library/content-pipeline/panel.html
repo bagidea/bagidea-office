@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📰 Content Pipeline</title>
+<style>
+  :root { --bg:#0c1322; --fg:#dbe7ff; --dim:#7e8db0; --accent:#5ec8ff; --card:#13203a; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI','Leelawadee UI',Tahoma,'Noto Sans Thai',system-ui,sans-serif; }
+  body { background:var(--bg); color:var(--fg); padding:14px; font-size:12.5px; }
+  h1 { font-size:15px; margin-bottom:8px; }
+  .add { display:flex; gap:6px; flex-wrap:wrap; background:var(--card); border-radius:10px; padding:10px; margin-bottom:12px; }
+  input { background:#0a1020; color:var(--fg); border:1px solid rgba(255,255,255,.12); border-radius:7px; padding:7px 9px; font:inherit; flex:1 1 200px; }
+  button { background:rgba(94,200,255,.12); border:1px solid rgba(94,200,255,.4); color:var(--fg); border-radius:8px; padding:6px 10px; cursor:pointer; font:inherit; }
+  .r { background:var(--card); border-radius:10px; padding:10px; margin-bottom:8px; }
+  .dim { color:var(--dim); font-size:11px; }
+  .run { font-size:11px; color:var(--dim); margin-top:4px; }
+</style></head><body>
+<h1>📰 Content Pipeline</h1>
+<div class="add">
+  <input id="feed" placeholder="feed URL (RSS or Atom)">
+  <input id="every" placeholder="every N min (30)" style="flex:0 1 120px">
+  <button id="follow">＋ Follow</button>
+  <input id="voice" placeholder="voice / instructions for the draft (optional)" style="flex:1 1 100%">
+  <input id="url" placeholder="…or one article URL">
+  <button id="run">▶ Run once</button>
+  <div class="dim" style="flex:1 1 100%">item in → article fetched → summary → draft in your voice → <b>you approve</b> (📥 APPROVALS) → published to your channel. Edit the pipeline in the Workflow Builder (“📰 Content pipeline”).</div>
+</div>
+<div id="list"></div>
+<script>
+  const BASE = "/plugin/content-pipeline";
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const cmd = (name, args) => fetch(BASE + "/cmd", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cmd: name, args }) }).then((r) => r.json());
+  async function load() {
+    const j = await fetch(BASE + "/list").then((r) => r.json());
+    const box = document.getElementById("list"); box.innerHTML = "";
+    if (!j.feeds.length) box.innerHTML = '<div class="dim">No feeds yet.</div>';
+    for (const f of j.feeds) {
+      const el = document.createElement("div"); el.className = "r";
+      el.innerHTML = `<div><b>${esc(f.url)}</b> <span class="dim">· every ${f.everyMin} min · ${f.trigger && f.trigger.enabled ? "polling" : "paused"}</span> <button data-u="${esc(f.url)}" style="float:right;font-size:11px">✕</button></div>`;
+      box.appendChild(el);
+    }
+    if (j.runs.length) { const el = document.createElement("div"); el.className = "r"; el.innerHTML = "<b>Recent runs</b>" + j.runs.map((x) => `<div class="run">${x.state === "done" ? "✓" : x.state === "failed" ? "✗" : "…"} ${new Date(x.startedAt).toLocaleString()} · ${esc(x.state)}</div>`).join(""); box.appendChild(el); }
+    box.querySelectorAll("[data-u]").forEach((b) => b.onclick = () => cmd("unfollow", b.dataset.u).then(load));
+  }
+  document.getElementById("follow").onclick = () => cmd("follow", `${document.getElementById("feed").value.trim()} :: ${document.getElementById("every").value.trim()} :: ${document.getElementById("voice").value.trim()}`).then((r) => { if (r.error) alert(r.error); load(); });
+  document.getElementById("run").onclick = () => cmd("run", `${document.getElementById("url").value.trim()} :: ${document.getElementById("voice").value.trim()}`).then((r) => { if (r.error) alert(r.error); else setTimeout(load, 1200); });
+  load();
+  try { const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"); ws.onmessage = (m) => { try { const e = JSON.parse(m.data); if (e.type === "workflow.run" && e.run && e.run.workflowId === "content-pipeline") load(); } catch {} }; } catch {}
+</script></body></html>

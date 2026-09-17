@@ -36,9 +36,17 @@ This keeps two promises:
 ## Checklist before bumping VERSION
 
 - [ ] `dev` merged to `main`, working tree clean.
-- [ ] Automated tests pass: `node --test daemon/tests/api.test.js`.
+- [ ] Automated tests pass — the same bar CI holds every PR to:
+      `node --test $(ls daemon/tests/*.test.js | grep -v meetings.test.js)`.
+      `meetings.test.js` is excluded there because it drives a real agent and
+      needs a brain CI doesn't have — run it here if you touched meetings:
+      `npm run test:meetings`.
 - [ ] Daemon boots clean: `node daemon/server.js` (no errors), or `bagidea restart`.
-- [ ] Shell builds: `cargo build --release` in `shell/`.
+- [ ] Shell builds: `cargo build --release` in `shell/`. This only proves the
+      code for **this** OS — `#[cfg(target_os = ...)]` blocks for the others are
+      parsed but never type-checked. CI (`.github/workflows/ci.yml`) builds all
+      three on every PR and on every push to `main`; check it is green for the
+      commit you are about to tag.
 - [ ] Godot scene loads: `godot/bin/BagIdeaOffice.exe --headless --check-only --quit`
       (only "leaked at exit" RID lines are fine — no `SCRIPT ERROR` / `Parse Error`).
 - [ ] Docs/README reflect the changes.

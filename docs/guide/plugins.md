@@ -120,6 +120,70 @@ module.exports = (ctx) => ({
 | `ctx.manifest` | your parsed `plugin.json` |
 | `ctx.log(msg)` | write to the daemon log |
 | `ctx.runClaude(agentId, prompt, opts?)` | run a real Claude Code turn as that agent — the same engine the office uses (advanced) |
+| `ctx.notify(item)` | *(v1.4)* send through the owner's notification rules — `{ kind, title, body, link }`; kinds: `done`, `reminder`, `mention`, `system`, … |
+| `ctx.approvals.ask(item)` → promise | *(v1.4)* wait for a human — `{ title, detail, options? }` lands in 📥 APPROVALS and on their phone; resolves with the decision |
+| `ctx.tasks` / `ctx.calendar` | *(v1.4)* the board and the calendar — `create/update/move/list/board`, `add/edit/occurrences/toICS` (see [tasks](tasks.md)) |
+| `ctx.schedule(job)` | *(v1.4)* book a standing order — `{ agent, prompt, mode:"now"|"at"|"every", at, time, daily, everyMin, enabled }` |
+| `ctx.triggers.register(kind, def)` | *(v1.4)* contribute a **new trigger kind** to the Workflow Builder — see [hooks](#hooks) |
+| `ctx.workflow.node(kind, impl, meta)` | *(v1.4)* contribute a **new workflow node** — see [hooks](#hooks) |
+| `ctx.memory.provider(fn)` | *(v1.4)* contribute lines at prompt-assembly time, for agents that opt in — see [hooks](#hooks) |
+| `ctx.codex.exec / review` | *(v1.4)* hand a task to [Codex](codex.md) |
+| `ctx.skillTests` | *(v1.6)* the skill regression gate — `cases(id)`, `setCases(id, cases)`, `run(id, content?)`, `summary()` (see the 🧪 skill-regression plugin) |
+
+### Hooks
+
+*New in v1.4.0.* The seven plugins in the [official library](library.md)
+are worked examples of every hook below — `daemon/plugin-library/<id>/index.js`. Every hook is optional and additive — a plugin written for
+v1.0 loads unchanged.
+
+**`onEvent(type, evt)`** — export it next to `onCommand` and the office calls
+it for every event on the stream (`task.completed`, `work.created`,
+`workflow.run`, `plugin.event`, …). A throw is logged and never reaches
+another plugin.
+
+```js
+module.exports = (ctx) => ({
+  onEvent(type, evt) {
+    if (type === "work.done" && evt.item.kind === "delegation") ctx.notify({ kind: "done", title: "🎉 " + evt.item.title });
+  },
+});
+```
+
+**A trigger kind** — the Builder's ⚡ panel gets a new option (`🧩 <label>`);
+its first two `fields` map onto the two inputs. `start` receives the saved
+trigger and a `fire(data)` function; whatever it returns is handed to `stop`.
+
+```js
+ctx.triggers.register("rss", {
+  label: "📰 RSS feed", fields: [{ key: "url", label: "feed URL" }, { key: "everyMin", label: "check every N min" }],
+  start: (trigger, fire) => setInterval(() => pollFeed(trigger.cfg.url).then((items) => items.forEach((it) => fire(it))), (Number(trigger.cfg.everyMin) || 30) * 60000),
+  stop: (handle) => clearInterval(handle),
+});
+```
+
+**A workflow node** — a new type in the palette. `impl(node, helpers)` gets
+the node with its text already rendered (`{{…}}` resolved), and helpers:
+`render(text)`, `prev`, `outputs`, `run`, `agent(id, prompt)` (a real turn),
+`notify(item)`. Return the node's output; throw to fail the step.
+
+```js
+ctx.workflow.node("post-x", async (node, h) => postToX(node.text), { label: "🐦 Post to X", hint: "the text to post · {{prev}} works" });
+```
+
+**A memory provider** — the narrow hook agreed in #42. The function returns
+lines (a string or an array); the office adds them to the prompt of agents
+that **opted in** to your plugin (agent editor → 🧠 MEMORY PLUGINS). The core
+owns the timeout (800 ms) and the budget (about 1500 characters across all
+providers); a throw or a timeout yields zero lines. Keep it fast and small —
+it runs on every turn.
+
+```js
+ctx.memory.provider((agentId, info) => readDecisions(ctx.dataDir).slice(-5).map((d) => `we decided ${d.what} because ${d.why}`));
+```
+
+Registrations are tagged with your plugin id and dropped on reload, so a
+plugin that fails to load never leaves a ghost trigger behind. `GET /plugins`
+lists each plugin's `hooks`.
 
 ### Built-in HTTP routes (free, no code)
 - `GET /plugin/<id>/panel` → serves your `panel.html`
@@ -196,6 +260,22 @@ curl -s -X POST http://127.0.0.1:8787/plugin/hello/cmd \
 
 Because the panel and agents both go through `/cmd`, an agent saying *"loop the
 playlist"* really controls the panel open in front of the user.
+
+**A second example — editing a record safely (🩹 Scar Board).** Scar Board's
+`update` command refines an existing scar but **locks** its identity and recall
+history (`id`, `authorId`, `createdAt`, `recallCount`, `lastRecalledAt`) — only
+`context` / `lesson` / `tags` / `severity` may change, and the file is written
+**atomically** (temp + rename) so a crash never corrupts the board:
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/plugin/scar-board/cmd \
+  -H "content-type: application/json" \
+  -d '{"cmd":"update","args":"s_abc123 :: refined context :: sharper lesson #tag"}'
+```
+
+An unknown `id` returns a clear `{ok:false, msg:"scar not found: …"}` — it never
+silently creates a scar. That **lock-immutable-fields + atomic-write** pair is a good
+template for any plugin that edits records it also appends.
 
 **An agent can also CREATE a plugin**: write the folder + files under `plugins/`,
 then `curl -s -X POST http://127.0.0.1:8787/plugins/reload -H "x-bagidea-ui: 1"`.

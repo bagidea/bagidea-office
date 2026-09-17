@@ -143,7 +143,20 @@
   };
   let CATALOG = [];
   let QUERY = "";
-  const lang = () => (document.documentElement.lang === "th" ? "th" : "en");
+  const lang = () => document.documentElement.lang || "en";
+  let TT_PLUG = {};        // english source -> translation, for the current language
+  let TT_LANG = null;
+  async function ensurePluginLang(l) {
+    if (l === TT_LANG) return;
+    TT_LANG = l;
+    // en and th are authored in plugins.json itself; everyone else overlays the
+    // English source, and a missing translation shows English rather than nothing.
+    if (l === "en" || l === "th") { TT_PLUG = {}; return; }
+    try {
+      const r = await fetch("assets/plugins-i18n/" + l + ".json", { cache: "force-cache" });
+      TT_PLUG = r.ok ? await r.json() : {};
+    } catch { TT_PLUG = {}; }
+  }
   const esc = (s) => String(s || "").replace(/[<>&"]/g, (c) => ({ "<":"&lt;", ">":"&gt;", "&":"&amp;", '"':"&quot;" }[c]));
 
   function render() {
@@ -161,7 +174,8 @@
     if (nomatch) nomatch.hidden = list.length > 0;
     count.textContent = list.length ? `${list.length} ${u.count}` : "";
     grid.innerHTML = list.map((p) => {
-      const desc = (p[L] && p[L].desc) || (p.en && p.en.desc) || (p.th && p.th.desc) || "";
+      const en = (p.en && p.en.desc) || "";
+      const desc = L === "th" ? ((p.th && p.th.desc) || en) : (TT_PLUG[en] || en || (p.th && p.th.desc) || "");
       const tags = (p.tags || []).filter((t) => t !== "official").map((t) => `<span class="ptag">${esc(t)}</span>`).join("");
       const official = p.official ? `<span class="ptag official">${u.official}</span>` : "";
       return `<div class="pcard">
@@ -193,10 +207,11 @@
   function toast(t) { const e = document.getElementById("ptoast"); e.textContent = t; e.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => e.classList.remove("show"), 3600); }
 
   // Re-render cards when i18n flips <html lang>.
-  new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
+  const onLang = () => ensurePluginLang(lang()).then(render);
+  new MutationObserver(onLang).observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
   fetch("plugins.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => {
     CATALOG = (d.plugins || []).filter((p) => p && p.id && p.repo);
-    render();
+    onLang();
   }).catch(() => render());
 
   const psearch = document.getElementById("psearch");

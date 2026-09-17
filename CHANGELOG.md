@@ -4,6 +4,1301 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [1.6.2] — 🌐 A twentieth brain, and reports that come home
+
+**Added**
+- **Atlas Cloud** as a 20th built-in provider — an OpenAI-compatible
+  aggregator (400+ models behind one key), routed through the built-in proxy
+  like Groq or Cerebras; `vendor/model` names (`openai/gpt-4.1-mini`). Contributed
+  by @binyangzhu000-sudo ([#54](https://github.com/bagidea/bagidea-office/pull/54)).
+  The provider count is updated across the site (14 languages), the pitch deck
+  and the guides.
+
+**Fixed**
+- **A delegated result came back to the wrong thread.** `makeDelegateFilter`
+  captured the session by value; on a fresh thread that is `undefined`, and the
+  report-back 4.5 s later resolved it as "the latest thread" — which a job, a
+  heartbeat or a social turn may have moved. The filter now takes a getter and
+  resolves the thread at dispatch time; every owner-facing builder hands it
+  `() => keyRef.key`. Found and first fixed by @sbrasesco
+  ([#41](https://github.com/bagidea/bagidea-office/pull/41), part 2); guarded
+  by `report-thread.test.js`.
+
+## [1.6.1] — 🧾 A run that dies says so
+
+**Fixed**
+- **An abnormal end never reached the session history**
+  ([#52](https://github.com/bagidea/bagidea-office/issues/52)). A run killed
+  by the watchdog (the 30-minute total or 5-minute idle cap), a child process
+  `error`, a brain-dead key (401 / 403 / an endpoint that never answers), or a
+  run that ended with no result all detected the failure correctly and
+  broadcast `task.failed` — to whoever was watching *live*. Nothing was written
+  into `entry.log`, the persistent history `GET /sessions/log` reads, so a
+  session checked later (from the API, another session, a dispatcher polling
+  a job) saw a trail that simply stopped after the last tool call. Each of the
+  four branches now writes one visible line — `⚠ Run ended abnormally — …`
+  with the reason — and persists it at once; once per run, never on a normal
+  finish. Guarded by `field-issue-52.test.js`. Reported with the exact root
+  cause by @hswancampbell1-afk.
+
+## [1.6.0] — 🧪 It learns, carefully
+
+The last release of the v2 plan (`docs/DESIGN-v2.md`): the safety piece that
+makes self-improvement trustworthy, and the sweep that puts everything since
+v1.0 on the website, the docs site and the pitch deck — in 14 languages.
+
+**Added**
+- **Skill regression** (`daemon/skilltests.js`, design J). A skill may carry
+  test cases — `{ prompt, expect }`, where `expect` is a regular expression
+  or, with a leading `!`, one that must not match. When the office's own
+  reflection proposes a correction to a skill it wrote (`refine` in
+  `maybeLearnSkill`), every case is judged by a real model turn with the
+  **candidate** text as the only instructions, *before* the live text is
+  touched. A correction that breaks a case is refused: a
+  `skill.refine.blocked` event, a notification saying which cases failed, and
+  the skill's `lastTest` records it. A refusal still lets that run's new skill
+  be learned. No cases → nothing to regress against → accepted, as before.
+  Routes: `GET /skills/tests?id=`, `POST /skills/tests { id, cases }`,
+  `POST /skills/tests/run { id, content? }` (owner only). Plugins get
+  `ctx.skillTests`.
+- 🧪 **skill-regression** — the eighth library plugin: the panel where cases
+  are written per self-written or edited skill, run by hand, and where the
+  last result (and any refused correction) is shown; agent commands `add`,
+  `run`, `list`, `clear`.
+- **The website in 14 languages** — seven feature cards (one inbox on your
+  phone · budgets in money · a workflow engine with triggers · a task board
+  and a real calendar · Codex as a colleague · official plugins · teams in one
+  click) and six docs links (inbox, budgets, tasks, Codex, library, teams),
+  each translated in all 14 languages and guarded by `site-i18n.test.js`.
+- **The pitch deck** gains six capability cards for v1.1–v1.5, a shipped
+  roadmap stop ("an office that runs while you're away"), and the version.
+- **Getting started** gains a *day one* section: hire a team, install a
+  plugin, and where everything shows up from then on.
+- **Tests** — `skilltests.test.js` (5): case validation and caps, the judge
+  (case-insensitive, `!` negation), one model turn per case with the skill
+  text as the instructions, the gate's three outcomes (no cases, pass, fail —
+  recorded on the skill; a model error counts as a failure), and the daemon
+  wiring (the gate runs before `cur.prev` is written).
+
+**Changed**
+- `npm/` and `npm-bagidea/` package versions track the office (1.6.0).
+
+## [1.5.0] — 🧩 It's useful
+
+The v2 plan's fifth release — the plugins, teams and tools that make the
+machine worth having: *"I use it for marketing / planning / automation"* is
+true now.
+
+**Added**
+- **The official plugin library** (`daemon/plugin-library/`, `GET /plugins/library`,
+  `POST /plugins/library/install { id }`, 🧩 → 📦 OFFICIAL LIBRARY,
+  `bagidea plugin library` / `plugin install <id>`). A fresh install still
+  starts with no plugins — that policy stands — but seven now ship with the
+  office and install in one click, each built on the v1.4 hooks:
+  - 📣 **campaign-board** — posts as cards on the office board (channel, date,
+    brand voice), copy drafted by an agent turn, `ctx.approvals.ask` before
+    anything is published, publishing through the tools the agent has; a
+    card dragged to *done* counts as published by hand; a `campaign-post` node.
+  - 📰 **content-pipeline** — an **`rss` trigger kind** (a dependency-free
+    RSS/Atom reader, primed on first poll so it never floods) and a
+    **`fetch-article` node** (HTML → readable text), plus the pipeline:
+    item → article → summary → draft → approval → channel.
+  - 🐙 **github-triage** — `setup owner/repo :: secret` installs a workflow
+    (webhook → `action == opened` → label/draft → **approval** → post with
+    `gh` → notify) and an HMAC webhook trigger, and prints the URL and the
+    tunnel hint; `triage owner/repo#n` runs one by hand.
+  - 📬 **inbox-agent** — a schedule, a classification pass through the
+    agent's own mail tool, drafts, a decision that skips the approval when
+    nothing needs a reply, and an approval in front of every send.
+  - 📊 **weekly-report** — a `gather-report` node that reads the office's own
+    records (cards done, open and overdue, workflow runs, spend, upcoming
+    events), a Director turn that writes it, delivery to the channel, the
+    report kept on disk; scheduled on a weekday.
+  - 🗂 **client-folders** — a file trigger and a workflow per client, the
+    agent you chose, optional instructions; every file is a card owned by
+    that agent, closed when the run finishes.
+  - 🧠 **decision-log** — "we decided X because Y" with supersede chains and
+    retirement; the **memory provider** injects the newest active decisions
+    for agents that opted in; a `decision-log` node records a step's
+    conclusion.
+- **Team templates** (`daemon/teams/*.json`, `GET /teams`,
+  `POST /teams/hire { id }`, ⚙ → AGENTS → 👥 HIRE A TEAM, `bagidea teams`,
+  `bagidea hire --team <id>`): dev-shop, research-lab, content-studio,
+  customer-support, solo-assistant. Personas, roles, avatars, auras, voices
+  and builtin skills; an existing agent id is never overwritten; the hire cap
+  applies; a template is plain data you can copy.
+- **Nine tools in the Hub**, each verified on npm and described in all 14
+  languages: Stripe, Airtable, Trello, Asana, YouTube Data, Google Calendar,
+  Gmail, Bluesky, HubSpot (53 entries now).
+- **Schedule triggers take a weekday** (`cfg.weekday` 0–6 with `at`).
+- Plugins can save and start workflows (`ctx.workflow.save/exists/load/runs`),
+  manage their own triggers (`ctx.triggers.add/update/remove/list/get`), and
+  borrow the engine's http client (`require(daemonDir + "/workflows").httpFetch`).
+- **Guides:** [`docs/guide/library.md`](docs/guide/library.md),
+  [`docs/guide/teams.md`](docs/guide/teams.md).
+- **Tests** — `library-teams.test.js` (10): every library plugin loads in the
+  real host and registers the hooks its manifest claims; decision-log's
+  supersede chain reaches the memory hook newest-first; weekly-report's
+  weekday schedule fires on Friday and not Thursday; client-folders wires a
+  file trigger per client and cards each file; github-triage's workflow has
+  the approval in front of the post and never leaks the secret;
+  content-pipeline parses RSS and Atom and its fetch node strips navigation;
+  campaign-board plans → drafts → approves → publishes on drag; inbox-agent
+  keeps every send behind an approval; every team template is well-formed,
+  English, and references real skills.
+
+**Changed**
+- The 🧩 PLUGINS window shows the library under the installed list; the
+  ⚙ AGENTS tab gains 👥 HIRE A TEAM.
+
+## [1.4.0] — 📋 It works
+
+The v2 plan's fourth release — the surfaces on top of the engine: a board that
+shows what the office is doing, a calendar that behaves like one, Codex as a
+tool the office can drive, and plugins that can reach all of it.
+
+**Added**
+- **One task board** (`daemon/tasks.js`; 🗂 → 📋 TASKS). A work item is
+  `{ title, owner, project, due, priority, status, dependsOn, recurrence, source }`
+  in one of todo / doing / waiting / done. Drag between columns, click to edit.
+  **Due dates** remind through the notification rules an hour before and once
+  overdue. **Dependencies** hold a card in *waiting* and release it by
+  themselves — the owner is told — when the last blocker closes. **Repeat**
+  (day / week / month) brings a finished card back, due the next period.
+  Everything the office does lands on the board: the Director's
+  **delegations** (owned by the assignee, *doing* → *done*, or *waiting* when
+  the task failed), **fired jobs** (one card per job, back to *doing* each
+  run), a meeting's **action items** (with their owner and due date),
+  **workflow runs**, and Codex calls. Every agent is told the board and its
+  API at the start of each turn (`<office-tasks>`), so they move their own
+  cards. `GET /tasks`, `GET /tasks/board`, `POST /tasks|/tasks/update|/tasks/move`,
+  `POST /tasks/delete` (owner only). Events `work.created|updated|done|removed`
+  — an **event** trigger can start a workflow on any of them. `/stats` carries
+  the summary; the Director's heartbeat reads it.
+- **A calendar that behaves like one** (`daemon/calendar.js`; the same
+  `calendar.json` on disk, old rows load unchanged). **Recurrence** — daily,
+  weekly by day, weekdays, monthly, yearly, with interval / count / until (the
+  RRULE subset real calendars export); **all-day** events; reminders **per
+  occurrence** (a weekly meeting reminds every week) through the rules *and*
+  the Director's spoken reminder as before; `link` to a task or project;
+  `agent` — an agent can book a follow-up and be the one reminded.
+  **`GET /calendar/ics`** exports (subscribe from a real calendar);
+  **`POST /calendar/import`** takes an .ics — the same UID updates instead of
+  duplicating. `GET /calendar` returns the events and the next 30 days of
+  occurrences. The 📅 tab gained repeat, all-day, 📤 / 📥 .ics, and a
+  day-grouped list.
+- **Codex as a system tool** (`daemon/codex.js`; design G2). The office runs
+  `codex exec --json -C <project> -s workspace-write --ephemeral` itself, the
+  task on stdin, the JSONL streamed into a live run (a 🧑‍💻 mission row at the
+  caller's desk; steps in ⚙ → 🧑‍💻 CODEX), and returns the final message plus
+  a **diff summary** scoped to the directory. Four doors: `POST /codex/exec`
+  (told to every agent when Codex is installed), the Director's
+  **`DELEGATE: codex @ <project> :: <task>`** (reports back like a teammate's
+  result), a **🧑‍💻 Codex workflow node**, and **`bagidea codex "…"
+  --project x`**. `POST /codex/review` / `bagidea codex review` runs
+  `codex exec review` as a **second opinion**. It works only inside registered
+  projects or the workspace; 👻 GHOST ISOLATION applies unchanged (its own
+  worktree, edits arrive as a branch); the cost is **estimated** on the
+  caller's budget line (`BRAIN_PRICES.codex`, labelled ≈). Settings in
+  ⚙ → 🧑‍💻 CODEX: enabled, sandbox, model, `--oss` local provider
+  (ollama / LM Studio), max minutes. Never the brain: persona, memory,
+  permissions and the world stay on the agent that called it.
+- **Plugin hooks** (design H; every existing plugin keeps working):
+  `onEvent(type, evt)` on the module; `ctx.notify(item)`;
+  `ctx.approvals.ask(item)` → promise (what #48 / #50 wanted); `ctx.tasks`,
+  `ctx.calendar`; `ctx.schedule(job)`; **`ctx.triggers.register(kind, def)`**
+  — a new trigger kind that appears in the Builder's ⚡ panel as `🧩 …`;
+  **`ctx.workflow.node(kind, impl, meta)`** — a new node type in the palette
+  (`GET /workflows/types`); **`ctx.memory.provider(fn)`** — the narrow hook
+  agreed in #42: lines at prompt-assembly time for agents that **opt in**
+  (agent editor → 🧠 MEMORY PLUGINS; `memoryPlugins` on the agent), the core
+  owning the 800 ms timeout and the ~1500-character budget, a throw yielding
+  zero lines; and `ctx.codex.exec / review`. Registrations are tagged with the
+  plugin id and dropped on reload. `GET /plugins` lists each plugin's `hooks`.
+- **CLI:** `bagidea tasks [column]`, `bagidea task add|done|move`,
+  `bagidea cal [add|ics]`, `bagidea codex ["task" | review]`.
+- **Guides:** [`docs/guide/tasks.md`](docs/guide/tasks.md),
+  [`docs/guide/codex.md`](docs/guide/codex.md), a *Hooks* section in
+  [`docs/guide/plugins.md`](docs/guide/plugins.md).
+- **Tests** — `tasks-calendar.test.js` (9) and `codex-hooks.test.js` (8),
+  plus wiring: a fake Codex binary that speaks the JSONL protocol end to end,
+  the argument shape (stdin prompt, sandbox, `-C`, review flags, `--oss`),
+  failure paths; memory providers that are opt-in, budgeted, time-boxed and
+  throw-safe; a plugin's trigger kind that really fires and a node that really
+  runs, both gone after a reload; recurrence expansion, per-occurrence
+  reminders, an ICS round trip with UID de-duplication.
+
+**Fixed**
+- **The Director was still being instructed in Thai.** `directorNote()` (the
+  split-into-sub-agents guidance, the PROJECT protocol, DEFINITION OF DONE),
+  the `<work-autonomy>` note every delegation carries, `projectNote()` (the
+  project list, the iron rules, the system-tools list), the heartbeat prompt,
+  the resume-after-limit prompt, the proposal-approved order and the
+  break-room PROPOSAL instruction — all English now, in the same sweep that
+  wired Codex into them. The #49 guard covers every one of these blocks and
+  the new modules, and skips display-only strings (`logPrompt`, chat lines).
+
+**Changed**
+- The 🗂 OFFICE OPS window opens on 📋 TASKS (the board); scheduled jobs moved
+  to their own 🔁 JOBS tab.
+- The job-creation code is one function (`createJob`) shared by the route
+  and by plugins' `ctx.schedule`.
+- Codex's diff summary is scoped to the directory it worked in (`-- .`), so a
+  workspace inside a larger repository never reports the repository's changes.
+
+## [1.3.0] — 🔀 It runs
+
+The v2 plan's third release — the core of the machine. A workflow stops being a
+drawing and starts being something that runs, and can start on its own.
+
+**Added**
+- **A workflow engine** (`daemon/workflows.js`). `POST /workflows/run` used to
+  serialize the graph to prose and hand it to the Director as one order. Now
+  every node executes on its own: in parallel where the edges fan out, joining
+  where they converge, a decision opening only the branch it chose (the other
+  is *skipped*, which is not a failure). Data flows down the edges as
+  `{{trigger.data.x}}`, `{{n3.output}}` and `{{prev}}` — small and explicit,
+  no scripting language. Every run is a persisted record
+  (`workspace/workflows/runs/`) that a restart **resumes**: delays re-arm,
+  approvals stay pending in the inbox, and an agent step that was mid-flight
+  is marked failed rather than pretended. Events `workflow.run` and
+  `workflow.node` drive live UI; `GET /workflows/runs` is the history.
+- **Three node types that make it a machine.** ✋ **approval** asks through
+  the inbox (kind *workflow*) and resumes on approve — from the sidebar, the
+  chat card, the CLI or your phone; 🔔 **notify** goes through the notification
+  rules; ⏳ **delay** waits `10m` / `2h 30m` / `until 09:00`. **fetch** is a
+  real HTTP request now (JSON parsed, redirects followed once); **decision** is
+  an expression (`==`, `!=`, `<`, `>`, `contains`, `matches`) or a plain
+  question the Director answers YES/NO; **output** records, writes a file
+  (`file:<path>`) or relays to your channels (`channel:`).
+- **Every agent step is a real turn** through `runClaude` — the same permission
+  broker, the same budget gate, the same Security Center — tracked as a task
+  row (🔀 in Mission Control). `@id:` picks the agent; the Director gets
+  DELEGATE power on a step, as on a job.
+- **⚡ Triggers** (`daemon/triggers.js`): a workflow starts without you.
+  **schedule** (every N minutes or daily at HH:MM), **webhook**
+  (`POST /hook/<token>`; an optional secret verifies an HMAC-SHA256 signature
+  — GitHub's `X-Hub-Signature-256` works as-is; `X-GitHub-Event` becomes the
+  run's event), **event** (any office event by type), **file** (a folder
+  watched with `fs.watch`, debounced, filtered by a glob) and **channel** (a
+  message starting with a keyword — consumed, never a Director order). The
+  engine's own events never trigger anything, so there are no loops. Secrets
+  are masked in every API response.
+- **The Builder learns all of it:** ✋ 🔔 ⏳ in the palette with a hint per type,
+  **▶️ Run now** watches the run and colours the canvas as it goes, **▶ RUNS**
+  keeps the history (click one to replay its states), **⚡ TRIGGERS** adds,
+  pauses, fires and removes triggers, and a webhook row copies its URL with the
+  tunnel hint.
+- **A guide, rewritten:** [`docs/guide/workflows.md`](docs/guide/workflows.md).
+- **`daemon/tests/workflows.test.js`** — seventeen tests with a fake agent: a
+  linear run with `{{prev}}`, fan-out that really runs in parallel and a join
+  that really waits, decisions by expression (no model) and by question,
+  approval wait/resume/reject, delay persistence across a "restart", a
+  mid-flight step failed on restart, fetch/notify/output doing real work
+  against a local server, failure reporting, bounded newest-first history, and
+  every trigger kind including HMAC verification and a real `fs.watch`.
+
+**Fixed**
+- **`daemon/joborder.js` instructed the model in Thai.** The standing-order and
+  Director notes every scheduled job carries were Thai prompt scaffolding — the
+  #49 class of bug, one module over from the v1.0.5 sweep. English now, and the
+  Thai guard in `field-issues-46-50.test.js` scans this file too (verified: it
+  fails naming `joborder.js` with the old text restored).
+
+**Changed**
+- `POST /workflows/run` returns at once with the run; `legacy: true` keeps the
+  pre-1.3 behaviour (the whole drawing to the Director, synchronously).
+
+Nothing starts by itself until you add a trigger. The daemon still listens on
+`127.0.0.1` only; a webhook reaches the internet through a tunnel you run.
+
+## [1.2.0] — 💸 On a budget
+
+The v2 plan's second release. Before the office is allowed to run on its own
+(v1.3), it needs a brake — and the two shell pieces of v1.1's notifications.
+
+**Added**
+- **Caps in money** (`daemon/budget.js`, ⚙ → 💸 BUDGET, `bagidea budget`).
+  The office per calendar day, an agent per day, a project for its lifetime.
+  At **80 %** one warning per day per scope through the notification rules
+  (kind 💸 budget); at **100 % the office stops taking new turns** for that
+  scope — the turn is refused at the very top of `runClaude`, before a session
+  is touched or an event is broadcast, with a chat message saying which cap,
+  how much, and what to do. Running turns always finish. A daily cap releases
+  at midnight; a project cap when you raise it.
+- **Honest numbers.** Claude's spend is the real bill (`total_cost_usd`);
+  swapped-in brains and the voice/image/video tools are estimates and are
+  **labelled ≈** in the panel, in STATS, in the CLI and in every warning. An
+  unknown price is never treated as zero.
+- **Attribution.** Every turn's cost is now recorded against the agent that
+  ran it (a ghost clone counts toward its parent) and the project it ran in
+  (`stats[day].agentCost` / `projCost`) — the two things the per-agent and
+  per-project caps are judged on. `brainBump` attributes too.
+- **🌅 Morning digest** at the time you choose: yesterday's spend, turns, the
+  top spenders, and what's waiting for you. Sent once, through the rules.
+  `bagidea budget digest` shows it now.
+- **Toasts are real windows now.** A `notify` the rules route to *toast* also
+  becomes a small always-on-top window in the corner of the **screen**, drawn by
+  the shell, so it shows when the chat window is hidden or covered; click it to
+  bring the office up. No OS-notification crate: an unpackaged app's Windows
+  toasts show up attributed to PowerShell, or not at all without an
+  AppUserModelID, and a window we own looks the same on all three platforms.
+- **The tray icon carries a red dot** while anything waits for you, with the
+  count in its tooltip — visible with every window closed. Drawn into the icon's
+  RGBA at runtime; no font, no crate.
+- `GET/POST /budget`, `POST /budget/digest`; `/stats` now carries `budget`;
+  a `budget.refused` event on the stream. Setting caps is human-UI-only.
+- **A guide:** [`docs/guide/budget.md`](docs/guide/budget.md).
+- **`daemon/tests/budget.test.js`** — eleven tests: the ledger (real + estimated,
+  labelled), 80 % warns exactly once and 100 % stops, per-agent and lifetime
+  per-project caps on their own attribution, ghost ids collapsing to the
+  parent, cap validation, the digest firing once at its time, and the wiring —
+  the gate sits inside `runClaude` before the session is touched, costs are
+  attributed on every result path, the shell has the arms and no new crate.
+
+**Changed**
+- `bagidea update` will fetch a new shell for this release (the toast window
+  and tray badge are binary changes).
+
+Nothing here changes what an agent may do, and nothing is capped until you set
+a cap. The digest is off until you switch it on.
+
+## [1.1.0] — 🔔 You'll know
+
+The first release of the v2 plan ([`docs/DESIGN-v2.md`](docs/DESIGN-v2.md)):
+*an office that runs while you're away, and can be trusted to.* Before it can
+run unattended it has to be able to ask you properly and to reach you when it
+does. This release is those two things, plus a free win.
+
+**Added**
+- **📥 One approvals queue** (`daemon/approvals.js`). Five separate things used
+  to wait on a person in five separate places — tool permissions in the Security
+  Center, a project's own hooks (trust), team pitches, an 🤖 AUTO agent's
+  `STATUS: BLOCKED`, and jobs created switched off. They now share one queue
+  with history, a note box, and the buttons each kind needs. Every old path
+  still works and closes its inbox item on the way, so the phone never shows a
+  card the office already settled. **Answering a blocked agent resumes the
+  work** with your answer — before, that block was a line on Telegram and a job
+  sitting idle until you came back.
+- **Answer from your phone.** Approvals are pushed to your channels; Telegram
+  gets inline buttons (one tap answers, the card settles so it can't be tapped
+  twice), and on every channel a typed reply works — `1 yes`, `2 no too risky`,
+  `2 continue use staging`, `/approve 1`, a bare `yes` when exactly one thing is
+  pending, `/inbox` to list. A reply that matches a pending item is answered on
+  the spot and never reaches the Director as an order.
+- **🔔 Notifications with rules** (`daemon/notify.js`, ⚙ → 🔔 NOTIFY). One
+  `notify.send()` behind every "tell the owner". Per kind — approval, blocked,
+  reminder, budget, done, workflow, proposal, mention, system — choose the
+  sidebar's 🔔 list (always on, with an unread count), an in-app toast, your
+  channels, and a sound; and *always*, *outside quiet hours*, or *only when
+  you've been away from the keyboard for five minutes*. Quiet hours may wrap
+  midnight. The old milestones→channels switch still mutes the channel leg.
+- **`bagidea inbox` · `approve` · `deny` · `answer` · `notify [test]`**, and
+  `GET /inbox`, `GET/POST /approvals`, `POST /approvals/respond`,
+  `GET /notify`, `POST /notify/send`, `/notify/read`, `/notify/rules`,
+  `/notify/presence` — `POST /approvals` is the primitive the author of
+  [#48](https://github.com/bagidea/bagidea-office/issues/48) /
+  [#50](https://github.com/bagidea/bagidea-office/issues/50) was building by
+  hand out of disabled jobs.
+- **🧑‍💻 Codex in the Tools Hub.** `codex mcp-server` as a one-click MCP entry
+  (44 entries now, 29 MCP): grant it to an agent and that agent can hand a
+  coding task to OpenAI's Codex, which works in the project and reports back
+  with a diff. It never replaces the caller. Translated into all 14 languages.
+  The deeper integration — Codex as a system tool and a workflow node with a
+  review mode — is v1.4.
+- **A guide:** [`docs/guide/inbox.md`](docs/guide/inbox.md).
+- **`daemon/tests/inbox.test.js`** — seventeen tests: the queue's ask/respond/
+  expiry/restart semantics, phone-reply parsing (a bare "yes" is accepted only
+  when it can't be ambiguous), rule routing, quiet hours across midnight, the
+  away gate, the legacy mute, and the wiring — every old path asks the queue,
+  the channel reply check runs before the Director sees the message, Telegram
+  handles `callback_query`, the overlay has the sections and pings presence,
+  Codex is translated everywhere.
+
+**Changed**
+- The 🛡 sidebar gains **🔔 NOTIFICATIONS** and **📥 APPROVALS** above the
+  Security Center; the badge now counts every pending approval, not only tool
+  permissions. Toasts stack in the corner of the chat window and open the item
+  on click.
+- The proposal verdict is one function (`decideProposal`) shared by the panel,
+  the chat card, the CLI and the phone, so every path agrees.
+
+Nothing changes what an agent may *do*: 🤖 AUTO and 🔓 auto-approve remain the
+switches for that. Everything new is on by default only where it matches how the
+office already behaved (milestones to channels); toasts and sounds follow the
+rules, and quiet hours are off until you set them.
+
+## [1.0.5] — 🌐 The office stops instructing agents in Thai
+
+Five bugs, all reported from one live v1.0.4 office by
+[@hswancampbell1-afk](https://github.com/hswancampbell1-afk), each with a
+code-level diagnosis that held up when checked against the source.
+
+**Fixed**
+- **Agents drifted into Thai regardless of the office language**
+  ([#49](https://github.com/bagidea/bagidea-office/issues/49)). They weren't
+  choosing Thai — **the daemon was instructing them in Thai**. `personaText()`
+  wrapped every persona in Thai section headers, and the line naming *which
+  language to reply in was itself written in Thai*. So were the preamble's
+  note-board line, `SUB_NOTE`, `VOICE_NOTE`, `MEDIA_NOTE`, `TOOLS_NOTE`,
+  `autoNote`, the AUTO continuation prompt, and the Gemini Live call's system
+  instruction. An English office was being instructed in Thai and then asked to
+  answer in English; drifting is the sane reading of that prompt.
+  All of it is English now — and the office **says which language it is set to**
+  rather than leaving the model to infer it: `officeLangNote()` names `reg.lang`
+  in the preamble. An agent whose persona sets its own language still wins, and a
+  Thai office still gets Thai.
+- **Duplicate job ids silently left jobs enabled**
+  ([#50](https://github.com/bagidea/bagidea-office/issues/50)). Ids were
+  `"j" + Date.now()` — unique only if nothing ever creates two jobs in the same
+  millisecond. A plugin queueing a meeting's action items created seven in a
+  loop; two pairs collided, `/jobs/update` matched whichever came first, and each
+  *create-then-disable* disabled one twin while leaving the other **enabled**.
+  Two of them fired work that was explicitly meant to wait for a human.
+- **`POST /jobs` discarded `enabled:false` and fired `mode:"now"` immediately**
+  ([#48](https://github.com/bagidea/bagidea-office/issues/48)). `enabled` was
+  hardcoded `true` and the dispatch happened synchronously inside the request, so
+  a job created disabled had already run before the response came back.
+  `dispatchJob()` never consults `.enabled` and the scheduler's `jobDue()` never
+  sees `"now"` jobs — that call site was the only gate there was.
+- **Proactive compaction never fired; one thread reached 9.5M tokens against a
+  200k budget** ([#46](https://github.com/bagidea/bagidea-office/issues/46)).
+  `overBudget()` estimated a thread's size from the transcript's **bytes ÷ 4**.
+  That under-counts tool-heavy sessions (file dumps and JSON tool envelopes don't
+  tokenize like prose) and goes blind entirely if the session id ever moves,
+  leaving the safety net silently absent. The real figure was already being
+  stamped on the thread every turn as `lastUsage.in` — the exact number the
+  context meter displays. It uses that now, keeping the byte estimate only for a
+  thread that hasn't completed a turn.
+- **Chat bubbles and Mission Control showed the raw agent id**
+  ([#47](https://github.com/bagidea/bagidea-office/issues/47)) instead of the
+  name you gave the agent. Both now route through the existing `nameOf()`.
+  Mission Control is built from DOM nodes rather than an `innerHTML` template
+  while we're there: `nameOf()` returns a field the owner types, and that row
+  escaped nothing — interpolating it would have turned a display bug into an
+  injection. `m.tool` and the task id move to `textContent` with it.
+
+**Not changed, deliberately** — two of the three causes named in #49 are display
+strings, not prompt input. `logPrompt` lands in `entry.log`, the overlay's chat
+log, while the model resumes its own Claude session; the compaction banners
+arrive as `opts._notice` and are pushed to that same log. The English report-back
+prompt beside them is what the model actually reads. And `OFFICE_MD_OLD_TH` stays
+Thai on purpose, exactly as the reporter warned: it is compared against an
+untouched old Thai `OFFICE.md` to detect and replace it, so translating it would
+quietly break that migration. There is now a test that says so.
+
+**Added**
+- `daemon/tests/field-issues-46-50.test.js` — seven tests, one per fault plus the
+  migration string. The Thai guard is per line and about *majority*, so
+  `(in Thai use ครับ/ผม)` inside an English instruction stays legal while a whole
+  Thai sentence fails. Run against the pre-fix code, **six of the seven fail**.
+
+## [1.0.4] — 🛠 A blank window that finally says what's wrong
+
+From a real deployment: a machine built for a customer to run local LLMs came up
+with a chat window that showed **nothing at all**. Two separate things were
+wrong, and neither of them said a word on screen. The engineer who set it up had
+installed on dozens of machines without ever hitting either, and had to go
+through the firewall and the proxy by hand while the customer sat in front of an
+empty window.
+
+**Fixed**
+- **The installer could finish “successfully” with no Claude Code CLI at all.**
+  PowerShell's *default* execution policy is `Restricted`, and in PowerShell
+  `npm` resolves to **`npm.ps1` — a script**, so `npm install -g
+  @anthropic-ai/claude-code` was refused outright:
+  *“npm.ps1 cannot be loaded because running scripts is disabled on this
+  system.”* The installer then printed **“+ installed”** regardless. Every agent
+  in the office is a claude session, so that is the entire product failing to
+  install and being reported as a success. It now calls **`npm.cmd`** (which no
+  policy can block), lifts the policy for its **own process only** (never
+  written to the registry, machine untouched), and **verifies `claude` is
+  actually on PATH** before saying anything — with the real fix printed if it
+  isn't.
+- **A window that could not reach the daemon showed an empty rectangle.** The
+  whole UI is served from `127.0.0.1:8787`; if something on the machine stands
+  between the two, the window painted nothing — no text, no error, no hint. It
+  now waits up to 25s for a slow daemon (a cold boot must never be reported as a
+  blocked machine) and otherwise shows an **embedded** page naming the three
+  causes — proxy, firewall, daemon not started — and pointing at `bagidea
+  doctor`. It retries on its own with a backoff, so a daemon that was merely
+  slow heals with nobody touching it.
+
+**Added**
+- **`bagidea doctor`** — the diagnostic that support call needed. It checks
+  whether anything answers on `127.0.0.1:8787` (and tells a *refused* connection
+  apart from a *hang* — they mean different things), whether a system proxy or
+  PAC script covers local addresses, whether `HTTP_PROXY` is set without
+  `NO_PROXY`, whether the execution policy will refuse `claude` and `npm`, and
+  whether the Claude Code CLI is installed at all. Each finding prints the fix
+  beside it. It runs **without the daemon** — that is the case it exists for.
+- **The installer asks about the persistent policy.** Your terminal still needs
+  it for `claude`/`npm` afterwards, so it explains the two ways out and offers
+  to set `RemoteSigned` for **your user only**. It never lowers a machine's
+  script policy silently — on a customer's machine that is not even the
+  installer's call to make. `BAGIDEA_SET_EXECUTION_POLICY=1` for unattended runs.
+- **`daemon/tests/unreachable-office.test.js`** — nine tests over the two
+  failures: no bare `npm` in the installer, the policy lifted at process scope
+  only, the success message guarded by a real check, the daemon given time
+  before being declared unreachable, the offline page naming the causes without
+  fetching anything, and doctor's bypass-list parsing (`<local>`, `127.0.0.1`,
+  `localhost` — but not a list that only covers the corporate network, which is
+  the configuration that breaks it). Run against the pre-fix code: **six of the
+  nine fail.**
+
+**Docs** — troubleshooting now opens with `bagidea doctor`, adds a section on the
+blank window (proxy, PAC, firewall, `NO_PROXY`), and documents the
+“running scripts is disabled” symptom for `claude`/`npm`.
+
+## [1.0.3] — 🔎 The endpoint box you couldn't type in
+
+Reported from a real office, with a screenshot: the 🔎 SEMANTIC RECALL row in
+⚙ → SKILLS had an endpoint field squeezed to nothing and a Save button hanging
+off the edge of the panel. Both true, both measured.
+
+**Fixed**
+- **The SEMANTIC RECALL endpoint field rendered at 22px — and the row ran 26px
+  past the panel.** `.assistrow` is a flex row that cannot wrap; the model and
+  key inputs were pinned with `flex: 0 0 190px` and `0 0 150px`, so **340px of
+  that row could not give ground**. The panel is `min(470px, 92vw)` with 16px
+  padding — about 426px — so the one flexible child, the endpoint, absorbed the
+  entire shortfall and collapsed. At 22px it could not even show its own
+  placeholder (`http://localhost:11434/v1`), so nothing on screen said what to
+  type into the field the feature needs; and what was left over pushed
+  บันทึก outside the panel. The endpoint is a URL, so it now takes a line of
+  its own (392px), and the model, key and Save share the next one.
+- **📦 RUN LOCATION had the same bug one field along.** Choosing **ssh**
+  reveals a fourth input, and the host and the office path ended up at **77px
+  each** — too narrow to read either placeholder, let alone a real path. It did
+  not overflow, which is why nobody caught it. They are now 185px and 343px.
+
+**Added**
+- **`daemon/tests/overlay-layout.test.js`** — four tests that compute, from the
+  markup, whether a settings row pins more width than the panel can give it
+  while being unable to wrap. Checked against the broken markup first: it fails
+  three of the four, so it is a guard and not decoration.
+
+Nothing else changed. The daemon reads `overlay.html` from disk on every
+request, so **tray → Reload chat window** is enough to pick this up — no
+restart, no update.
+
+## [1.0.2] — 📖 The documentation catches up with the product
+
+v1.0.0 shipped five real capabilities and v1.0.1 made the office speak fourteen
+languages properly. Neither of them reached the surfaces most people actually
+read: the website's feature grid, the docs site, and the guide set had no idea
+any of it existed. A capability nobody can find is a capability nobody has.
+
+Nothing here changes behaviour. It changes what the product tells you, and in
+how many languages it tells you.
+
+**Added**
+- **The website now describes what v1.0 added.** Four new cards on the landing
+  page — 📦 *Run it somewhere else*, 🔎 *Recall by meaning*, 🎨 *Media
+  Studio* and 📚 *Skills that correct themselves* — and six new sections on the
+  docs page: where agents run, ghosts that don't overwrite each other, recall by
+  meaning, self-correcting skills, the Tools Hub and the Media Studio. Each one
+  cites the **ALL-CAPS English setting name** the app itself shows, so the page
+  and the office agree on what a thing is called.
+- **All of it in all fourteen languages, on the same commit.** 24 new site
+  strings × 14 languages, written rather than left to fall back — English,
+  ไทย, 中文, Español, हिन्दी, العربية, Português, Русский, 日本語, Deutsch,
+  Français, 한국어, Indonesia, Tiếng Việt.
+- **The Plugins Hub read English in 12 of the 14 languages** — the last known
+  gap of this kind. `web/plugins.json` carried English and Thai, and the page
+  collapsed every other language to one of those two before rendering, so a
+  reader in Korean got a fully translated page wrapped around English plugin
+  cards. The catalog now has per-language overlays
+  (`web/assets/plugins-i18n/<lang>.json`, keyed by the English source, fetched
+  on demand) and `plugins.html` reads the real document language. Guarded by
+  `daemon/tests/plugins-catalog.test.js` — eight tests, including one that
+  fails if the page stops fetching the overlays, because twelve translated
+  files no page loads is twelve files of dead weight and the bug still ships.
+- **A guide for the 🧰 Tools Hub** ([`docs/guide/tools-hub.md`](docs/guide/tools-hub.md)):
+  the 43 entries and what separates the 15 built-in abilities from the 28 MCP
+  servers, the creative shelf (Blender, Godot, Unity, Unreal Engine, Roblox
+  Studio), why keys should be named rather than pasted, how to read the risk
+  line, and how to submit an entry — including why every one is checked against
+  the registry before it merges. Linked from the README, the docs site and the
+  tools page.
+- **`daemon/tests/site-i18n.test.js` — the website's i18n is now checkable.**
+  Eight tests: every advertised language has a table, every English key is
+  translated everywhere, no language carries a key English has dropped, no
+  *paragraph* is the English left in place, every `data-i18n` key on every page
+  has an English source, the v1.0 capabilities are present in all 14 languages,
+  and the ALL-CAPS setting names the docs cite still exist in the app. With the
+  eight plugin-catalog tests, the suite goes from 242 to 258.
+
+**Changed**
+- **README.** The daemon feature list now documents 📦 run location and 🔎
+  semantic recall as their own entries, and the ghost, skills and tools entries
+  say what v1.0.0 actually did to them. Eight new HTTP API rows
+  (`/registry/backend`, `/registry/ghostworktrees`, `/registry/semantic`,
+  `/registry/skill/revert`, `/gen/image/edit`, `/gen/video`, `/studio`,
+  `/tools/catalog`), the Media Studio in the media section, the Tools Hub guide
+  in the guide table, and seven v1.0 items on the roadmap.
+- **The ghost card on the landing page** stopped describing only the part that
+  was true before v1.0.0 — it now mentions the private `git worktree` each
+  ghost gets and the branches its work comes back as.
+
+## [1.0.1] — 🌐 Fourteen languages, actually
+
+This office ships worldwide, and 1.0.0 quietly assumed otherwise in three
+places. Nothing here changes behaviour; it changes what the product says, and
+to whom.
+
+**Fixed**
+- **The Tools page read English in 12 of the 14 languages.** The site's language
+  files cover page *chrome*; the tool descriptions live in the catalog, which
+  only ever carried English and Thai — so a reader in Japanese or Arabic got a
+  translated page wrapped around English cards. All 79 catalog strings are now
+  translated into every supported language (`web/assets/tools-i18n/<lang>.json`,
+  fetched on demand, English as the fallback). "Falls back to English" is not
+  the same as "supported".
+- **Three new settings had no stable name outside Thai.** Every field in the
+  chat window leads with an ALL-CAPS English term — 🔌 MCP SERVERS, ⚡ SYSTEM
+  TOOLS, 🔑 API KEYS — with the Thai after it. That is not decoration: the
+  window is Thai-source and a DOM pass machine-translates it at runtime, so the
+  English term is the part that survives unchanged. It is the name an English
+  office shows and the only name the docs can cite. The 1.0.0 additions were
+  Thai-only; they are now **📦 RUN LOCATION**, **🔎 SEMANTIC RECALL** and
+  **👻 GHOST ISOLATION**.
+- **The English guide cited Thai labels.** Doubly wrong: a reader of an English
+  page is running an English office and would never see them. Those pages now
+  cite the English names, and the example of a word-match failure that ran in
+  Thai runs in English on the English-facing pages.
+
+**Added**
+- **Tests that keep it true.** The catalog now fails CI if a language is
+  missing an overlay file, if any English string is untranslated in any
+  language, if a "translation" is just the English copied through — the failure
+  that looks like success — or if a file carries a string the catalog no longer
+  has.
+
+## [1.0.0] — 🏢 An office that can run anywhere, recall what you meant, and correct itself
+
+> **On the version number:** nothing here breaks. Every addition is opt-in and an
+> office that updates and changes no settings behaves exactly as it did on
+> 0.9.54. `1.0.0` is a statement about the product being ready, not the semver
+> rule about breaking changes — the one deliberate exception to the table below.
+
+**Added — the five things the field had and we didn't**
+
+A survey of where the open-source agent projects have got to (OpenClaw,
+Hermes Agent, thClaws, ARRA Oracle) found five real gaps once the ones we had
+already closed were set aside. All five are here.
+
+- **📦 An agent can run somewhere that isn't your desktop.** Every run was
+  `claude -p` on this machine, so an agent that went wrong went wrong on the
+  real computer and the office could never be bigger than one of them. ⚙ →
+  TOOLS now takes a **Docker** image or an **SSH** host; set it for the office
+  or per agent. A container gets the office read-only at `/office` and the
+  working directory at `/work`, and nothing else on the disk exists as far as
+  that agent is concerned. Keys pass by *name*, so values never appear in a
+  process listing. A backend that cannot be built correctly is **refused, not
+  downgraded** — most importantly when `--settings` cannot be placed, because
+  that is what installs the permission broker, and a run that quietly loses it
+  works fine with nobody watching.
+- **👻 Ghost clones stop overwriting each other.** Parallel ghosts have always
+  shared one directory. Each can now get its own `git worktree`, with the work
+  coming back as `office/ghost-<id>` branches to review. Your checkout is never
+  touched, a ghost that changed nothing leaves nothing, and a ghost that failed
+  still keeps what it wrote. Off by default: it moves where a ghost's edits
+  land.
+- **🔎 Recall by meaning, not only by words.** Memory search matched words —
+  ask *"why did the wallpaper vanish"* and a note reading *"WorkerW teardown kills
+  the embedded world"* shares no meaningful token with the question and never came
+  back. Point ⚙ → SKILLS → **🔎 SEMANTIC RECALL** at any OpenAI-shaped `/embeddings` (a local Ollama costs nothing
+  and keeps your memory on the machine) and both rankings are fused. Off by
+  default; word search is untouched and still runs alone.
+- **📚 Skills that fix themselves.** The office wrote itself new skills and never
+  revised one, so a skill with subtly wrong steps stayed wrong forever and got
+  handed to more agents over time. Reflection can now correct one — and it runs
+  after **failures** too, which is the strongest evidence a skill is wrong and
+  was previously thrown away. Never a built-in, never one you have edited, and
+  the previous version is kept.
+- **🎨 Media Studio.** The office could make a picture but not change one, so
+  any real production job left halfway through. Make, change and animate in one
+  window; an edit never overwrites its input and its result becomes the
+  selection, so the next instruction refines rather than restarts. Agents can
+  make and edit pictures; video is owner-only and says its price on the button.
+
+**Added — the engines, and a tool catalog that resolves**
+- **The engines are in the office.** 🧰 Tools Hub gains a *Creative & game dev*
+  tier — **Blender**, **Godot**, **Unity**, **Unreal Engine** and **Roblox
+  Studio** — so an agent can model, light and render, run a scene and read the
+  debug output back, or edit a script and playtest it, inside the real tool
+  instead of only writing files and hoping. Plus **Figma** (read the actual
+  layout, not a screenshot of it) and **ElevenLabs** (voice) for the rest of a
+  production.
+- **Chrome DevTools, Context7, Exa and Firecrawl.** DevTools gives an agent a
+  performance trace and the console when a page is broken; Context7 pulls the
+  *current* docs for the library being written against — the cure for
+  confidently-wrong code from a stale memory of an API.
+- **A hosted MCP server can now be added by pasting its URL.** An `https://…`
+  goes in the same one-line box as a launch command and connects over HTTP;
+  anything else is still run as a program. Nothing extra to choose. Linear ships
+  as the first entry of that kind.
+- **New builtin skill: 3D & Game Production** — how to work through an engine:
+  check the tool is actually connected before planning around it, read the scene
+  before changing it, change small and then *look* (render, run, screenshot,
+  read the output), and never claim what you have not seen.
+
+**Fixed — a tool catalog half of which could only fail**
+- **Seven Tools Hub entries were dead buttons.** npm has deprecated the
+  reference servers for GitHub, Brave Search, Postgres, Slack, Puppeteer and
+  Google Drive, and `@google-workspace/mcp-server` — offered for one-click
+  install — **never existed at all**; it 404s. Every command in the catalog was
+  re-checked against the live npm / PyPI / GHCR registries and replaced with the
+  maintained server (GitHub's own, Brave's own, Notion's own, and so on).
+  Puppeteer and the separate Drive server are gone, covered by Playwright +
+  Chrome DevTools and by Google Workspace.
+- **The hub called the built-in browser `browser`; the registry calls it `web`.**
+  So the Playwright card never showed as installed even though every office
+  ships with it seeded, and pressing Add created a *second* copy under the other
+  name. Card ids now come from the catalog, which is the same file the rest of
+  the office reads.
+- **A server you added by hand was invisible here** — the hub only listed what it
+  had a card for, so a custom MCP could be added from this page and then never
+  removed from it. Anything in the registry the catalog does not describe now
+  gets a card of its own.
+
+**Changed**
+- **The tool catalog is data, not markup.** It lived hard-coded inside
+  `toolshub.html`, which is why it could rot for months behind Add buttons that
+  could only fail. It now lives in `web/tools.json` — one source of truth shared
+  by the website's Tools page and the in-office hub, fetched live (bundled copy
+  offline) exactly like the plugin catalog. A renamed package is now a PR, not a
+  release. The hub also groups cards by what they are *for*, and prints the one
+  setup step each server needs, in the office's language.
+
+**Fixed — paths pasted into a language that reads them differently**
+- **`bagidea say` was broken on Windows for anyone whose account name has an
+  apostrophe.** The WAV's path was interpolated into a single-quoted PowerShell
+  string, and `os.tmpdir()` follows `%TEMP%` — which is
+  `C:\Users\<account>\AppData\Local\Temp` by default. An account named O'Brien
+  closed the string mid-path, PowerShell reported *"The string is missing the
+  terminator"*, and nothing played. The same line was a command-injection primitive
+  for anything able to influence `TEMP`: one statement parsed as four. The path now
+  travels in the **environment**, so there is no string for an apostrophe to close.
+- **Three more paths pasted into somebody else's language unquoted**, all carrying
+  the install root, which follows the account name the same way: `bagidea uninstall`
+  on macOS escaped for the shell and then dropped the result into an **AppleScript**
+  string literal without escaping it again (two languages need two quotings); and
+  both the macOS and Linux branches of `POST /update` — the in-app 🔄 button —
+  interpolated `cd '${root}'` with no escaping at either layer.
+- **The in-app 🔄 update button rebuilt nothing on Linux.** It ran `build-mac.sh`.
+  Now `build-linux.sh`, which is what every other Linux path in the repo uses.
+
+  All four found while reviewing [#45](https://github.com/bagidea/bagidea-office/pull/45),
+  an automated scanner report that flagged a neighbouring line built entirely from a
+  constant lookup table — safe — and walked past these.
+
+## [0.9.54] — 🍎 The Mac wallpaper stops crawling, and no PR ships blind
+
+**Fixed**
+- **macOS: the wallpaper ran at 2 fps while it was in plain sight.** The occlusion
+  monitor that throttles the world when it's hidden had two independent bugs, both
+  found and fixed by [@kmmao](https://github.com/kmmao)
+  ([#43](https://github.com/bagidea/bagidea-office/pull/43)):
+  it skipped the Dock's full-screen window by matching the **localized** process name
+  against the literal `"Dock"`, so on any non-English system the match failed and the
+  Dock counted as an app covering the whole screen on *every* poll — the throttle flag
+  could never clear, and restarting didn't help. It's now matched by bundle id
+  (`com.apple.dock`), which is locale-independent. And coverage was always judged on
+  `CGMainDisplayID()`, so with two monitors a fullscreen app on the primary throttled
+  a wallpaper that was fully visible on the secondary; the monitor now finds the
+  world's own desktop-level window and judges both coverage and display-sleep on the
+  display it actually overlaps most. Single-monitor English installs are unchanged,
+  and real fullscreen occlusion still throttles to 2 fps as before.
+
+**Changed**
+- **Every pull request now gets a build signal.** `.github/workflows/ci.yml` builds
+  the Rust shell on Windows, macOS and Linux and runs the daemon test suite on Node
+  20 and 22, on every PR and every push to `main`. Before this the repo had no CI on
+  pull requests at all — and a build on one OS says nothing about the others, because
+  `#[cfg(target_os = ...)]` code for a platform you're not on is parsed but never
+  type-checked. #43 had to be verified by hand on a throwaway branch; the next one
+  won't. `meetings.test.js` is excluded (it drives a real agent conversation and
+  needs a brain CI doesn't have) — `RELEASING.md` now names the same bar so a
+  release is never held to a weaker standard than a PR.
+- **The plugin guide now shows how to edit a record safely.** `docs/guide/plugins.md`
+  gained a second `/cmd` worked example — Scar Board's `update`, which locks a record's
+  identity and recall history (`id`, `authorId`, `createdAt`, `recallCount`,
+  `lastRecalledAt`), refuses an unknown id instead of silently creating one, and writes
+  atomically (temp + rename). That lock-immutable-fields + atomic-write pair is the
+  template for any plugin that edits records it also appends to.
+
+## [0.9.53] — 📡 The feed goes back to glass, and reads on hover
+
+**Fixed**
+- **The 📡 feed strip had a pale frame, a washed-out header and white corners.**
+  0.9.52 made the office window per-pixel transparent and handed the fading to the
+  page — and a full WebView2 host does not carry that evenly across its layers. The
+  feed list reached your desktop at true alpha, but the 6px gutter around it, the
+  title bar and everything outside the window's rounded corners landed on an opaque
+  backing surface: the edge lit up as a pale frame against a bright wallpaper, the
+  header lost its contrast until the text behind it was easier to read than the
+  title, and the bottom corners grew white arcs. No arrangement of CSS fixes that,
+  so the translucency is **the window's own uniform alpha** again — every pixel
+  faded equally, which is what the mode looked like from the beginning.
+- **The four corners of every window now match.** Two bugs, both long-standing:
+  Windows' `CreateRoundRectRgn` takes the *ellipse* size rather than the radius, so
+  the window was being cut with a corner half the size the page draws — leaving an
+  opaque nub between the two arcs; and the feed's title bar painted square corners
+  of its own over the top two, so the strip had soft corners at the bottom and hard
+  ones at the top.
+
+**Added**
+- **Point at the feed and it firms up to read.** Resting translucency is unchanged;
+  while the pointer is over the strip the window goes nearly solid, then fades back
+  when you leave. (The webview covers the whole window, so the native side never
+  sees a mouse move — the page reports the pointer and the shell moves the alpha.)
+
+**Changed**
+- The freeze mitigations from 0.9.51 that were **not** about the window alpha stay
+  exactly as they were: the overlay's resizable style is still never flipped, the
+  stale size floor is still cleared on the way out of ⛶ large, and tray → **Reload
+  chat window** is still there. The alpha itself is back because the freeze it was
+  removed for was never once reproduced — around 30 scripted mode switches then, and
+  more since — while the damage it did to the look was visible on every bright
+  desktop. The layered style is also flipped far less than it used to be: on once
+  when feed starts, off once when it ends, with only the *value* moving in between.
+
+## [0.9.52] — 📡 The feed goes see-through again
+
+**Fixed**
+- **Feed mode lost its glass in 0.9.51.** Dropping the layered-window alpha took
+  the see-through with it: the office window has always been an *opaque* window, so
+  once the OS stopped dimming it, no amount of CSS transparency could show your
+  desktop through the strip — the feed became a solid grey panel sitting on your
+  wallpaper. The window itself is now **per-pixel transparent** (the same way the
+  chat head and the boot splash already were), so the page decides: an opaque
+  `body` background in chat and ⛶ large mode, a translucent canvas plus the old
+  0.77 fade on cards, avatars and text in 📡 feed. Hovering the strip still brings
+  it back to near-solid for reading. The layered-window trick stays gone.
+
+## [0.9.51] — 🪟 A window that comes back
+
+**Fixed**
+- **The chat window could come back from a mode switch dead.** Going ⛶ large, then
+  📡 feed, then back left the window drawing its last frame forever: the window
+  itself resized and moved correctly, but the page inside never repainted again —
+  no hover, no new messages, nothing but a restart. Two things this shell did to
+  that window are things WebView2 does not support being hosted through, and both
+  sat in exactly that path. Both are gone:
+  - the window's **resizable style is no longer flipped** on every ⛶ toggle (it is
+    born resizable and stays that way — the OS resize handles are unreachable
+    behind the webview either way, so large mode's edge strips are still the only
+    way to drag it);
+  - the feed strip's **see-through look is CSS now**, not a layered-window alpha
+    (`WS_EX_LAYERED` on Windows, `NSWindow.alphaValue` on macOS). One look, one
+    implementation, every platform.
+
+  Honest caveat: the freeze could not be reproduced on demand — around 30 scripted
+  mode switches never triggered it — so this removes the hazards rather than a
+  proven cause. Hence the rescue below.
+
+**Added**
+- **Tray → "Reload chat window".** First aid for a chat window that has stopped
+  responding: it rebuilds the page and puts the window back to its normal size,
+  position and mode — **without touching the daemon**, so agents that are mid-task
+  keep running. Use it before **Restart office**, which takes the whole stack down.
+
+**Changed**
+- Leaving ⛶ large now **clears the size floor** it had set. The floor exists so a
+  stretched large window can't be dragged below the normal size; leaving it in
+  place afterwards meant mini (390×430) and the feed strip (330 wide) were smaller
+  than a minimum that was still nominally in force.
+
+## [0.9.50] — 🌱 Not just agents. An ecosystem.
+
+**Added**
+- **The story of what the office has become, written down.** A new guide —
+  [A self-evolving, self-extending agentic AI ecosystem](docs/guide/ecosystem.md) —
+  covering the four things that make it more than a team of agents: **multi-agent
+  collaboration** (many agents, different roles, skills, tools and even different
+  brains, coordinating and reporting up the chain), **knowledge that compounds**
+  (shared `OFFICE.md` notes, per-agent memory written automatically after real
+  work, workflows saved as reusable skills, an archive any agent can search — so a
+  new project doesn't start from zero), **self-extension** (an agent that finds its
+  current capabilities aren't enough can propose the tool or plugin that would be,
+  and with your approval that capability becomes a real part of the running office
+  — the shift from *AI that uses tools* to *AI that proposes new tools for
+  itself*), and the **human gates** that keep you the CEO. Plus the loop it all
+  runs on: `Goal → Think → Act → Learn → Extend → Collaborate → Repeat`.
+- **A matching section on the website and the docs site**, linked from the README
+  — pre-translated in **all 14 languages** in the same change.
+
+**Fixed**
+- **Two UI strings the site referenced but never had.** `inst_s1_win` /
+  `inst_s1_mac` (the shell labels above the install commands) were used in the
+  markup with no string behind them, so every language quietly fell back to
+  English. Added in all 14.
+- **The English pack was contradicting the page it renders into.** It still called
+  the npm path "quickest" and said the installer compiles with Rust — stale since
+  the prebuilt shell landed, and since the English pack overwrites the markup it
+  was what English readers actually saw. `en`/`de`/`th` synced to the wording the
+  other 11 languages already had.
+- **The website scrolled sideways on a phone.** A grid track sized itself to the
+  min-content of the long one-line installer URL, and the provider list rendered
+  as one unbreakable word — together they dragged the whole page past the viewport.
+  The same bug shape made the docs page overflow on narrow screens. Verified at
+  390 px and 1280 px: no horizontal overflow left.
+- **`daemon/tests/api.test.js` reported a failure it had invented.** `t.skip()`
+  marks a test skipped but does **not** stop the body, so the Windows/macOS
+  early-out ran the request anyway — against an endpoint that is human-UI only and
+  correctly answers `403` without the `x-bagidea-ui` header. The test now returns
+  on skip and sends the header the overlay sends.
+
+> Docs, website and a test only — no change to how the office behaves.
+> `bagidea update` picks it up.
+
+## [0.9.49] — 🕘 A clock that agrees with your taskbar
+
+**Fixed**
+- **The roofline clock drifted minutes behind the real time.** It was driven by an
+  accumulated frame-delta timer that only *looked* at the system clock once every
+  60 seconds — so the office was stale by up to a minute at the best of times, and
+  by however long the renderer had been starved at the worst (an occluded
+  wallpaper, a machine back from sleep: the frame timer stops, the wall clock does
+  not). The clock now samples the system time **every second** and repaints the
+  moment the minute rolls over, so it can't disagree with the clock in the corner
+  of the same screen. The daylight/atmosphere pass still runs once a minute, and a
+  pinned atmosphere (🌅/☀️/🌇/🌙) is untouched.
+- **A stray horizontal scrollbar under 📡 OFFICE FEED.** The feed renders the same
+  markdown the chat does, but it never inherited the chat's wrapping rules — so a
+  single long line inside a code block (a path, a command) stretched the whole
+  stream sideways and left a scrollbar the feed should never have had. Feed
+  markdown now wraps like chat markdown, and the feed only scrolls vertically.
+
+> No shell change in this release — `bagidea update` picks it all up.
+
+## [0.9.48] — 🤖 The office stops waiting for you
+
+**Added**
+- **🤖 AUTO — the team keeps going without you.** The office used to stop mid-job to
+  ask your opinion and then sit there until you came back. With AUTO on, agents
+  decide within their remit and **open their own next turn** until the work is
+  genuinely finished. It still stops for the things that are actually yours to
+  answer: a credential it can't get, or an irreversible/outward action (push,
+  deploy, delete, spend) — and a block is pushed to your channels so you hear about
+  it wherever you are. Bounded to **8 self-driven rounds per job** so a
+  misunderstood task can't loop, and every round is announced in chat. Off by
+  default: **⚙ → TOOLS → "🤖 Keep going (AUTO)"** or `bagidea auto on`. It removes the
+  wait for an *opinion* — what an agent may DO is still the separate 🔓 auto-approve
+  switch.
+
+**Security**
+- **Registering a folder no longer means "run whatever code it ships"**
+  ([#39](https://github.com/bagidea/bagidea-office/issues/39), reported by
+  [@glmgbj233](https://github.com/glmgbj233)). A project can carry its own
+  `.claude/settings.json`, and that file is executable configuration: a command hook
+  such as `SessionStart` runs the instant a session opens in the folder — before the
+  model acts, so the office's permission broker never sees it. The office pre-trusts
+  project directories (headless sessions stall forever on the trust dialog they
+  can't show), which turned *registering* a folder into a standing yes. Now the
+  office reads what would actually run: a project with **no hooks of its own** is
+  trusted silently as before, while one that ships hooks raises a 🛡 card listing the
+  literal commands and **parks the work** until you answer — approve and the task
+  resumes by itself. Approval is bound to that exact setup, so editing the settings
+  file *or the script a hook calls* asks again, and a hook resolving outside the
+  project is flagged. Answerable from the terminal too: `bagidea trust`.
+
+**Fixed**
+- **A scheduled job now actually sets work in motion.** A standing order would fire
+  on time, the Director would answer with a plan — and nothing happened, so the
+  owner had to come back and give the same order by hand. The job runner was the one
+  path in the office that sent the raw prompt with none of the scaffolding every
+  other path carries: no dispatch protocol on the way in, and **no `DELEGATE:` parser
+  on the way out**, so the lines that hand work to the team were printed as prose and
+  thrown away. A fired job is now run exactly like an order you just typed — the
+  Director dispatches and the results report back to him — and it carries the
+  "act in this turn, don't just acknowledge" mandate plus 🤖 AUTO when that's on. The
+  same missing parser is fixed on the resume-after-limit path.
+- **Ghost task cards on the board.** A task whose run ended *without a verdict* —
+  the brain turned out to be unusable (bad key, dead endpoint) and the office cut
+  it off, the CLI crashed, or a limit killed it mid-turn — left its card pinned
+  **running** on the wallpaper board and in the NOW-WORKING strip, forever: the row
+  only clears on a completed/failed event, and that event was only sent when the
+  run reported a proper result. Every ending now emits one, so a card can no longer
+  outlive its work while the team sits idle. A run the office killed for a dead
+  brain ends **red**, not green.
+- **A nameless body could appear on the office floor.** Clearing a task row whose
+  process was already gone broadcast the ending with an *empty* agent id — and the
+  wallpaper gives a body to whatever id an event names, so an unnamed "Researcher"
+  materialised and stayed: the roster reconciler skips ids it can't match and
+  nothing else could remove it. Endings now name a real teammate or none at all,
+  the renderer resolves the owner from the **task id** instead (so ⏹ on a stale row
+  clears the right person), and an empty id is ignored outright.
+- **A link in chat no longer swallows the office.** Clicking a URL an agent posted
+  (a pull request, a doc) navigated the office *itself* to that page — the whole UI
+  was replaced by github.com and only a restart brought it back. The office runs
+  inside a webview, where `target="_blank"` is simply ignored. Every `http(s)` link
+  — chat, update bar, cards, the MCP hub — now opens in your **real browser** and
+  leaves the office where it was. A non-previewable file (pdf…) in chat opens in the
+  OS default app instead of navigating away.
+- **The 🔓 auto-approve switch looked like a dot, not a switch.** Its label is long
+  enough to wrap, and as a sibling flex item it squeezed the 34 px track down to a
+  bare circle — unreadable as on/off. The track now keeps its size and the label
+  wraps beside it. (The setting itself always worked.)
+- **npm bootstrapper republished (0.9.47).** `npx bagidea-office` had been serving
+  0.9.39 since the publish step skips versions already on the registry, so the
+  TLS-hardened installer fetch (#37) and the winget-free Windows path never reached
+  new installs.
+
+**Docs**
+- README, the guide set, the website (all **14 languages**) and the pitch deck cover
+  AUTO, the project-hook trust card and standing orders. The English surfaces had
+  drifted back into Thai in places — the user-guide index, the PLACE examples, the
+  NOW-WORKING strip quote, a settings label and a dead Thai anchor into
+  troubleshooting — all now English, and the guide index lists every guide instead of
+  two thirds of them.
+
+> No shell change in this release — `bagidea update` picks it all up.
+
+## [0.9.47] — ↻ Model lists that stay current · agents that don't stall waiting for you
+
+**Added**
+- **↻ Live model lists — Claude included.** The pickers used to show whatever was
+  hardcoded on release day, so a model that shipped *today* stayed invisible until
+  the next office release. Every provider's list is now pulled from its own
+  `/models` **20 s after boot and every 12 h**, plus on demand: **⚙ → CONNECT →
+  `↻ Refresh model list`** (all providers at once, with counts + when it last ran)
+  and the `↻` beside the **Model** field (that provider only). Claude was the one
+  provider with **no live fetch at all** — Anthropic's list needs your own
+  credentials rather than a provider key, so the office uses `ANTHROPIC_API_KEY`
+  when you've set one and otherwise the Claude Code CLI's existing login on this
+  machine (read-only; sent nowhere but `api.anthropic.com`, macOS Keychain
+  included). The newest model becomes the pre-selected default — and **no existing
+  agent's brain is ever rewritten for you**. New `POST /registry/models/refresh`.
+- **🔓 Auto-approve tool permissions (opt-in, ⚙ → TOOLS).** Hand out work, walk
+  away: a permission prompt with nobody there to click Allow used to park the job
+  for 50 s and then be **denied**. With the switch on, requests are allowed
+  automatically. Off by default — it is a real trade-off, so it's your call.
+- **Every running task is visible now**, including the ones that used to run
+  silently: 👻 **sub-agents (ghosts) get their own live rows**, and meetings /
+  coffee breaks report as tasks like everything else.
+
+**Changed**
+- **Delegated work is owned end-to-end.** Teammates now carry a `<work-autonomy>`
+  mandate: decide what's within your remit and keep going — come back only when
+  genuinely blocked (a missing credential, a truly ambiguous requirement, an
+  irreversible outward action that needs the owner's call). Work no longer stalls
+  on questions the teammate could have answered itself.
+- **One agent hitting a limit no longer stops the floor.** A sustained **429**
+  (rate/usage ceiling) now triggers the same failover as a sustained 5xx — the task
+  moves to the fallback brain if you've set one — and the job pool runs **3 lanes**
+  (`reg.maxJobs`; 🌱 eco mode still keeps it to one), so the rest of the team keeps
+  working while one agent waits out its limit and comes back by itself.
+- **Unified markdown rendering for all agent text** — chat, feed, workflow analysis
+  and results, proposals and notes now go through one vendored, XSS-safe `md.js`
+  (marked + DOMPurify) instead of showing raw markdown and literal `<b>` tags.
+  Thanks **[@bmdy5](https://github.com/bmdy5)**
+  ([#36](https://github.com/bagidea/bagidea-office/pull/36)).
+
+**Fixed**
+- **The macOS installer could die silently** right after downloading the shell —
+  printing a success line while never installing Godot, the Claude hooks or the
+  `bagidea` CLI. macOS ships **bash 3.2**, where `.`/`source` is a POSIX *special*
+  builtin: sourcing a missing file exits the shell **before `|| true` can catch
+  it** — and on the prebuilt-shell path Rust is never installed, so `~/.cargo/env`
+  never exists. All four such lines now test the file first. Root-caused, with the
+  exact version-independent fix, by
+  **[@lyfer-bob](https://github.com/lyfer-bob)**
+  ([#38](https://github.com/bagidea/bagidea-office/issues/38)).
+- **The team stopped gathering in the CEO's room.** The exec-room fence was only
+  enforced on *named* waypoints, so social behaviours (chat, high-five, chase)
+  walked agents straight in on raw coordinates. Every destination now passes
+  through the fence: non-residents are rerouted to the lobby and only the CEO +
+  Director stand there. Walking past is still fine.
+- **A missing security light crashed the patrol tween** (`rp_target` on a freed
+  object) on world builds that don't have one — now guarded, so the flash is
+  skipped instead of erroring.
+- **The npm bootstrapper forces HTTPS + TLS 1.2** when fetching the install script,
+  so it can't be pulled over a downgraded channel. Thanks
+  **[@anupamme](https://github.com/anupamme)**
+  ([#37](https://github.com/bagidea/bagidea-office/pull/37)).
+
+> No shell change in this release — `bagidea update` picks it all up.
+
+## [0.9.46] — ⛶ Large window: opens fullscreen, drag any edge to resize
+
+**Changed**
+- **Large window mode now opens fullscreen** (was ~86% centered) and you shrink it
+  by dragging — same floor as before: it never goes below the normal window size.
+- **You can actually resize it now.** The chat webview covers the whole frameless
+  window, so the OS never showed native resize handles — dragging an edge did
+  nothing. Large mode now has invisible drag strips on all four edges and corners
+  that start a real OS resize (`drag_resize_window`), so you can pull it to any
+  size you like. Corners round again the moment it's smaller than the full screen.
+- **The mini / restore-size button is hidden while large is open** (it's meaningless
+  there) and comes back the moment you leave large mode.
+
+> Shell + overlay change — arrives with `bagidea update` (the prebuilt shell from
+> this release's assets). 0.9.45's large button on an un-updated shell couldn't
+> resize; this is the fix.
+
+## [0.9.45] — zero-Anthropic-account fix · 📦 move-to-a-new-machine · Gemini tool-use fix · large window · two hide levels · 🌱 eco mode
+
+**Added**
+- **📦 Move your office to a new machine** — `bagidea export` packs everything that
+  makes an office *yours* (agents, roles, skills, brains + keys, agent memory,
+  meetings, projects, uploads, plugins) into one `.tgz`; `bagidea import <file>`
+  on the new machine restores it (previews contents, asks for `yes`, backs up the
+  existing registry first, refuses archives with paths outside the install).
+  Zero-dependency — uses the `tar` that ships with Win10+/macOS/Linux.
+- **⛶ Large window mode** — a fourth window mode next to normal/mini/feed: a big
+  **resizable** chat window (opens at ~86% of your screen, centered) for reading
+  long threads and real work. Stretch it to fullscreen; it can never shrink below
+  the normal window size. New ⛶ title-bar button; feed mode gracefully exits it.
+- **Two hide levels** (tray) — the office keeps working under both:
+  **Hide everything** (wallpaper + chat + chat head) and new
+  **Hide chat + button (wallpaper stays)** — the world lives on your desktop while
+  the chat UI gets out of the way.
+- **Work updates now reach your channels** — delegation (🕊), the finished-work
+  report (📨) and new team pitches (💡) are pushed to every connected channel
+  (Telegram/Discord/LINE/…), so long-running work is followable from the phone.
+  Mute with `channelNotify: false` in the registry.
+- **🖼 Telegram gets real photos** — when a reply or report references a preview
+  image (generated image, uploaded screenshot, any image path), the actual file is
+  uploaded via `sendPhoto` after the text — not just a path string.
+- **🌱 Eco mode** — `bagidea eco on`: one switch that cuts idle token burn.
+  Self-driven rhythms stretch to floors (heartbeat ≥3h, social ≥6h, pitches ≥6h)
+  and the delegated-work QA double-pass is skipped. Direct orders are never
+  throttled. `POST /registry/eco` for the API-minded.
+
+**Fixed**
+- **Gemini brains died with `400 … missing thought_signature in functionCall parts`**
+  the moment an agent used a tool. Gemini thinking models sign each tool call and
+  REQUIRE the signature echoed back with the conversation history — the built-in
+  proxy dropped it in both directions. It now remembers each tool call's
+  `thought_signature` and re-attaches it on the history echo (with Google's
+  documented `skip_thought_signature_validator` fallback for pre-fix history).
+  Gemini-only; other providers get no extra fields.
+- **"The 3D Editor won't open on some machines"** — three real causes, all fixed:
+  (1) every Godot fallback path pointed at dev-machine locations no install uses —
+  the launcher (shell + daemon) now also checks the installer's actual tools dir,
+  ignores a `BAGIDEA_GODOT` that points at a missing file (and the installer no
+  longer sets it when the download failed); (2) a stale `bagidea_shell_alive` flag
+  from a crashed shell muted the daemon's fallback launcher forever — the shell now
+  re-touches the flag every 5s and the daemon only trusts a FRESH one; (3) a PID-
+  recycling bug could "focus" an unrelated process instead of launching. And when
+  no engine exists at all, `bagidea editor` / the UI now say so plainly instead of
+  pretending to open.
+- **Claude model picker missed the Claude 5 family** — `claude-fable-5` and
+  `claude-sonnet-5` added to the hint list (Claude is the one provider with no live
+  /models fetch; every other provider pulls its live list on Connect — verified
+  across all 19).
+- **English-first for fresh installs** — 37 UI strings (meeting controls, permission
+  prompts, fallback-brain/connect status, plugin updates, voice hints…) had no
+  English seed and stayed Thai for a brand-new EN user without a Gemini key. The
+  bundled English seed now covers them; website "First run" copy that still said
+  "log in to Claude once" rewritten in all 14 languages.
+
+**Fixed (the headline one)**
+- **A user who never logged into Claude couldn't run *any* agent — even one routed
+  to GLM, DeepSeek, Qwen, or another provider.** The office's agent runtime is
+  always the Claude Code CLI (only the *model behind it* changes — we point
+  `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN` at the chosen backend). But the CLI
+  runs an **interactive first-run wizard** until `~/.claude.json` marks onboarding
+  done — and a headless `claude -p` spawn has no terminal to answer it, so it hangs
+  and dies **before it ever reaches the third-party model**. A machine that logged
+  into Claude even once (then stopped using it) sailed past this; a never-logged-in
+  machine hit it on every single spawn, whatever brain was selected.
+- The office now **seeds `hasCompletedOnboarding: true` in `~/.claude.json` on
+  daemon boot** (creating the file if absent, never downgrading an existing value),
+  so a pure GLM/DeepSeek user with **no Anthropic account at all** can run agents.
+  It's exactly the flag the interactive wizard sets on completion.
+- Second stall fixed on the same path: `ensureTrusted()` (the folder pre-trust that
+  avoids the CLI's "Do you trust this folder?" prompt) used to `JSON.parse` an
+  existing `~/.claude.json` and silently no-op when the file was **missing** — so a
+  fresh user's project dirs were never pre-trusted either. It now creates the file.
+- Installer wording corrected: it no longer implies you must "log in later by
+  running: claude". Claude login is **optional** — needed only if you actually run
+  Claude models; every other provider needs just its API key in Settings.
+
+## [0.9.44] — 📂 "Open folder" opens the *real* folder again (Windows)
+
+**Fixed**
+- **The 📂 button under a media file in chat opened `Documents` instead of the
+  folder the file actually lives in** (Windows). It hit any path containing a
+  **space** — which is most real media: `uploads/`, an image dropped in from
+  elsewhere, a Thai filename, anything ChatGPT generated
+  (`ChatGPT Image Jul 1, 2026, 08_10_04 PM.png`). Paths without a space worked,
+  which is why this hid for so long.
+- Root cause: `explorer.exe` doesn't parse its command line by CRT rules — it
+  needs `/select,"C:\dir\file.ext"` with the switch bare and the path quoted.
+  We passed `"/select,<path>"` as a single argv token, so Node quoted the
+  **whole** token as soon as the path held a space. Explorer then never saw
+  `/select` at all and silently fell back to the default folder — `Documents`.
+  The line now hands the command line over verbatim, so the quotes land around
+  the path only.
+- Verified end-to-end against the real shipped line on three paths: spaces +
+  commas, a Thai name with spaces, and a plain no-space path (to prove the case
+  that already worked still does).
+- Scope: Windows `/reveal` only. The **Projects** 📂 button and "open in default
+  app" (⤢) use different, already-correct forms; macOS (`open -R`) and Linux
+  (`xdg-open`) were never affected.
+
+## [0.9.43] — An opt-in fallback brain: agents survive a provider outage
+
+**Added**
+- **🛟 Office-wide fallback brain (opt-in).** When a teammate's brain gets
+  *sustainedly* overloaded — repeated `5xx` from the provider (GLM/Z.AI's `529`
+  under load is the classic) — the office can now **re-run that same task on a
+  fallback brain you chose**, instead of leaving it to die on the retry loop.
+  Set it once in **Settings → CONNECT → 🛟 สมองสำรอง** (pick any *connected*
+  provider + an optional model). The failed-over run keeps the original task and
+  still reports back to whoever delegated it; a one-line note tells you it
+  switched and why.
+- This is the *right* version of the v0.9.39 auto-failover we deliberately
+  reverted in v0.9.40. The revert's objection was "not everyone has a Claude
+  brain, and a transient blip shouldn't burn a fallback." Both are addressed:
+  it is **off by default** (no fallback set → behavior is byte-for-byte the same
+  as before — the same brain just retries hard), it only fires after the
+  overload is **sustained** (not a one-off), it only routes to a provider that's
+  **actually connected**, and it **never** loops back onto the down brain or
+  fails over twice for one task.
+
+**Notes**
+- Only server-side overload/unavailability (`5xx`) triggers failover. Bad auth
+  (`401/403`) and a dead endpoint still fast-fail with a clear message as before;
+  rate/usage limits (`429`) still pause-and-resume — none of those switch brains.
+
+**Known issue (still under investigation)**
+- The macOS "stuck on the boot logo" render bug from v0.9.42 is **not** fixed
+  here — it's waiting on the boot-log console output from an affected Mac to pin
+  shim-vs-renderer before the fix ships.
+
+## [0.9.42] — Docs & website overhaul; a cross-platform ready-flag fix
+
+**Documentation**
+- A full accuracy + coverage pass across every doc surface — README, the guide
+  set, the website (all 14 languages), and the pitch deck. Provider count
+  corrected **18 → 19** (Kimi Code is its own provider), the builtin skill
+  library corrected to the real **15 packs**, stale model recommendations
+  refreshed (`glm-4.6 → glm-5.2`, `kimi-k2.5 → kimi-k2.6`), and the CLI
+  reference completed (`brains`, `jobs`, `key set`, `editor`).
+- **The File & Media Toolkit is now documented** as a headline capability —
+  every agent can read/convert PDF·Excel·Word·PowerPoint, build slide decks,
+  transcribe video, and edit images. It was undocumented before.
+- The website's "latest version" badge (stuck on `v0.8.0`) now **self-updates
+  from the repo `VERSION`**, and Linux is labelled "experimental" consistently.
+
+**Fixed**
+- **macOS/Linux: the world-ready handoff flag lands in the right place.** Godot
+  wrote it to `$TEMP` (a Windows-only variable), so on macOS/Linux the shell
+  never saw it and fell back to a blind ~9-second timeout to lift the splash.
+  It now uses `OS.get_temp_dir()`, which resolves correctly on all three OSes.
+
+**Known issue (under investigation)**
+- On some Macs the world can **stay stuck on the boot logo** and never render as
+  the wallpaper. Everything else runs (the daemon, agents, networking) — it's
+  Godot's first frame not drawing, so the boot splash never clears. This is a
+  render-path issue, separate from the flag fix above, and a fix is being
+  worked once the Mac-side console output pins the exact cause.
+
 ## [0.9.41] — The wallpaper stops vanishing; agents schedule timed work for real
 
 **Fixed**

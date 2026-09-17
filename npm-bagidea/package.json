@@ -1,6 +1,6 @@
 {
   "name": "bagidea",
-  "version": "0.9.20",
+  "version": "1.6.0",
   "description": "Short alias for bagidea-office — `npx bagidea` installs BagIdea Office: a living HD-2D office where every AI agent is a real Claude Code session, on your desktop wallpaper.",
   "bin": {
     "bagidea-office": "cli.js"

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📬 Inbox Agent</title>
+<style>
+  :root { --bg:#0c1322; --fg:#dbe7ff; --dim:#7e8db0; --accent:#5ec8ff; --card:#13203a; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI','Leelawadee UI',Tahoma,'Noto Sans Thai',system-ui,sans-serif; }
+  body { background:var(--bg); color:var(--fg); padding:14px; font-size:12.5px; }
+  h1 { font-size:15px; margin-bottom:8px; }
+  .box { background:var(--card); border-radius:10px; padding:10px; margin-bottom:10px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  input, select, textarea { background:#0a1020; color:var(--fg); border:1px solid rgba(255,255,255,.12); border-radius:7px; padding:7px 9px; font:inherit; }
+  button { background:rgba(94,200,255,.12); border:1px solid rgba(94,200,255,.4); color:var(--fg); border-radius:8px; padding:6px 10px; cursor:pointer; font:inherit; }
+  .dim { color:var(--dim); font-size:11px; }
+  .run { font-size:11px; color:var(--dim); margin-top:4px; }
+</style></head><body>
+<h1>📬 Inbox Agent</h1>
+<div class="box">
+  <span>Every</span><input id="every" type="number" min="5" value="30" style="width:70px"><span>min ·</span>
+  <select id="agent"></select>
+  <button id="setup">📅 Check on a schedule</button>
+  <button id="run">▶ Check now</button>
+  <button id="off">⏹ Stop</button>
+  <textarea id="rules" rows="2" style="flex:1 1 100%" placeholder="House rules for replies (optional): tone, what never to promise, who to cc, languages…"></textarea>
+  <div class="dim" style="flex:1 1 100%">Needs a mail tool granted to that agent in the 🧰 Tools Hub (Gmail, for example). Every send waits for your approval in 📥 APPROVALS.</div>
+</div>
+<div id="st" class="box"></div>
+<script>
+  const BASE = "/plugin/inbox-agent";
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const cmd = (name, args) => fetch(BASE + "/cmd", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cmd: name, args }) }).then((r) => r.json());
+  async function load() {
+    const j = await fetch(BASE + "/status").then((r) => r.json());
+    const sel = document.getElementById("agent"); if (!sel.options.length) sel.innerHTML = Object.entries(j.agents).map(([id, n]) => `<option value="${id}">${esc(n)}</option>`).join("");
+    sel.value = j.cfg.agent; document.getElementById("every").value = j.cfg.everyMin; document.getElementById("rules").value = j.cfg.rules || "";
+    document.getElementById("st").innerHTML = `<div style="flex:1 1 100%"><b>${j.installed ? (j.triggers.length ? "Checking every " + j.triggers[0].cfg.everyMin + " min" : "Installed, not scheduled") : "Not installed yet"}</b></div>` +
+      `<div class="run" style="flex:1 1 100%">${j.runs.length ? j.runs.map((x) => `${x.state === "done" ? "✓" : x.state === "failed" ? "✗" : "…"} ${new Date(x.startedAt).toLocaleString()} · ${esc(x.state)}`).join("<br>") : "no runs yet"}</div>`;
+  }
+  document.getElementById("setup").onclick = () => cmd("setup", `${document.getElementById("every").value} :: ${document.getElementById("agent").value} :: ${document.getElementById("rules").value.trim()}`).then(load);
+  document.getElementById("run").onclick = () => cmd("run", "").then(() => setTimeout(load, 1200));
+  document.getElementById("off").onclick = () => cmd("off", "").then(load);
+  load();
+  try { const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"); ws.onmessage = (m) => { try { const e = JSON.parse(m.data); if (e.type === "workflow.run" && e.run && e.run.workflowId === "inbox-agent") load(); } catch {} }; } catch {}
+</script></body></html>

@@ -147,10 +147,30 @@ Using multiple monitors? Press **⋯ → 🖥 Display** to choose which monitor 
 (primary / 2nd / 3rd…); the list shows however many monitors are actually detected.
 When you pick a new monitor, the office **restarts itself briefly** to move to it
 
-## 6. Next steps
+## 6. Day one: a team and a plugin, in two clicks
+
+The office starts with a Director and you. For a real project, hire a **team**:
+⚙ → AGENTS → **👥 HIRE A TEAM** — a dev shop, a research lab, a content
+studio, a support desk or a solo assistant, with personas, skills and voices
+already chosen (`bagidea hire --team dev-shop` from the terminal). Then give
+it something to run: 🧩 → **📦 OFFICIAL LIBRARY** — the Campaign Board, the
+Content Pipeline, GitHub Triage, the Inbox Agent, the Weekly Report, Client
+Folders, the Decision Log, Skill Regression — one click each, every outward
+step behind an approval. Everything the office does from then on shows up on
+🗂 → 📋 TASKS, and everything it needs from you lands in 📥 APPROVALS — on
+your phone too, once a channel is connected.
+
+## 7. Next steps
 
 - [Hire more employees + set up personas](agents.md)
 - [Create projects for agents to work in real folders](projects.md)
 - [Let agents open the web & click through tasks for you (web automation)](web-automation.md)
 - [Give orders by voice + feed mode](voice-feed.md)
 - [Connect Telegram to give orders from your phone](channels.md)
+- [Give an agent a new ability from the 🧰 Tools Hub](tools-hub.md) — Blender, Godot,
+  Unity, Unreal, Roblox Studio, GitHub, Postgres and 21 more, one click each
+- [Make and change pictures in the 🎨 Media Studio](ai-features.md#-media-studio)
+- [Run an agent in a container or on another machine](agents.md#-where-agents-run)
+- [The inbox: one queue, your rules, your phone](inbox.md) · [Budgets in money](budget.md)
+- [A workflow that runs itself](workflows.md) · [The task board and calendar](tasks.md)
+- [Codex as a colleague](codex.md) · [The official plugins](library.md) · [Team templates](teams.md)

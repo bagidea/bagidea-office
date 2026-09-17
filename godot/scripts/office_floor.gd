@@ -23,7 +23,8 @@ const DAY_KEYS := [
 	[24.0, -40.0, 0.22, Color(0.5, 0.62, 1.0),  Color(0.05, 0.07, 0.16), 0.8],
 ]
 
-var _day_timer := 0.0
+var _clock_timer := 0.0
+var _last_minute := -1  # minute-of-day last painted on the roofline clock
 var _hour_override := -1.0
 var _cli_pinned := false  # --hour=N beats replayed ui.daylight events
 
@@ -154,8 +155,10 @@ func _enter_editor_mode() -> void:
 	Engine.max_fps = 60
 	# tell the shell the editor is on screen → it drops the circular logo splash
 	# (same handoff as the wallpaper's bagidea_world_ready flag)
+	# NB: OS.get_temp_dir() (not $TEMP, which is Windows-only) so the flag lands
+	# where the shell's std::env::temp_dir() reads it on macOS/Linux too.
 	var flag := FileAccess.open(
-		OS.get_environment("TEMP").path_join("bagidea_editor_ready"), FileAccess.WRITE)
+		OS.get_temp_dir().path_join("bagidea_editor_ready"), FileAccess.WRITE)
 	if flag:
 		flag.store_line(Time.get_datetime_string_from_system())
 
@@ -178,16 +181,30 @@ func _opaque_after_first_frame() -> void:
 		DisplayServer.window_set_size(DisplayServer.screen_get_size())
 	# Signal the shell that the scene is on screen — it holds the WorkerW
 	# attach until now so the transparent splash survives the whole load.
+	# OS.get_temp_dir() works on all three OSes; $TEMP is Windows-only and would
+	# be empty on macOS/Linux, so the shell would never see this flag.
 	var flag := FileAccess.open(
-		OS.get_environment("TEMP").path_join("bagidea_world_ready"), FileAccess.WRITE)
+		OS.get_temp_dir().path_join("bagidea_world_ready"), FileAccess.WRITE)
 	if flag:
 		flag.store_line(Time.get_datetime_string_from_system())
 
 func _process(delta: float) -> void:
-	_day_timer -= delta
-	if _day_timer <= 0.0:
-		_day_timer = 60.0  # re-evaluate once a minute
-		_apply_daylight()
+	# The roofline clock has to agree with the taskbar, so it SAMPLES the system
+	# clock every second and repaints the moment the minute rolls over. The old
+	# loop counted 60 seconds of frame deltas instead and only then looked at the
+	# time: stale by up to a minute even at a healthy frame rate, and stale for
+	# however long the renderer was starved when it wasn't (an occluded
+	# wallpaper, a machine coming back from sleep — where the frame timer stops
+	# but the wall clock doesn't). That is how a desktop clock ends up minutes
+	# behind the one in the corner of the same screen.
+	_clock_timer -= delta
+	if _clock_timer <= 0.0:
+		_clock_timer = 1.0
+		var t := Time.get_time_dict_from_system()
+		var minute_of_day: int = int(t.hour) * 60 + int(t.minute)
+		if minute_of_day != _last_minute:
+			_last_minute = minute_of_day
+			_apply_daylight()
 
 	if _wallpaper_mode:
 		# Occlusion throttle: shim writes /tmp/bagidea_occ when the window is

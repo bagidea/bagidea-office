@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📊 Weekly Report</title>
+<style>
+  :root { --bg:#0c1322; --fg:#dbe7ff; --dim:#7e8db0; --accent:#5ec8ff; --card:#13203a; }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI','Leelawadee UI',Tahoma,'Noto Sans Thai',system-ui,sans-serif; }
+  body { background:var(--bg); color:var(--fg); padding:14px; font-size:12.5px; display:flex; flex-direction:column; height:100vh; }
+  h1 { font-size:15px; margin-bottom:8px; }
+  .bar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  button, select, input { background:rgba(94,200,255,.12); border:1px solid rgba(94,200,255,.4); color:var(--fg); border-radius:8px; padding:6px 10px; cursor:pointer; font:inherit; }
+  input, select { background:#0a1020; cursor:text; }
+  .dim { color:var(--dim); font-size:11px; }
+  .list { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .list button { font-size:11px; }
+  pre { flex:1; overflow:auto; background:var(--card); border-radius:10px; padding:12px; white-space:pre-wrap; font-family:inherit; line-height:1.5; }
+</style></head><body>
+<h1>📊 Weekly Report</h1>
+<div class="bar">
+  <select id="day"><option value="mon">Monday</option><option value="tue">Tuesday</option><option value="wed">Wednesday</option><option value="thu">Thursday</option><option value="fri">Friday</option><option value="sat">Saturday</option><option value="sun">Sunday</option></select>
+  <input id="at" type="time" value="09:00" style="width:110px">
+  <button id="setup">📅 Schedule it</button>
+  <button id="run">▶ Write one now</button>
+  <button id="gather">🔢 Just the numbers</button>
+  <span id="st" class="dim"></span>
+</div>
+<div id="list" class="list"></div>
+<pre id="out">The report gathers what the office did — cards done, spend, workflow runs, upcoming events — and the Director writes it. It goes to your channel and is kept here.</pre>
+<script>
+  const BASE = "/plugin/weekly-report";
+  const cmd = (name, args) => fetch(BASE + "/cmd", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cmd: name, args }) }).then((r) => r.json());
+  const st = (t) => document.getElementById("st").textContent = t;
+  async function load() {
+    const j = await fetch(BASE + "/reports").then((r) => r.json());
+    st(j.installed ? (j.triggers.length ? "scheduled: " + j.triggers.map((t) => (t.cfg.weekday !== undefined ? ["sun","mon","tue","wed","thu","fri","sat"][t.cfg.weekday] + " " : "daily ") + t.cfg.at).join(", ") : "installed, not scheduled") : "not installed yet");
+    const box = document.getElementById("list"); box.innerHTML = "";
+    for (const f of j.reports.slice(0, 12)) { const b = document.createElement("button"); b.textContent = f.replace(/^report-|\.md$/g, ""); b.onclick = () => fetch(BASE + "/report?f=" + encodeURIComponent(f)).then((r) => r.text()).then((t) => document.getElementById("out").textContent = t); box.appendChild(b); }
+  }
+  document.getElementById("setup").onclick = () => cmd("setup", document.getElementById("day").value + " " + document.getElementById("at").value).then((r) => { st("scheduled " + (r.when || "")); load(); });
+  document.getElementById("run").onclick = () => cmd("run", "7").then((r) => { st("writing… (watch ▶ RUNS in the Workflow Builder, or come back in a minute)"); });
+  document.getElementById("gather").onclick = () => cmd("gather", "7").then((r) => document.getElementById("out").textContent = r.text || JSON.stringify(r));
+  load();
+  try { const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"); ws.onmessage = (m) => { try { const e = JSON.parse(m.data); if (e.type === "plugin.event" && e.plugin === "weekly-report") { load(); fetch(BASE + "/report?f=" + encodeURIComponent(e.file)).then((r) => r.text()).then((t) => document.getElementById("out").textContent = t); } } catch {} }; } catch {}
+</script></body></html>

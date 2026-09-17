@@ -81,7 +81,10 @@ if [ "$PREBUILT" != "1" ] && ! command -v cargo &> /dev/null; then
   echo "    + installing Rust (rustup)..."
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
 fi
-source "$HOME/.cargo/env" 2>/dev/null || true
+# Test-then-source (never `|| true`): `.`/`source` is a POSIX special builtin, so a
+# missing-file failure can abort the script under `set -e` on stricter/older bash.
+# With a prebuilt shell, Rust isn't installed and this file won't exist (#38).
+if [ -f "$HOME/.cargo/env" ]; then . "$HOME/.cargo/env"; fi
 
 # ---- 2. Godot ----------------------------------------------------------------
 GODOT_DIR="$ROOT/godot/bin-linux"

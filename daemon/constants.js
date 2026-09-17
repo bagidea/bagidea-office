@@ -286,13 +286,47 @@ const SKILL_LIBRARY = {
       "Keep raw inputs untouched, write outputs to new files, and if a tool is missing tell the owner the one-line install.",
     ].join("\n"),
   },
+  "game-3d-production": {
+    name: "3D & Game Production",
+    description: "Work INSIDE a running Blender, Godot, Unity, Unreal or Roblox Studio through its MCP server — build, run, look at the result, and fix it — instead of only writing files and hoping.",
+    content: [
+      "The office can drive real creative tools. Add the one you need in 🧰 Tools Hub",
+      "(Creative & game dev), then tick `mcp:<name>` on the agent that will use it.",
+      "",
+      "• Blender    `uvx blender-mcp`      — model, texture, light, render; pull assets from Poly Haven/Sketchfab",
+      "• Godot      `npx -y @coding-solo/godot-mcp` — launch the editor, run a scene, READ THE DEBUG OUTPUT",
+      "• Unity      `uvx mcpforunityserver` — assets, scenes, components, scripts, builds",
+      "• Unreal     `npx -y unreal-engine-mcp-server` — actors, Blueprints, editor automation",
+      "• Roblox     `npx -y @chrrxs/robloxstudio-mcp@latest --auto-install-plugin` — scripts, Luau, playtests",
+      "",
+      "How to work, in order:",
+      "1. CHECK THE TOOL IS CONNECTED before planning around it. Each of these needs something",
+      "   on the other side — an add-on enabled, the editor open, Studio restarted. If it is not",
+      "   connected, say so and tell the owner the one step to fix it. Do not fake progress.",
+      "2. Read the scene before you change it. Ask what objects/nodes/actors exist rather than",
+      "   assuming the names in your head match the ones in the project.",
+      "3. Change SMALL, then LOOK. Render a frame, run the scene, take the screenshot, read the",
+      "   debug output. These tools exist so you can see the result — an agent that edits blind",
+      "   through an engine MCP is slower than one editing files, not faster.",
+      "4. Anything you cannot verify by looking, say you have not verified.",
+      "",
+      "Source files still belong in git. Treat the editor as where you inspect and iterate, and",
+      "the repo as what you ship: commit scenes, scripts and assets as normal files, and never",
+      "leave the only copy of an hour of work living inside an unsaved editor session.",
+      "",
+      "For look and art direction, follow the project's own reference (a Look Bible, a rubric, a",
+      "golden reference shot) if it has one — match it, do not invent a new style mid-project.",
+    ].join("\n"),
+  },
 };
 
 const DEFAULT_MAIN_AGENT = {
   name: "Shino", role: "Director", avatar: 7, protected: true,
   aura: "nature", voice: "boyish", tier: 2,
-  // Explicit brain (never the blank/implicit model): Opus 4.8 — flagship, 1M context.
-  provider: "claude", model: "claude-opus-4-8",
+  // Explicit brain (never the blank/implicit model): the Claude flagship, 1M context.
+  // Seed only — an office that already exists keeps whatever the owner picked, and the
+  // live model refresh never rewrites an agent's brain.
+  provider: "claude", model: "claude-opus-5",
   prompt:
     "You are Shino, the Director of this BagIdea Office — the owner's (the " +
     "CEO's) second-in-command and the one who actually runs the floor. The CEO " +
