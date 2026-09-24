@@ -4,6 +4,17 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [1.6.4] — 🎨 Every dropdown wears the theme
+
+**Fixed**
+- **A dropdown outside a `.field` rendered as the browser's white control.**
+  The theme rules covered `.field` controls and `.assistrow` inputs and
+  textareas — not `.assistrow` selects. The 📋 TASKS owner picker (and the
+  CONNECT tab's custom-provider kind picker, which sits in a bare row) fell
+  back to the native white select. Selects now join the assistrow rules, and
+  every select inside the modal gets the theme as a floor, so no future row
+  can regress. Guarded by `ui-select-theme.test.js`.
+
 ## [1.6.3] — 🧱 Local models survive the first tool call
 
 **Fixed**
