@@ -4,6 +4,24 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [1.6.7] — 🎤 The pitch deck catches up
+
+**Changed**
+- **The pitch deck now describes the whole office.** It had 14 slides and
+  one 19-card wall for everything since v1.0; it has 25 slides now, one per
+  capability — the living world, the chain of command, spatialized security
+  and run location, the 20 swappable brains, memory and learning (three-tier
+  memory, semantic recall, auto-learned and self-correcting skills, skill
+  regression, the 15 skill packs, the File & Media Toolkit), work that
+  doesn't wait (AUTO, standing jobs, heartbeat, the inbox, notification
+  rules, budgets), the workflow engine, the task board and calendar, Codex,
+  voice / channels / media, plugins and tools, the eight official plugins
+  and five teams, who it's for, an everything-at-a-glance checklist, the
+  developer surface, and a status slide whose version and star count are
+  fetched live. Every figure was re-checked against the code (20 providers,
+  53 tools, 7 Hub entries, 8 library plugins, 376 tests). Also fixed the
+  README roadmap's "43 verified entries" for the Tools Hub (it's 53).
+
 ## [1.6.6] — 🙏 Every contributor, everywhere
 
 **Fixed**

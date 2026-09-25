@@ -89,6 +89,7 @@ interesting part of building it.
 ### 🆕 Recently shipped
 BagIdea Office is updated **constantly** — every office gets a 🔄 banner and one-click `bagidea update`. The latest:
 
+- **v1.6.7 — 🎤 the pitch deck catches up:** the [pitch deck](https://bagidea.github.io/bagidea-office/pitch/) had 14 slides and one 19-card wall for everything since v1.0; it's 25 slides now, one per capability — world, chain of command, security, brains, memory & learning, autonomy, the engine, the board, Codex, voice & channels, plugins & tools, the library and teams, who it's for, an at-a-glance checklist, the developer surface — with every figure re-checked against the code and a status slide that fetches the version and star count live.
 - **v1.6.6 — 🙏 every contributor, everywhere:** the README's contributor table and the website's contributor grid had stopped at v1.0; @kmmao, @sbrasesco, @binyangzhu000-sudo and @f2dac are on both now, CONTRIBUTORS.md files them correctly, and a `Co-authored-by` commit puts the people whose PR commits were authored by an AI tool onto GitHub's Contributors graph as well.
 - **v1.6.5 — 🕊️ the Hub's first official companion:** **Emmaus** is on the Plugins Hub — a Bible-counsel companion: tell Selah, a 3D counselor, what you're going through and get Scripture-grounded guidance, practical steps and a prayer, spoken aloud in Thai or English; every quoted verse is checked against the bundled corpus ([bagidea/emmaus](https://github.com/bagidea/emmaus), MIT; the Bible texts keep their own terms). Described in all 14 languages; the Hub guide now lists what's on the Hub and how it differs from the built-in library.
 - **v1.6.4 — 🎨 every dropdown wears the theme:** the 📋 TASKS owner picker (and the CONNECT tab's custom-provider kind picker) rendered as the browser's white select — the theme rules covered `.field` controls and `.assistrow` inputs, not `.assistrow` selects. Selects join the rules, and every select inside the modal gets the theme as a floor.
@@ -878,7 +879,7 @@ this makes them employable"*).
       runs after failures; never a built-in, never one you edited, previous version kept
 - [x] **🎨 Media Studio** — make / change / animate in one window; an edit never
       overwrites its input
-- [x] **🧰 Tools Hub rebuilt** — 43 verified entries incl. Blender, Godot, Unity, Unreal
+- [x] **🧰 Tools Hub rebuilt** — 53 verified entries incl. Blender, Godot, Unity, Unreal
       and Roblox Studio; the catalog is fetched live
 - [x] **🌐 Fourteen languages, end to end** — the tool catalog translated in all of them,
       guarded by tests that fail when a "translation" is the English copied through

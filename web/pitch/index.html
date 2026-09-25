@@ -6,7 +6,7 @@
 <title>BagIdea Office — Pitch Deck</title>
 <link rel="icon" href="../img/logo.png">
 <link rel="apple-touch-icon" href="../img/logo.png">
-<meta name="description" content="BagIdea Office — pitch deck. An AI company that lives on your desktop wallpaper.">
+<meta name="description" content="BagIdea Office — pitch deck. An AI company that lives on your desktop wallpaper: a Director, a team, 20 swappable brains, a workflow engine, budgets, a task board, plugins and tools — open source, in 14 languages.">
 <style>
   :root{
     --ground:#0b1220;            /* twilight navy — the office screen at dusk */
@@ -52,6 +52,7 @@
   .cap{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.06em;margin-top:12px;text-align:center}
   .split{display:grid;grid-template-columns:1fr 1.08fr;gap:clamp(28px,5vw,64px);align-items:center}
   .split.rev{grid-template-columns:1.08fr 1fr}
+  .split.tall{grid-template-columns:1.35fr .8fr}
   /* hero */
   #hero{justify-content:center;overflow:hidden}
   #hero .glowbg{position:absolute;inset:0;z-index:0;background:
@@ -77,13 +78,27 @@
   @keyframes nudge{50%{transform:translateY(5px)}}
   /* cards */
   .grid{display:grid;gap:16px;margin-top:38px}
-  .g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
   .card{background:linear-gradient(160deg,var(--panel),var(--ground-2));border:1px solid var(--line);
     border-radius:15px;padding:24px 22px;transition:border-color .2s,transform .2s}
   .card:hover{border-color:rgba(94,200,255,.5);transform:translateY(-3px)}
   .card .k{font-family:var(--mono);font-size:11.5px;color:var(--accent-2);letter-spacing:.13em;margin-bottom:11px}
   .card h3{font-size:19px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
   .card p{color:var(--dim);font-size:14px;line-height:1.55}
+  .card p code,.lede code{font-family:var(--mono);font-size:.92em;color:var(--accent);background:rgba(94,200,255,.07);
+    border-radius:5px;padding:1px 5px}
+  .grid.tight{gap:12px;margin-top:28px}
+  .card.sm{padding:18px 17px;border-radius:13px}
+  .card.sm .k{margin-bottom:8px}.card.sm h3{font-size:16px;margin-bottom:6px}.card.sm p{font-size:13px;line-height:1.5}
+  /* checklist — many short items */
+  .list{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 26px;margin-top:30px}
+  .list div{font-size:14px;color:var(--dim);line-height:1.45;padding-left:18px;position:relative}
+  .list div::before{content:"▸";position:absolute;left:0;color:var(--accent)}
+  .list b{color:var(--text);font-weight:600}
+  /* pipeline */
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:26px;font-family:var(--mono);font-size:12.5px;color:var(--text)}
+  .flow span{border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:rgba(94,200,255,.05)}
+  .flow i{color:var(--accent-2);font-style:normal}
   /* layered stack */
   .stack{display:flex;flex-direction:column;gap:11px;margin-top:8px}
   .layer{display:grid;grid-template-columns:42px 1fr;align-items:center;gap:16px;
@@ -104,6 +119,7 @@
   .chip{font-family:var(--mono);font-size:12px;color:var(--text);border:1px solid var(--line);
     background:rgba(94,200,255,.05);border-radius:999px;padding:6px 12px}
   .chip.local{color:var(--accent-2);border-color:rgba(255,180,84,.35)}
+  .chip.dim{color:var(--dim)}
   /* roadmap */
   .road{display:flex;flex-direction:column;margin-top:36px;max-width:760px}
   .stop{display:grid;grid-template-columns:120px 1fr;gap:22px;padding:16px 0;border-top:1px solid var(--line)}
@@ -112,7 +128,7 @@
   .stop h3{font-size:16px;font-weight:700;margin-bottom:4px}.stop p{color:var(--dim);font-size:13.5px;line-height:1.5}
   /* comparison matrix */
   .compare{width:100%;border-collapse:collapse;margin-top:34px;font-size:14.5px}
-  .compare th,.compare td{padding:12px 12px;text-align:center;border-bottom:1px solid var(--line)}
+  .compare th,.compare td{padding:11px 12px;text-align:center;border-bottom:1px solid var(--line)}
   .compare thead th{font-family:var(--mono);font-size:11px;letter-spacing:.07em;color:var(--dim);
     text-transform:uppercase;font-weight:600;vertical-align:bottom;line-height:1.3}
   .compare tbody th{text-align:left;font-weight:600;color:var(--text);font-size:14.5px;max-width:30ch}
@@ -144,16 +160,17 @@
     justify-content:space-between;padding:0 16px;background:rgba(8,13,24,.82);backdrop-filter:blur(8px);
     border-top:1px solid var(--line);font-family:var(--mono);font-size:11.5px;letter-spacing:.09em;color:var(--dim)}
   #bar .l{color:var(--accent)}#bar .l b{color:var(--text)}
-  #bar .dots{display:flex;gap:7px}
-  #bar .dot{width:7px;height:7px;border-radius:50%;background:rgba(140,153,194,.32);transition:.2s;cursor:pointer}
-  #bar .dot.on{background:var(--accent);box-shadow:0 0 9px var(--accent);transform:scale(1.18)}
+  #bar .dots{display:flex;gap:6px}
+  #bar .dot{width:6px;height:6px;border-radius:50%;background:rgba(140,153,194,.32);transition:.2s;cursor:pointer}
+  #bar .dot.on{background:var(--accent);box-shadow:0 0 9px var(--accent);transform:scale(1.25)}
   #bar .r{display:flex;align-items:center;gap:12px}#bar .r b{color:var(--text)}
   #fs{background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:7px;
     width:26px;height:22px;cursor:pointer;font-size:13px;line-height:1;transition:.18s}
   #fs:hover{color:var(--accent);border-color:var(--accent)}
+  @media(max-width:1100px){.g4{grid-template-columns:repeat(2,1fr)}.list{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:860px){
-    .split,.split.rev{grid-template-columns:1fr;gap:24px}
-    .g3,.g2{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}
+    .split,.split.rev,.split.tall{grid-template-columns:1fr;gap:24px}
+    .g3,.g2,.g4{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.list{grid-template-columns:1fr}
     .stop{grid-template-columns:80px 1fr;gap:14px}#bar .dots{display:none}.slide{padding:9vh 7vw 15vh}
     .heroshot{order:-1}
     .tiers{grid-template-columns:repeat(2,1fr)}
@@ -175,12 +192,14 @@
       <div>
         <div class="wordmark"><img src="../img/logo.png" alt="BagIdea"> <b>BAGIDEA&nbsp;OFFICE</b></div>
         <h1>An AI company<br>on your <span class="glow">wallpaper.</span><span class="cursor"></span></h1>
-        <p class="lede">A real office of AI agents that work <strong>on your desktop</strong> — not in a chat box. They sit at desks, take your orders, open your project folders, and ship while you watch.</p>
+        <p class="lede">A real office of AI agents that work <strong>on your desktop</strong> — not in a chat box. They sit at desks, take your orders, open your project folders, run your workflows, keep your calendar, and ship while you watch.</p>
         <div class="herofoot">
           <div><b>1</b> wallpaper</div>
           <div><b>∞</b> employees</div>
-          <div><b>19</b> AI brains</div>
+          <div><b>20</b> AI brains</div>
           <div><b>3</b> platforms</div>
+          <div><b>14</b> languages</div>
+          <div><b>$0</b> to install</div>
         </div>
       </div>
       <div class="heroshot">
@@ -196,10 +215,11 @@
     <div class="eyebrow">The problem</div>
     <h2>AI agents are powerful.<br>And completely invisible.</h2>
     <p class="lede">They live trapped in a chat window or a scrolling terminal. You can't <strong>see</strong> a team working, can't tell who's doing what, and close the tab and the "office" is gone. Multi-agent work feels like managing ghosts you can't point at.</p>
-    <div class="grid g3">
+    <div class="grid g4">
       <div class="card"><div class="k">no presence</div><h3>A wall of text</h3><p>One chat thread can't show five agents collaborating. Parallel work collapses into a transcript nobody can follow.</p></div>
       <div class="card"><div class="k">no place</div><h3>Nowhere to live</h3><p>Close the window and it's over. Your "AI team" has no home, no continuity, no sense of an ongoing workplace.</p></div>
       <div class="card"><div class="k">no control</div><h3>Trust, blindly</h3><p>Agents touch your files and run commands off-screen. Approving actions means reading log lines, not watching the room.</p></div>
+      <div class="card"><div class="k">no rhythm</div><h3>Only when you type</h3><p>Nothing happens between prompts. No schedule, no budget, no board, no memory of last week — every session starts from zero.</p></div>
     </div>
   </section>
 
@@ -210,11 +230,11 @@
       <div>
         <div class="eyebrow">The solution</div>
         <h2>Give the team a <b class="cy">place to work</b>.</h2>
-        <p class="lede">BagIdea Office turns your wallpaper into a living HD-2D office. Every character is a <strong>real Claude Code agent</strong> — give an order to the Director and watch him walk it to the right desk, split the work, and report back. Behind the pixels it's real engineering in real folders.</p>
+        <p class="lede">BagIdea Office turns your wallpaper into a living HD-2D office. Every character is a <strong>real Claude Code agent</strong> — give an order to the Director and watch him walk it to the right desk, split the work, and report back. Behind the pixels it's real engineering in real folders — and a real company around it: an inbox, budgets, a task board, a calendar, a workflow engine, plugins and tools.</p>
         <div class="grid g3" style="margin-top:30px">
           <div class="card"><div class="k">you see it</div><h3>Work has a body</h3><p>Agents walk, sit and hand off tasks on-screen — parallel work you can point at.</p></div>
           <div class="card"><div class="k">it's real</div><h3>Not a screensaver</h3><p>Each one a genuine <code>claude&nbsp;-p</code> session editing files and shipping code.</p></div>
-          <div class="card"><div class="k">it stays</div><h3>Always at work</h3><p>Lives on the wallpaper day and night; picks work back up after a restart.</p></div>
+          <div class="card"><div class="k">it stays</div><h3>Always at work</h3><p>Lives on the wallpaper day and night; picks work back up after a restart; runs while you're away.</p></div>
         </div>
       </div>
     </div>
@@ -226,63 +246,109 @@
       <div>
         <div class="eyebrow">Under the pixels</div>
         <h2>One order in.<br>Real work out.</h2>
-        <p class="lede" style="margin-bottom:30px">Four layers turn "build me X" into shipped work — every step visible on the wallpaper.</p>
+        <p class="lede" style="margin-bottom:30px">Five layers turn "build me X" into shipped work — every step visible on the wallpaper. No cloud in the middle: everything runs on <strong>127.0.0.1</strong>.</p>
         <div class="stack">
-          <div class="layer"><div class="n">01</div><div><h3>The world (Godot HD-2D)</h3><p>A pixel office — desks, rooms, day/night on your real clock.</p></div></div>
-          <div class="layer"><div class="n">02</div><div><h3>The daemon (local Node)</h3><p>Routes orders, brokers permissions, streams every event to the world.</p></div></div>
-          <div class="layer"><div class="n">03</div><div><h3>The agents (real Claude Code)</h3><p>Headless sessions with their own persona, skills and tools — in your folders.</p></div></div>
-          <div class="layer"><div class="n">04</div><div><h3>You, anywhere</h3><p>Command from the wallpaper, the CLI, or Telegram / Discord / LINE.</p></div></div>
+          <div class="layer"><div class="n">01</div><div><h3>The world (Godot 4, HD-2D)</h3><p>A pixel office behind your icons — desks, nine rooms, day/night on your real clock.</p></div></div>
+          <div class="layer"><div class="n">02</div><div><h3>The daemon (Node, zero dependencies)</h3><p>Routes orders, brokers permissions, runs the engine, journals every event and replays it on restart.</p></div></div>
+          <div class="layer"><div class="n">03</div><div><h3>The agents (real Claude Code)</h3><p>Headless sessions with their own persona, skills, tools and brain — inside your project folders.</p></div></div>
+          <div class="layer"><div class="n">04</div><div><h3>The shell (native Rust)</h3><p>Chat head, overlay, tray, single instance, start at login — one executable on Windows, macOS and Linux.</p></div></div>
+          <div class="layer"><div class="n">05</div><div><h3>You, anywhere</h3><p>Command from the wallpaper, the CLI, the HTTP API, or Telegram / Discord / LINE / Slack / WhatsApp / Messenger.</p></div></div>
         </div>
       </div>
       <div class="shot"><img src="../img/overlay.png" alt="The chat overlay with the agent roster and a live task feed" loading="lazy"></div>
     </div>
   </section>
 
-  <!-- 05 — DIFFERENTIATION -->
-  <section class="slide" data-title="Why it's different">
-    <div class="eyebrow">Why it's different</div>
-    <h2>Things only an <b class="am">office</b> can do.</h2>
-    <div class="grid g3">
-      <div class="card"><div class="k">parallelism</div><h3>Ghost clones</h3><p>An agent splits into translucent clones that work in parallel on a Ghost Deck, then merges — visible the whole time.</p></div>
-      <div class="card"><div class="k">safety</div><h3>Spatial permissions</h3><p>A risky action raises an approval card over the agent's head. Allow per-tool, once or forever — and a folder that ships its own startup hooks has to be trusted on its own terms.</p></div>
-      <div class="card"><div class="k">delegation</div><h3>A real Director</h3><p>Talk to one manager. He plans, assigns to whoever fits, and walks the result back to your desk.</p></div>
-      <div class="card"><div class="k">reach</div><h3>Hands on the web</h3><p>One skill and an agent drives a real browser — open pages, click, fill forms — watch it or run it quietly.</p></div>
-      <div class="card"><div class="k">documents</div><h3>Reads &amp; builds files</h3><p>Every agent can read a PDF, turn a spreadsheet into data, author a slide deck, or transcribe a video — files in, work out.</p></div>
-      <div class="card"><div class="k">time</div><h3>Works on a schedule</h3><p>"Every morning at 8, brief me." Agents book the job in the office's own scheduler — it fires as a real order, dispatched to the team, whether or not you're at the desk.</p></div>
-      <div class="card"><div class="k">autonomy</div><h3>Doesn't wait for you</h3><p>Switch on AUTO and the team stops parking work on questions — it decides within its remit and opens its own next turn until the job is done. It still stops for anything irreversible.</p></div>
-      <div class="card"><div class="k">memory</div><h3>Learns on the job</h3><p>Agents pick up skills and keep notes across sessions — the office sharpens with use.</p></div>
-      <div class="card"><div class="k">extensible</div><h3>Agents build tools</h3><p>The office writes its own plugins — new panels and commands — then installs them on itself.</p></div>
-      <div class="card"><div class="k">always on</div><h3>Never disappears</h3><p>The world lives on the wallpaper and heals itself — if Windows tears the desktop down, it re-embeds in seconds, no restart.</p></div>
-      <div class="card"><div class="k">portable</div><h3>Follows you anywhere</h3><p><code>bagidea export</code> packs the whole office — team, skills, memory, projects, plugins — into one file; <code>import</code> revives it on any machine.</p></div>
-      <div class="card"><div class="k">on your phone</div><h3>Reports to your pocket</h3><p>Delegations, finished-work reports and new pitches land in Telegram/Discord — with real preview photos, not file paths.</p></div>
-      <div class="card"><div class="k">one inbox</div><h3>Asks you once, where you are</h3><p>Every permission, pitch, block and approval lands in one queue and reaches your phone. Answer with a tap; rules per kind, quiet hours, "only when I'm away".</p></div>
-      <div class="card"><div class="k">budgets</div><h3>Caps in money</h3><p>A dollar cap per day, per agent, per project. Warn at 80 %, stop at 100 % — and a morning digest of what yesterday cost.</p></div>
-      <div class="card"><div class="k">engine</div><h3>Workflows that run themselves</h3><p>The diagram executes for real — parallel branches, approvals, delays, runs that survive a restart — and starts on a schedule, a webhook, a file, or a keyword from your phone.</p></div>
-      <div class="card"><div class="k">board</div><h3>One board for everything</h3><p>Delegations, jobs, meeting actions, workflow runs and your own cards — due dates, dependencies, repeat — plus a real calendar with .ics both ways.</p></div>
-      <div class="card"><div class="k">codex</div><h3>A second coding agent</h3><p>Hand Codex a task from any agent, the Director or a workflow. Sandboxed inside the project, diff summarised, cost on the caller's budget. Never the brain.</p></div>
-      <div class="card"><div class="k">ready-made</div><h3>Plugins and teams, one click</h3><p>Campaign Board, Content Pipeline, GitHub Triage, Inbox Agent, Weekly Report, Client Folders, Decision Log — and five whole teams to hire in one click.</p></div>
-      <div class="card"><div class="k">frugal</div><h3>Eco mode</h3><p>One switch stretches the office's idle rhythms and skips optional QA passes — idle token burn drops, your direct orders never slow down.</p></div>
+  <!-- 05 — THE WORLD -->
+  <section class="slide" data-title="The living world">
+    <div class="split rev">
+      <div><div class="shot"><img src="../img/editor.png" alt="The Office Editor: a top-down 3×3 room grid with furniture placement" loading="lazy"></div>
+        <div class="cap">the Office Editor — swap rooms, place furniture, import your own models</div></div>
+      <div>
+        <div class="eyebrow">The living world</div>
+        <h2>A place, not a <b class="cy">dashboard</b>.</h2>
+        <p class="lede">An HD-2D office rendered <strong>behind your desktop icons</strong>: 3D rooms, pixel-art people lit by the scene, reflective floors, tilt-shift focus, film grain — and countryside outside the glass.</p>
+        <div class="list" style="grid-template-columns:repeat(2,1fr)">
+          <div><b>Nine swappable rooms</b> on a 3×3 jigsaw grid — Executive, Operations, Lobby, Cafeteria, Server, Meeting, Recreation, two Dormitories. Click two rooms to swap; furniture, seats, navigation and the pets follow.</div>
+          <div><b>Real day and night</b> — sun, sky, ambient light and reflections follow your machine's clock; a roofline clock and a manual atmosphere picker for golden-hour shots.</div>
+          <div><b>The Ghost Deck</b> — a floating glass platform with 12 desks where an agent's parallel clones work, then glide home and dissolve back into their owner.</div>
+          <div><b>Nameplates and FX</b> — MMO-style plates with a live state pill; ✅ ❌ ❗ 👍 🎵 flipbooks over heads; equippable elemental auras; a gold crown for you, a lead star for the Director.</div>
+          <div><b>Ambient life</b> — agents nap in a bunk, watch the rec-room TV, kick a football, drift into groups to chat; a cat, dogs, bird flocks, fireflies, and the odd server-room fire 💥 someone runs to put out.</div>
+          <div><b>It never disappears</b> — a world supervisor re-embeds the wallpaper within ~2 s whenever Windows tears the desktop down (resolution change, Explorer restart, a fullscreen game).</div>
+          <div><b>Your own furniture</b> — the Office Editor places walls, decor and imported <code>.glb</code> / <code>.gltf</code> / <code>.fbx</code> models and images into the world, atmosphere intact.</div>
+          <div><b>Mission Control</b> — an in-world board with one card per running task, and a lobby totem that shows daemon connectivity: truth, not decoration.</div>
+        </div>
+      </div>
     </div>
   </section>
 
-  <!-- 06 — SWAPPABLE BRAIN -->
+  <!-- 06 — CHAIN OF COMMAND -->
+  <section class="slide" data-title="Chain of command">
+    <div class="split">
+      <div>
+        <div class="eyebrow">Chain of command</div>
+        <h2>You are the CEO.<br>He is the <b class="am">Director</b>.</h2>
+        <p class="lede">Talk to one manager. Order the CEO and the Director walks over, takes the order, replies with a plan, and dispatches real sessions to the team with <code>DELEGATE:</code> lines — each hand-off acted out on the floor, each result reported back up the chain.</p>
+        <div class="flow"><span>your order</span><i>→</i><span>Director plans</span><i>→</i><span>DELEGATE: agent @ project :: job</span><i>→</i><span>results report back</span><i>→</i><span>follow-ups</span><i>→</i><span>he walks the summary to your desk</span></div>
+        <div class="grid g2 tight">
+          <div class="card sm"><div class="k">👻 sub-agents</div><h3>Self-splitting ghosts</h3><p>Any session may end a reply with <code>SUB:</code> lines when the request parallelizes — the daemon spawns clone sessions, each in its own 👻 thread, then resumes the parent for a synthesis. <b class="cy">Ghost isolation</b> gives each clone a private git worktree, so two ghosts editing the same file both succeed and their work comes back as branches.</p></div>
+          <div class="card sm"><div class="k">🗣 meetings</div><h3>Real discussions</h3><p>Pick 2–4 agents and a topic — round-robin turns over a shared transcript, minutes on the in-world whiteboard, and agents that research with tools mid-meeting to back an idea up.</p></div>
+          <div class="card sm"><div class="k">📁 projects</div><h3>Real folders, resumable</h3><p>Register any folder; the Director creates new ones with a <code>PROJECT:</code> line and routes work into them. The assignee's session lives <i>inside</i> the directory and you can resume it yourself — one window per project, one occupant at a time.</p></div>
+          <div class="card sm"><div class="k">💡 proposals</div><h3>They pitch you</h3><p>Idle agents drift together for small talk that can turn into a written project proposal — real websites, apps, plugins. You approve or reject each one <b class="cy">with your reasons</b>, which is how the team learns what you want next.</p></div>
+        </div>
+      </div>
+      <div><div class="shot"><img src="../img/org.png" alt="The org chart by tier: CEO, Director, team" loading="lazy"></div>
+        <div class="cap">the org chart — CEO, Director, the team by tier</div></div>
+    </div>
+  </section>
+
+  <!-- 07 — SECURITY -->
+  <section class="slide" data-title="Spatialized security">
+    <div class="split rev">
+      <div><div class="shot"><img src="../img/agents.png" alt="The agent editor: avatar, aura, persona, skills, tools" loading="lazy"></div>
+        <div class="cap">per-agent grants — skills, tools, MCP servers, brain</div></div>
+      <div>
+        <div class="eyebrow">Spatialized security</div>
+        <h2>Permission has a <b class="cy">place</b> too.</h2>
+        <p class="lede">When an agent needs a tool you haven't granted, its character <strong>walks to the Security Center</strong> and waits — amber light, ❗ over its head, the exact command on your screen. The hook really does long-poll the daemon until you decide.</p>
+        <div class="list" style="grid-template-columns:repeat(2,1fr)">
+          <div><b>Allow · ✓✓ Forever · Deny</b> — a denial makes the agent visibly re-plan; <i>forever</i> adds the tool to its profile so it never asks again.</div>
+          <div><b>Granted tools run silently</b> — and the agent doesn't even leave its desk; a short grace confirms a trip is actually needed.</div>
+          <div><b>A project's own hooks are a separate yes</b> — a folder that ships <code>.claude/settings.json</code> hooks raises a card with the literal commands and parks the work until you answer; editing the hooks asks again.</div>
+          <div><b>Run it somewhere else</b> — point the office, or one agent, at a throwaway Docker container or a machine over SSH. The container sees the office read-only and the working directory, nothing else; keys travel by name, never by value.</div>
+          <div><b>Refused, not downgraded</b> — a backend that can't be built correctly (say, the permission broker can't be installed) is refused outright, because a run that loses its broker works fine with nobody watching.</div>
+          <div><b>Everything local</b> — the daemon binds 127.0.0.1, API keys live in a masked vault and are injected per run; your code never leaves the machine unless you point a brain at a cloud.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 — SWAPPABLE BRAINS -->
   <section class="slide" data-title="Swappable brains">
     <div class="split rev">
-      <div class="shot"><img src="../img/swappable-brains.png" alt="Per-agent model/provider configuration across many providers" loading="lazy"></div>
+      <div><div class="shot"><img src="../img/swappable-brains.png" alt="Per-agent model/provider configuration across many providers" loading="lazy"></div>
+        <div class="cap">per agent: provider, model, and a live context meter in the chat</div></div>
       <div>
         <div class="eyebrow">Swappable brains</div>
         <h2>Hire each one a <b class="cy">different mind</b>.</h2>
-        <p class="lede">Per agent, pick the model that fits the job and the budget — frontier Claude for the hard calls, fast cheap models for grunt work, or a fully local brain for zero cloud. One office, many minds, no lock-in.</p>
+        <p class="lede">Per agent, pick the model that fits the job and the budget — frontier Claude for the Director's hard calls, fast cheap models for grunt work, or a fully local brain for zero cloud. <strong>Claude Code stays the engine; only the brain swaps</strong>, and it fails open to Claude.</p>
         <div class="chips">
-          <span class="chip">Claude</span><span class="chip">GPT</span><span class="chip">Gemini</span>
-          <span class="chip">DeepSeek</span><span class="chip">GLM</span><span class="chip">Qwen</span>
-          <span class="chip">Kimi</span><span class="chip">Kimi Code</span><span class="chip">Grok</span>
-          <span class="chip">Mistral</span><span class="chip">Groq</span><span class="chip">Cerebras</span>
+          <span class="chip">Claude</span><span class="chip">GLM</span><span class="chip">DeepSeek</span><span class="chip">Qwen</span>
+          <span class="chip">MiniMax</span><span class="chip">Kimi</span><span class="chip">Kimi Code</span>
+          <span class="chip">OpenAI</span><span class="chip">Atlas Cloud</span><span class="chip">Gemini</span><span class="chip">OpenRouter</span>
+          <span class="chip">NVIDIA build</span><span class="chip">Groq</span><span class="chip">Cerebras</span><span class="chip">xAI Grok</span>
+          <span class="chip">Mistral</span><span class="chip">Together AI</span><span class="chip">Fireworks</span>
           <span class="chip local">◆ Ollama</span><span class="chip local">◆ LM Studio</span>
-          <span class="chip">+ your own</span>
+          <span class="chip dim">+ any custom endpoint</span>
         </div>
-        <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-top:34px">
-          <div class="stat"><div class="num">19</div><div class="lab">providers, swappable<br>per agent</div></div>
+        <div class="list" style="grid-template-columns:repeat(2,1fr);margin-top:24px">
+          <div><b>A built-in proxy</b> translates Anthropic ↔ OpenAI on the fly — zero dependencies, no LiteLLM, no Python; strict local chat templates survive tool calls.</div>
+          <div><b>Auto-compact for every model</b> — before a thread overflows, Claude summarizes it and a fresh thread continues; a rate or context error triggers the same recovery.</div>
+          <div><b>Live model lists</b> are fetched on connect, so a brand-new model appears without an app update.</div>
+          <div><b>See everything</b> — each message tagged with its model, a context meter in the thread bar, a 🧠 BRAINS panel, and spend per provider in STATS.</div>
+        </div>
+        <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-top:30px">
+          <div class="stat"><div class="num">20</div><div class="lab">providers, swappable<br>per agent</div></div>
           <div class="stat"><div class="num">1M</div><div class="lab">context, auto-tuned<br>per model</div></div>
           <div class="stat"><div class="num">$0</div><div class="lab">possible — run fully<br>on local models</div></div>
         </div>
@@ -290,29 +356,171 @@
     </div>
   </section>
 
-  <!-- 07 — ECOSYSTEM -->
-  <section class="slide" data-title="Ecosystem">
+  <!-- 09 — MEMORY & LEARNING -->
+  <section class="slide" data-title="Memory & learning">
+    <div class="eyebrow">Memory &amp; learning</div>
+    <h2>It gets <b class="am">better</b> the longer you keep it.</h2>
+    <p class="lede">Nothing starts from zero. The office remembers what it did, distills it into notes and skills, retrieves only what's relevant, and — carefully — corrects its own mistakes.</p>
+    <div class="grid g3 tight">
+      <div class="card sm"><div class="k">🧠 memory</div><h3>Three tiers, written for you</h3><p>A shared <code>OFFICE.md</code>, a memory file per agent and one per project — distilled automatically after real work. A BM25 index (zero deps, works in Thai) injects only the memories relevant to the task, never a blind dump.</p></div>
+      <div class="card sm"><div class="k">🔎 semantic recall</div><h3>Words <i>and</i> meaning</h3><p>Point the office at any OpenAI-shaped embeddings endpoint — a local Ollama costs nothing and keeps memory on the machine — and word and vector rankings are fused, so "why did the wallpaper vanish" finds the note about WorkerW teardown.</p></div>
+      <div class="card sm"><div class="k">📚 auto-learned skills</div><h3>Hermes-style learning</h3><p>After a multi-tool task, a reflection pass decides whether the work distills into a reusable skill; if so it's saved, assigned and announced with a golden burst in the world.</p></div>
+      <div class="card sm"><div class="k">🔧 self-correcting</div><h3>It fixes what it wrote</h3><p>The same reflection can correct a skill it already wrote, and runs after failures — the strongest evidence a skill is wrong. Never a built-in, never one you edited by hand; the previous version is kept.</p></div>
+      <div class="card sm"><div class="k">🧪 skill regression</div><h3>Tests before it changes</h3><p>A skill can carry test cases. A proposed correction runs every case first, and one that breaks a case is refused — visibly, with a notification saying why. Self-improvement that cannot quietly get worse.</p></div>
+      <div class="card sm"><div class="k">📦 15 skill packs</div><h3>Built-in capabilities</h3><p>deep-research, web-automation, office-control, office-ops, plugin-builder, code-review, doc-writer, debug-detective, data-wrangler, project-kickoff, diagram-maker, archive-search, build-workflow, file-media-toolkit, schedule-via-office-job.</p></div>
+    </div>
+    <div class="repo">📄 The <b>File &amp; Media Toolkit</b> is in every agent: read and convert PDFs · Excel / Word / PowerPoint ↔ data · author documents and slide decks · transcribe a YouTube link or a video · edit images · slice JSON.</div>
+  </section>
+
+  <!-- 10 — WORK THAT DOESN'T WAIT -->
+  <section class="slide" data-title="Work that doesn't wait">
+    <div class="eyebrow">Autonomy</div>
+    <h2>Work that doesn't <b class="cy">wait for you</b>.</h2>
+    <p class="lede">The gap between "an assistant" and "a team" is what happens when you're not typing. The office has a rhythm of its own — and brakes you set once.</p>
+    <div class="grid g3 tight">
+      <div class="card sm"><div class="k">🤖 AUTO</div><h3>Keep-going mode</h3><p>An agent that hits a fork decides within its remit and opens its own next turn — up to 8 rounds, each announced in chat. It still stops dead for a credential it can't get or anything irreversible, and that block is pushed to your phone.</p></div>
+      <div class="card sm"><div class="k">⏰ standing jobs</div><h3>Works on a schedule</h3><p>"Every morning at 8, brief me." Run now, at a datetime, daily, or every N minutes. A fired job is a real order, not a reminder — the Director dispatches it to the team and the results come back to him.</p></div>
+      <div class="card sm"><div class="k">💓 heartbeat</div><h3>The Director makes rounds</h3><p>Every 15 / 30 / 60 minutes he reviews the calendar, the standing jobs and the note board — and pings you only when something deserves it. "OK" stays silent.</p></div>
+      <div class="card sm"><div class="k">📥 one inbox</div><h3>Asks you once, where you are</h3><p>Tool permissions, project trust, pitches, a blocked agent, jobs created switched off, a workflow's approval, anything a plugin asks — one queue, with history and a note box. Answer in the sidebar, the terminal, or with a tap on Telegram. Answering a blocked agent resumes its work.</p></div>
+      <div class="card sm"><div class="k">🔔 notifications</div><h3>Rules, not noise</h3><p>Per kind, route to the sidebar list, a pop-up, your channels, a sound — <i>always</i>, <i>outside quiet hours</i>, or <i>only when you're away from the keyboard</i>.</p></div>
+      <div class="card sm"><div class="k">💸 budgets</div><h3>Caps in money</h3><p>A dollar cap per day for the office and per agent, per project for its lifetime. A warning at 80 %, new turns refused at 100 % (running work finishes), estimates labelled ≈, and a 🌅 morning digest of what yesterday cost and what's waiting.</p></div>
+    </div>
+    <div class="repo">♻️ A watchdog respawns the daemon if it ever dies · a run that ends abnormally writes <b>why</b> into the history · 🌱 <b>Eco mode</b> cuts idle token burn without slowing your direct orders.</div>
+  </section>
+
+  <!-- 11 — WORKFLOW ENGINE -->
+  <section class="slide" data-title="Workflow engine">
+    <div class="split tall">
+      <div>
+        <div class="eyebrow">Workflow engine</div>
+        <h2>Draw it. Then it <b class="am">runs itself</b>.</h2>
+        <p class="lede">Plan work as plain-language nodes on a drag-drop canvas; the Director tells you which skills, tools and agents it needs. Press Run and the office <strong>executes the graph</strong> — every node on its own, in parallel where the arrows allow, joins that wait, decisions that open one branch.</p>
+        <div class="flow"><span>⚡ trigger</span><i>→</i><span>🤖 action</span><i>→</i><span>🌐 fetch</span><i>→</i><span>🔀 decision</span><i>→</i><span>✋ approval</span><i>→</i><span>🔔 notify</span><i>→</i><span>⏳ delay</span><i>→</i><span>📤 output</span></div>
+        <div class="list" style="grid-template-columns:repeat(2,1fr)">
+          <div><b>Starts without you</b> — on a schedule, from a webhook, on an office event, when a file lands, from a keyword you type on your phone — or on an RSS item, a kind a plugin added.</div>
+          <div><b>Survives a restart</b> — every run is a persisted record: delays re-arm, approvals stay in your inbox, a mid-flight step is marked failed rather than pretended.</div>
+          <div><b>Data flows down the arrows</b> — <code>{{prev}}</code>, <code>{{trigger.data.x}}</code>, <code>{{n3.output}}</code>; a decision is an expression or a question the Director answers.</div>
+          <div><b>Every action is a real agent turn</b> — with that agent's persona, memory, tools and brain, and every outward step behind an approval.</div>
+          <div><b>Plugins extend it</b> — a plugin can add its own trigger kind and its own node type (the Content Pipeline adds <i>rss</i> and <i>fetch-article</i>).</div>
+          <div><b>Also a skill</b> — <i>build-workflow</i> lets an agent draft a workflow for you from a sentence.</div>
+        </div>
+      </div>
+      <div><div class="shot"><img src="../img/briefing.png" alt="A plugin panel running inside the office" loading="lazy"></div>
+        <div class="cap">a workflow's plugin panel, live in the office</div></div>
+    </div>
+  </section>
+
+  <!-- 12 — TASK BOARD & CALENDAR -->
+  <section class="slide" data-title="Task board & calendar">
+    <div class="split">
+      <div>
+        <div class="eyebrow">Task board &amp; calendar</div>
+        <h2>One board for <b class="cy">everything</b> the office does.</h2>
+        <p class="lede">Delegations, fired jobs, meeting action items, workflow runs and your own cards all land on one board — <strong>todo · doing · waiting · done</strong> — and every agent knows the API, so they move their own cards.</p>
+        <div class="list" style="grid-template-columns:repeat(2,1fr)">
+          <div><b>Due dates</b> that remind you through your notification rules.</div>
+          <div><b>Dependencies</b> that hold a card and release it by themselves.</div>
+          <div><b>Repeat</b> every day, week or month; priorities; drag between columns.</div>
+          <div><b>Owned by the assignee</b> — a delegation's card moves as the agent works.</div>
+          <div><b>A real calendar</b> — recurrence (daily / weekly / weekdays / monthly), all-day events, reminders per occurrence, <code>.ics</code> export and import.</div>
+          <div><b>A personal touch</b> — the Director physically walks over to remind you, N minutes ahead; agents can book a follow-up themselves.</div>
+          <div><b>A shared note board</b> — notes live in the UI and in <code>notes.md</code>; agents read it and append bullets, file-watched both ways.</div>
+          <div><b>An org chart</b> by tier, and a 📊 dashboard — runs, cost, a 7-day chart, busiest agents, uptime, channels, key status.</div>
+        </div>
+      </div>
+      <div><div class="shot"><img src="../img/projects.png" alt="Office Ops: projects, jobs, calendar, notes" loading="lazy"></div>
+        <div class="cap">🗂 OFFICE OPS — projects, the board, jobs, calendar, notes, org</div></div>
+    </div>
+  </section>
+
+  <!-- 13 — CODEX -->
+  <section class="slide" data-title="Codex as a colleague">
+    <div class="eyebrow">A second coding agent</div>
+    <h2>Codex, as a <b class="am">colleague</b> — never the brain.</h2>
+    <p class="lede">Hand a coding task to OpenAI's Codex from any agent, from the Director, from a workflow node or the terminal. It works <strong>inside registered projects only</strong>, sandboxed, ghost-isolated when that's on; the diff is summarised and the cost estimated on the caller's budget.</p>
+    <div class="grid g4 tight">
+      <div class="card sm"><div class="k">from the Director</div><h3><code>DELEGATE: codex @ project :: task</code></h3><p>Codex joins the delegation round trip like any teammate; its result reports back to the Director.</p></div>
+      <div class="card sm"><div class="k">from a workflow</div><h3>A Codex node</h3><p>Drop it into the graph; the diff flows down the arrows to the next step or an approval.</p></div>
+      <div class="card sm"><div class="k">from the terminal</div><h3><code>bagidea codex</code></h3><p>Or <code>POST /codex/exec</code> for scripts — one shape everywhere.</p></div>
+      <div class="card sm"><div class="k">a second opinion</div><h3><code>codex exec review</code></h3><p>Ask Codex to review what a Claude agent wrote. Persona, memory and permissions stay with whoever called it.</p></div>
+    </div>
+    <div class="repo">🧑‍💻 Codex is also a one-click entry in the 🧰 Tools Hub — grant it to any agent as a tool.</div>
+  </section>
+
+  <!-- 14 — VOICE, CHANNELS, MEDIA -->
+  <section class="slide" data-title="Voice, channels & media">
+    <div class="eyebrow">Voice, channels &amp; media</div>
+    <h2>Talk to it. Call it. <b class="cy">Text it from the bus</b>.</h2>
+    <div class="grid g3 tight">
+      <div class="card sm"><div class="k">🎤 voice in</div><h3>Push-to-talk</h3><p>Hold Right Ctrl anywhere in Windows and speak to the CEO (Thai works); in-overlay hold-to-record everywhere, transcribed by Whisper or Gemini.</p></div>
+      <div class="card sm"><div class="k">🗣 voice out</div><h3>16 agent voices</h3><p>8 ♀ · 8 ♂ Gemini TTS presets, one per agent, each with its own style. Voiced agents toss out short spoken mood lines on their own; long read-aloud only when you ask.</p></div>
+      <div class="card sm"><div class="k">📞 calls</div><h3>Realtime voice chat</h3><p>Call the main agent over Gemini Live — your mic bridged to the office in the voice you assigned it.</p></div>
+      <div class="card sm"><div class="k">📨 six channels</div><h3>Telegram · Discord · LINE · Slack · WhatsApp · Messenger</h3><p>Messages enter the CEO flow; the Director answers on the same channel. Delegations, reports and new pitches follow you there — with real preview photos, not file paths.</p></div>
+      <div class="card sm"><div class="k">📎 media</div><h3>Attachments inline</h3><p>Paperclip or drag-drop; images, video and audio render in the chat; every message timestamped; agents make images via a system tool and they just appear.</p></div>
+      <div class="card sm"><div class="k">🎨 Media Studio</div><h3>Make · change · animate</h3><p>One window, because the work is iterative — an edit never overwrites its input. Agents can make and change pictures; video stays on your button, with the price printed on it.</p></div>
+    </div>
+  </section>
+
+  <!-- 15 — ECOSYSTEM -->
+  <section class="slide" data-title="Plugins & tools">
     <div class="split">
       <div>
         <div class="eyebrow">An ecosystem, not an app</div>
         <h2>A workplace that <b class="am">extends itself</b>.</h2>
-        <div class="grid g2" style="margin-top:26px">
-          <div class="card"><div class="k">🧩 plugins hub</div><h3>Apps inside the office</h3><p>Panels, routes and agent commands that pop out into their own windows. Browse the community Hub and <b class="cy">one-click install</b> — and one click <b class="cy">updates</b> them.</p></div>
-          <div class="card"><div class="k">🧰 tools hub</div><h3>Capabilities on tap</h3><p>Built-in tools plus MCP servers — a real browser, Google, databases and more — granted per agent from a curated catalog.</p></div>
-          <div class="card"><div class="k">🏆 showcase</div><h3>What people built</h3><p>A public gallery of offices, shipped projects, plugins and art. Submit yours with a PR and get credited.</p></div>
-          <div class="card"><div class="k">🛠 self-building</div><h3>It writes its own</h3><p>Ask the team for a tool and an agent scaffolds, builds, deploys and installs a working plugin onto the office itself.</p></div>
+        <div class="grid g2 tight">
+          <div class="card sm"><div class="k">🧩 plugin host</div><h3>Apps inside the office</h3><p>A plugin folder adds panels, server routes and commands agents can drive, with hooks into everything: <code>onEvent</code>, notifications, approvals, the board, the calendar, the scheduler, its own trigger kinds and workflow nodes, even a per-agent memory provider.</p></div>
+          <div class="card sm"><div class="k">🧩 plugins hub</div><h3>Browse, one-click install, one-click update</h3><p>A community catalog read live from the repo — Agent Workbench, Music Player, Calculator, Web View, WAX Wallet, and 🕊️ <b class="cy">Emmaus</b>, the first official companion (a 3D Bible counselor with voice). Install from any GitHub repo, publish with a PR.</p></div>
+          <div class="card sm"><div class="k">🧰 tools hub</div><h3>53 capabilities on tap</h3><p>15 built-in tools plus MCP servers granted per agent: a real browser, Chrome DevTools, GitHub, Codex, Google Workspace, Notion, Linear, Slack, Sentry, Postgres, Stripe, Figma, ElevenLabs — and Blender, Godot, Unity, Unreal and Roblox Studio. Catalog fetched live, in 14 languages.</p></div>
+          <div class="card sm"><div class="k">🛠 self-building</div><h3>It writes its own</h3><p>Ask the team for a tool and an agent scaffolds, builds, deploys and installs a working plugin onto the office itself — every step through the same approvals. Our own team built the tool they use to talk to each other.</p></div>
         </div>
-        <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-top:30px">
-          <div class="stat"><div class="num">6+</div><div class="lab">community plugins<br>in the Hub</div></div>
-          <div class="stat"><div class="num">31</div><div class="lab">tools — built-in<br>+ MCP servers</div></div>
-          <div class="stat"><div class="num">1-click</div><div class="lab">install · update<br>· publish via PR</div></div>
+        <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-top:30px">
+          <div class="stat"><div class="num">53</div><div class="lab">tools — built-in<br>+ MCP servers</div></div>
+          <div class="stat"><div class="num">7</div><div class="lab">plugins on the Hub<br>+ any GitHub repo</div></div>
+          <div class="stat"><div class="num">8</div><div class="lab">official plugins<br>in the library</div></div>
+          <div class="stat"><div class="num">🏆</div><div class="lab">a public showcase —<br>submit by PR</div></div>
         </div>
       </div>
-      <div class="shot"><img src="../img/briefing.png" alt="A briefing plugin panel running inside the office" loading="lazy"></div>
+      <div><div class="shot"><img src="../img/plugins.png" alt="The Plugins panel with installed and Hub plugins" loading="lazy"></div>
+        <div class="cap">🧩 plugins — installed, the official library, the community Hub</div></div>
     </div>
   </section>
 
-  <!-- 08 — SELF-EVOLVING -->
+  <!-- 16 — OFFICIAL LIBRARY & TEAMS -->
+  <section class="slide" data-title="Ready-made">
+    <div class="eyebrow">Ready-made</div>
+    <h2>Eight plugins and five teams, <b class="cy">one click</b> away.</h2>
+    <p class="lede">Real uses of the engine that ship with the office — the install still starts empty, so nothing runs until you say so. Every outward step sits behind an approval.</p>
+    <div class="grid g4 tight">
+      <div class="card sm"><div class="k">📣</div><h3>Campaign Board</h3><p>A marketing calendar the office runs — posts as cards, copy drafted in your voice, an approval before anything is published.</p></div>
+      <div class="card sm"><div class="k">📰</div><h3>Content Pipeline</h3><p>RSS / URL → fetched → summarized → drafted → approved → your channel.</p></div>
+      <div class="card sm"><div class="k">🐙</div><h3>GitHub Triage</h3><p>Issues in → labelled, answered, assigned — every reply approved by you.</p></div>
+      <div class="card sm"><div class="k">📬</div><h3>Inbox Agent</h3><p>Email in → classified → drafts → approval → sent, through the agent's own mail tool.</p></div>
+      <div class="card sm"><div class="k">📊</div><h3>Weekly Report</h3><p>Monday morning, written by the Director from the office's own records.</p></div>
+      <div class="card sm"><div class="k">🗂</div><h3>Client Folders</h3><p>One folder per client with its own memory, tasks and history.</p></div>
+      <div class="card sm"><div class="k">📓</div><h3>Decision Log</h3><p>Every approval, rejection and reason, searchable — the office's institutional memory.</p></div>
+      <div class="card sm"><div class="k">🧪</div><h3>Skill Regression</h3><p>Write test cases for skills and watch the runs that guard every self-correction.</p></div>
+    </div>
+    <div class="chips" style="margin-top:26px">
+      <span class="chip dim">👥 teams:</span><span class="chip">🧑‍💻 dev shop</span><span class="chip">🔬 research lab</span><span class="chip">🎬 content studio</span><span class="chip">🎧 customer support</span><span class="chip">🧍 solo assistant</span>
+      <span class="chip dim">names, roles, personas, skills and voices — hired together; plain JSON you can copy · <code>bagidea hire --team dev-shop</code></span>
+    </div>
+  </section>
+
+  <!-- 17 — WHO IT'S FOR -->
+  <section class="slide" data-title="Who it's for">
+    <div class="eyebrow">Who it's for</div>
+    <h2>A team for <b class="am">whatever</b> you do.</h2>
+    <div class="grid g3 tight">
+      <div class="card sm"><div class="k">developers</div><h3>A dev shop on the wallpaper</h3><p>Real project folders, resumable sessions, ghost clones on private worktrees, Codex for a second opinion, GitHub Triage, a browser the agents drive for QA — and a brain per agent to keep the bill sane.</p></div>
+      <div class="card sm"><div class="k">marketing &amp; content</div><h3>A content studio</h3><p>Campaign Board, Content Pipeline, the Media Studio for pictures and clips, copy in your voice, publishing only after you tap approve on your phone.</p></div>
+      <div class="card sm"><div class="k">support &amp; ops</div><h3>An inbox that answers</h3><p>Inbox Agent classifies and drafts, Client Folders keep each account's memory, the Weekly Report writes itself, and the Decision Log remembers why.</p></div>
+      <div class="card sm"><div class="k">research</div><h3>A research lab</h3><p>deep-research and web-automation skills, meetings where agents look things up mid-discussion, PDFs and videos read and transcribed, findings that compound in memory.</p></div>
+      <div class="card sm"><div class="k">one person</div><h3>A solo assistant</h3><p>A calendar that reminds you in person, a board you share with one agent, standing jobs every morning, and a voice you can call.</p></div>
+      <div class="card sm"><div class="k">builders</div><h3>A platform</h3><p>A zero-dependency HTTP API, an event protocol, a plugin SDK with a template repo, a CLI for everything, and export/import that moves a whole office to another machine in one file.</p></div>
+    </div>
+  </section>
+
+  <!-- 18 — SELF-EVOLVING -->
   <section class="slide" data-title="Self-evolving">
     <div class="eyebrow">Beyond agents</div>
     <h2>Not just agents. <b class="cy">An ecosystem</b>.</h2>
@@ -321,12 +529,12 @@
       <div class="card"><div class="k">🤖 collaboration</div><h3>A team, not a model</h3><p>Many agents — different roles, skills, tools, even different <b class="cy">brains</b> — coordinating, handing work off, splitting into ghost clones for parallel work and reporting back up the chain.</p></div>
       <div class="card"><div class="k">🧠 memory</div><h3>Knowledge that compounds</h3><p>Shared office notes, per-agent memory written automatically after real work, workflows saved as reusable skills, a searchable archive. One project's knowledge is the next project's <b class="cy">head start</b>.</p></div>
       <div class="card"><div class="k">🛠 self-extension</div><h3>It asks for what it lacks</h3><p>An agent that finds its capabilities aren't enough for the job proposes the tool or plugin that would be — and with your approval that becomes a real part of the running office. <b class="am">AI that proposes new tools for itself.</b></p></div>
-      <div class="card"><div class="k">👑 control</div><h3>You are still the CEO</h3><p>Every widening passes a human gate — the Security Center, project-hook trust, ✅ / ✕ on every proposal with your reasons. The office grows in the direction <b class="cy">you keep approving</b>.</p></div>
+      <div class="card"><div class="k">👑 control</div><h3>You are still the CEO</h3><p>Every widening passes a human gate — the Security Center, project-hook trust, budgets, ✅ / ✕ on every proposal with your reasons, tests a skill must pass before it changes. The office grows in the direction <b class="cy">you keep approving</b>.</p></div>
     </div>
     <div class="repo" style="margin-top:30px">Goal → Think → Act → Learn → Extend → Collaborate → <b>Repeat</b></div>
   </section>
 
-  <!-- 09 — WHY WE WIN (comparison) -->
+  <!-- 19 — WHY WE WIN (comparison) -->
   <section class="slide" data-title="Why we win">
     <div class="eyebrow">How we compare</div>
     <h2>What an <b class="cy">office</b> does<br>that a chat box can't.</h2>
@@ -344,57 +552,118 @@
         <tr><th>A team you watch work — embodied, on your desktop</th><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td class="us yes">✓</td></tr>
         <tr><th>A Director that plans &amp; delegates across agents</th><td class="par">~</td><td class="par">~</td><td class="no">✗</td><td class="us yes">✓</td></tr>
         <tr><th>Swappable brain per agent — 20 providers, local&nbsp;$0</th><td class="no">✗</td><td class="par">~</td><td class="no">✗</td><td class="us yes">✓</td></tr>
+        <tr><th>Visual, per-action permission approvals — answered from your phone</th><td class="no">✗</td><td class="par">~</td><td class="no">✗</td><td class="us yes">✓</td></tr>
+        <tr><th>Runs while you're away — schedules, triggers, a workflow engine</th><td class="no">✗</td><td class="par">~</td><td class="no">✗</td><td class="us yes">✓</td></tr>
+        <tr><th>Budgets in money, a task board, a calendar, memory that compounds</th><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td class="us yes">✓</td></tr>
         <tr><th>Self-extending plugin + tool ecosystem the agents build</th><td class="no">✗</td><td class="par">~</td><td class="par">~</td><td class="us yes">✓</td></tr>
-        <tr><th>Visual, per-action permission approvals</th><td class="no">✗</td><td class="par">~</td><td class="no">✗</td><td class="us yes">✓</td></tr>
         <tr><th>Always-on · lives on the wallpaper · resumable</th><td class="no">✗</td><td class="no">✗</td><td class="no">✗</td><td class="us yes">✓</td></tr>
-        <tr><th>Command it from your phone — 6 channels</th><td class="par">~</td><td class="no">✗</td><td class="no">✗</td><td class="us yes">✓</td></tr>
+        <tr><th>Command it from your phone — 6 channels · voice · calls</th><td class="par">~</td><td class="no">✗</td><td class="no">✗</td><td class="us yes">✓</td></tr>
         <tr><th>100% local · open source · 14 languages</th><td class="par">~</td><td class="par">~</td><td class="no">✗</td><td class="us yes">✓</td></tr>
       </tbody>
     </table>
     <div class="cmpnote">✓ built in &nbsp;·&nbsp; ~ partial / varies &nbsp;·&nbsp; ✗ not really &nbsp;—&nbsp; vs the typical tool in each category</div>
   </section>
 
-  <!-- 09 — REACH -->
-  <section class="slide" data-title="Built for everyone">
-    <div class="eyebrow">Built for everyone</div>
-    <h2>Everywhere you work, in your language.</h2>
-    <p class="lede">Cross-platform, fully localized and alive — voice in, voice out, and a world whose lighting tracks the real sun outside.</p>
-    <div class="stats">
-      <div class="stat"><div class="num">3</div><div class="lab">OSes — Windows, macOS,<br>Linux (one engine)</div></div>
-      <div class="stat"><div class="num">14</div><div class="lab">languages, fully<br>localized UI</div></div>
-      <div class="stat"><div class="num">🎤</div><div class="lab">push-to-talk (Right Ctrl)<br>— speak, hear a reply</div></div>
-      <div class="stat"><div class="num">24h</div><div class="lab">living world — day/night<br>on your real clock</div></div>
+  <!-- 20 — EVERYTHING AT A GLANCE -->
+  <section class="slide" data-title="At a glance">
+    <div class="eyebrow">Everything, at a glance</div>
+    <h2>The <b class="am">whole</b> office on one slide.</h2>
+    <div class="list">
+      <div><b>Living HD-2D wallpaper world</b> — 9 swappable rooms, Ghost Deck, day/night, pets, FX, auras</div>
+      <div><b>World supervisor</b> — re-embeds in ~2 s when Windows tears the desktop down</div>
+      <div><b>Office Editor</b> — swap rooms, place furniture, import .glb/.gltf/.fbx</div>
+      <div><b>CEO → Director → team</b> — DELEGATE round trips, follow-ups, walked-back summaries</div>
+      <div><b>Ghost clones</b> — SUB: parallelism, per-ghost threads, private git worktrees</div>
+      <div><b>Meetings</b> — 2–4 agents, whiteboard minutes, research mid-meeting</div>
+      <div><b>Social office</b> — banter that turns into written project proposals you approve with reasons</div>
+      <div><b>Projects</b> — real folders, resumable sessions, one window each, PROJECT: protocol</div>
+      <div><b>Spatial permissions</b> — walk to Security, Allow / Forever / Deny, granted tools silent</div>
+      <div><b>Project-hook trust</b> — a folder's own hooks need their own yes</div>
+      <div><b>Run location</b> — Docker or SSH, keys by name, refused not downgraded</div>
+      <div><b>20 swappable brains</b> — direct, via the built-in proxy, or local; auto-compact everywhere</div>
+      <div><b>Memory</b> — OFFICE.md + per-agent + per-project; BM25 + optional semantic recall</div>
+      <div><b>Skills</b> — 15 packs, auto-learned, self-correcting, regression-tested</div>
+      <div><b>File &amp; Media Toolkit</b> — PDF, Office docs, decks, transcription, images, JSON</div>
+      <div><b>AUTO mode</b> — up to 8 self-driven rounds, stops for the irreversible</div>
+      <div><b>Standing jobs + heartbeat</b> — real orders on a schedule; rounds every 15–60 min</div>
+      <div><b>One inbox</b> — every approval in one queue, answered from your phone</div>
+      <div><b>Notifications with rules</b> — per kind, quiet hours, only-when-away</div>
+      <div><b>Budgets in money</b> — 80 % warn, 100 % stop, morning digest</div>
+      <div><b>Workflow engine</b> — 8 node types, 5 trigger kinds + plugin kinds, runs survive restarts</div>
+      <div><b>Task board + calendar</b> — deps, repeat, .ics, agents move their own cards</div>
+      <div><b>Codex</b> — as a delegate, a node, a CLI, a reviewer; never the brain</div>
+      <div><b>Voice</b> — push-to-talk, 16 voices, realtime calls</div>
+      <div><b>6 channels</b> — Telegram, Discord, LINE, Slack, WhatsApp, Messenger</div>
+      <div><b>Media Studio</b> — make, change, animate; edits never overwrite</div>
+      <div><b>Plugins</b> — host + hooks, Hub, library of 8, agents that build their own</div>
+      <div><b>Tools Hub</b> — 53 entries, built-in + MCP, per-agent grants</div>
+      <div><b>5 team templates</b> — hire a whole team in one click</div>
+      <div><b>CLI · HTTP API · event protocol</b> — script all of it</div>
+      <div><b>Export / import</b> — the whole office in one file</div>
+      <div><b>Eco mode · watchdog · self-updater · start at login</b></div>
+      <div><b>3 OSes · 14 languages · 100 % open source</b></div>
     </div>
   </section>
 
-  <!-- 09 — STATUS -->
+  <!-- 21 — REACH -->
+  <section class="slide" data-title="Built for everyone">
+    <div class="split rev">
+      <div><div class="shot"><img src="../img/cli.png" alt="The bagidea CLI" loading="lazy"></div>
+        <div class="cap">the <code>bagidea</code> CLI — the whole office from a terminal</div></div>
+      <div>
+        <div class="eyebrow">Built for everyone</div>
+        <h2>Everywhere you work, in your language.</h2>
+        <p class="lede">Cross-platform, fully localized and alive — voice in, voice out, a world whose lighting tracks the real sun outside, and a developer surface for people who'd rather script it.</p>
+        <div class="stats">
+          <div class="stat"><div class="num">3</div><div class="lab">OSes — Windows, macOS,<br>Linux (one engine)</div></div>
+          <div class="stat"><div class="num">14</div><div class="lab">languages — UI, site,<br>docs and catalogs</div></div>
+          <div class="stat"><div class="num">1-line</div><div class="lab">install on a bare<br>machine, any OS</div></div>
+          <div class="stat"><div class="num">24h</div><div class="lab">living world — day/night<br>on your real clock</div></div>
+        </div>
+        <div class="list" style="grid-template-columns:repeat(2,1fr);margin-top:30px">
+          <div><b>A CLI for everything</b> — <code>bagidea ask</code>, <code>chat</code>, <code>hire</code>, <code>inbox</code>, <code>approve</code>, <code>budget</code>, <code>codex</code>, <code>plugin install</code>, <code>export</code> / <code>import</code>, <code>update</code>…</div>
+          <div><b>An HTTP API and an event protocol</b> — every panel in the office is built on the same routes and the same event stream plugins get.</div>
+          <div><b>Self-updating</b> — a version-gated 🔄 banner, one click pulls, rebuilds what changed and relaunches; npm and prebuilt binaries per release.</div>
+          <div><b>Claude login optional</b> — a third-party-only or local-only office just works; Gemini and OpenAI keys unlock voice, calls and images.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 22 — STATUS -->
   <section class="slide" data-title="Where it stands">
     <div class="eyebrow">Where it stands today</div>
     <h2>Shipping, not a slide.</h2>
-    <p class="lede">A working product on a fast release cadence — one-line installer, in-app auto-updater, and a real community filing issues we ship fixes for within the day.</p>
+    <p class="lede">A working product on a fast release cadence — one-line installer, in-app auto-updater, CI on three OSes, and a real community filing issues and PRs we ship fixes for within the day.</p>
     <div class="stats">
-      <div class="stat"><div class="num">v1.6</div><div class="lab">live & self-updating<br>in the wild</div></div>
-      <div class="stat"><div class="num">100%</div><div class="lab">open source —<br>art is free / CC0</div></div>
-      <div class="stat"><div class="num">1-line</div><div class="lab">install on a bare<br>machine, any OS</div></div>
+      <div class="stat"><div class="num" data-live="version">v1.6</div><div class="lab">live &amp; self-updating<br>in the wild</div></div>
+      <div class="stat"><div class="num" data-live="stars">230+</div><div class="lab">GitHub stars —<br>and growing</div></div>
+      <div class="stat"><div class="num">376</div><div class="lab">automated tests<br>on Node 20 and 22</div></div>
+      <div class="stat"><div class="num">12</div><div class="lab">contributors<br>credited by name</div></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="num">100%</div><div class="lab">open source (MIT) —<br>art is free / CC0</div></div>
       <div class="stat"><div class="num">local</div><div class="lab">runs on 127.0.0.1 —<br>your code stays yours</div></div>
+      <div class="stat"><div class="num">0</div><div class="lab">npm dependencies<br>in the daemon</div></div>
+      <div class="stat"><div class="num">v1.1→1.6</div><div class="lab">the whole v2 plan shipped<br>in six releases</div></div>
     </div>
   </section>
 
-  <!-- 10 — ROADMAP -->
+  <!-- 23 — ROADMAP -->
   <section class="slide" data-title="Where it's going">
     <div class="eyebrow">Where it's going</div>
     <h2>From a desktop toy to a daily team.</h2>
     <div class="road">
       <div class="stop done"><div class="when">shipped</div><div><h3>The living office + real agents</h3><p>Wallpaper world, the Director, ghost-clone parallelism, spatial permissions, channels and the CLI.</p></div></div>
-      <div class="stop done"><div class="when">shipped</div><div><h3>Open the brain &amp; the platform</h3><p>20 swappable providers, the plugin Hub, cross-platform builds, web automation, 14 languages.</p></div></div>
-      <div class="stop done"><div class="when">shipped</div><div><h3>Work that finishes itself</h3><p>Keep-going mode: the team decides within its remit and opens its own next turn until a job is really done — scheduled orders included — while irreversible steps still stop for you.</p></div></div>
-      <div class="stop done"><div class="when">shipped</div><div><h3>An office that runs while you're away</h3><p>One inbox on your phone, budgets in money, a workflow engine with triggers, a task board and calendar, Codex as a colleague, seven official plugins, teams in one click, skills that must pass their tests before they change.</p></div></div>
-      <div class="stop"><div class="when">next</div><div><h3>Deeper autonomy</h3><p>Standing goals the office pursues on its own, more plugins in the library, richer self-built tooling, sharper on-the-job memory.</p></div></div>
+      <div class="stop done"><div class="when">shipped</div><div><h3>Open the brain &amp; the platform</h3><p>20 swappable providers, the plugin Hub and Tools Hub, cross-platform builds, web automation, 14 languages.</p></div></div>
+      <div class="stop done"><div class="when">shipped</div><div><h3>Work that finishes itself</h3><p>Keep-going mode, scheduled orders, Docker/SSH run location, ghost worktrees, semantic recall, self-correcting skills, the Media Studio.</p></div></div>
+      <div class="stop done"><div class="when">shipped</div><div><h3>An office that runs while you're away</h3><p>One inbox on your phone, budgets in money, a workflow engine with triggers, a task board and calendar, Codex as a colleague, eight official plugins, teams in one click, skills that must pass their tests before they change.</p></div></div>
+      <div class="stop"><div class="when">next</div><div><h3>Deeper autonomy</h3><p>Standing goals the office pursues on its own, a wake word, more plugins in the library and on the Hub, richer self-built tooling, sharper on-the-job memory.</p></div></div>
       <div class="stop"><div class="when">vision</div><div><h3>Your always-on company</h3><p>A team that runs your projects around the clock, hires the right minds, and grows its own tools — on a wallpaper anyone can install free.</p></div></div>
     </div>
   </section>
 
-  <!-- 12 — SPONSORS -->
+  <!-- 24 — SPONSORS -->
   <section class="slide" data-title="Back the build">
     <div class="eyebrow">Support the office</div>
     <h2>Free for everyone —<br><b class="am">powered by backers</b>.</h2>
@@ -408,7 +677,7 @@
     <div class="repo" style="margin-top:30px">Become a sponsor → <b>bagidea.github.io/bagidea-office</b> (#sponsors) &nbsp;·&nbsp; or open an issue to talk partnership</div>
   </section>
 
-  <!-- 13 — CLOSE -->
+  <!-- 25 — CLOSE -->
   <section class="slide" id="close" data-title="Open it">
     <div class="split">
       <div>
@@ -416,7 +685,7 @@
         <h1 style="font-size:clamp(32px,5.2vw,76px)">Don't read about<br>the office.<br><span style="color:var(--accent)">Open it.</span></h1>
         <p class="lede">It installs on a bare machine in one line and turns your wallpaper into a working team in minutes. Watch the Director take your first order and walk it to a desk — that demo is the pitch.</p>
         <a class="cta" href="https://github.com/bagidea/bagidea-office">▸ github.com/bagidea/bagidea-office</a>
-        <div class="repo">one office · <b>∞</b> employees · <b>19</b> minds · <b>3</b> platforms · <b>14</b> languages · free &amp; open source</div>
+        <div class="repo">one office · <b>∞</b> employees · <b>20</b> minds · <b>3</b> platforms · <b>14</b> languages · <b>53</b> tools · free &amp; open source</div>
       </div>
       <div class="shot heroshot"><img src="../img/world.png" alt="The BagIdea Office at night" loading="lazy"></div>
     </div>
@@ -427,7 +696,7 @@
 <div id="bar">
   <div class="l">▸ <b>BAGIDEA OFFICE</b></div>
   <div class="dots" id="dots"></div>
-  <div class="r"><span><span id="cur">01</span> / <span id="tot">11</span></span>
+  <div class="r"><span><span id="cur">01</span> / <span id="tot">25</span></span>
     <button id="fs" title="Present fullscreen (F)">⛶</button></div>
 </div>
 
@@ -441,9 +710,10 @@
     d.onclick=()=>slides[i].scrollIntoView();dots.appendChild(d);});
   const dotEls=[...dots.children];let idx=0;
   function onScroll(){
-    const h=deck.clientHeight,i=Math.round(deck.scrollTop/h);
+    const h=deck.clientHeight;let i=0;
+    for(let j=0;j<slides.length;j++){if(slides[j].offsetTop<=deck.scrollTop+h*0.4)i=j;}
     prog.style.width=(deck.scrollTop/(deck.scrollHeight-h)*100)+'%';
-    if(i!==idx){idx=Math.max(0,Math.min(slides.length-1,i));
+    if(i!==idx){idx=i;
       cur.textContent=String(idx+1).padStart(2,'0');
       dotEls.forEach((d,j)=>d.classList.toggle('on',j===idx));}
   }
@@ -464,6 +734,16 @@
     else if(e.key==='End'){slides[slides.length-1].scrollIntoView();}
     else if(e.key==='f'||e.key==='F'){e.preventDefault();toggleFs();}
   });
+  // live figures — the version from the repo's VERSION file, the star count from GitHub; the
+  // static text stays as the fallback when either fetch fails (offline, rate-limited).
+  fetch('https://raw.githubusercontent.com/bagidea/bagidea-office/main/VERSION',{cache:'no-cache'})
+    .then(r=>r.ok?r.text():'').then(v=>{v=(v||'').trim();
+      if(/^\d+\.\d+\.\d+$/.test(v))document.querySelectorAll('[data-live="version"]').forEach(e=>e.textContent='v'+v);})
+    .catch(()=>{});
+  fetch('https://api.github.com/repos/bagidea/bagidea-office')
+    .then(r=>r.ok?r.json():null).then(j=>{const n=j&&j.stargazers_count;
+      if(typeof n==='number'&&n>0)document.querySelectorAll('[data-live="stars"]').forEach(e=>e.textContent=n.toLocaleString('en-US'));})
+    .catch(()=>{});
 </script>
 </body>
 </html>
