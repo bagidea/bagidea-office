@@ -61,6 +61,17 @@
       "preview": "https://raw.githubusercontent.com/bagidea/waxwing/main/brand/preview-hero.png",
       "th": { "desc": "กระเป๋า self-custody สำหรับเชน Antelope (WAX · EOS · Telos · XPR, testnet & mainnet, ดีฟอลต์ WAX testnet) — สร้าง/นำเข้าคีย์เข้ารหัส AES-256-GCM + scrypt, รหัสผ่านเดียวปลดล็อกทุกเน็ตเวิร์ก, auto-lock, ส่ง/ stake/ unstake/ ซื้อ-ขาย RAM ผ่าน WharfKit, ส่งออก/นำเข้า wallet แบบเข้ารหัส · คีย์ไม่เคยออกจากเครื่อง" },
       "en": { "desc": "A self-custody wallet for Antelope chains (WAX · EOS · Telos · XPR, testnet & mainnet, default WAX testnet) — generate/import keys encrypted at rest (AES-256-GCM + scrypt), one wallet-level password unlocks all networks, auto-lock, send / stake / unstake / buy-sell RAM via WharfKit, encrypted export/import. Your keys never leave the machine." }
+    },
+    {
+      "id": "emmaus",
+      "name": "🕊️ Emmaus",
+      "author": "bagidea",
+      "repo": "https://github.com/bagidea/emmaus",
+      "tags": ["companion", "bible", "voice", "3d"],
+      "official": true,
+      "preview": "https://raw.githubusercontent.com/bagidea/emmaus/main/docs/screenshots/companion-speaking.png",
+      "th": { "desc": "เพื่อนคู่ใจที่ให้คำปรึกษาจากพระคัมภีร์ — เล่าเรื่องที่คุณกำลังเผชิญให้ Selah ผู้ให้คำปรึกษาแบบ 3 มิติฟัง แล้วรับคำแนะนำที่ยึดพระคัมภีร์ ขั้นตอนที่ทำได้จริง และคำอธิษฐาน พร้อมเสียงพูดภาษาไทยหรืออังกฤษ · ทุกข้อพระคัมภีร์ที่ยกมาตรวจกับคลังพระคัมภีร์ในเครื่อง" },
+      "en": { "desc": "A Bible-counsel companion — tell Selah, a 3D counselor, what you're going through and get Scripture-grounded guidance, practical steps and a prayer, spoken aloud in Thai or English. Every quoted verse is checked against the bundled Bible corpus." }
     }
   ]
 }
