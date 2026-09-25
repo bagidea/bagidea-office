@@ -23,7 +23,14 @@ const MANUAL = join(ROOT, "web/sponsors.manual.json");
 const OUT = join(ROOT, "web/sponsors.json");
 const README = join(ROOT, "README.md");
 const LOGIN = process.env.SPONSORS_LOGIN || "bagidea";
-const TOKEN = process.env.SPONSORS_TOKEN || "";
+const TOKEN = (process.env.SPONSORS_TOKEN || "").trim();
+// Reject anything that isn't a plausible GitHub token shape before it is ever
+// sent in an Authorization header — guards against a malformed/truncated
+// value (e.g. accidental injection of other data) leaking to the API call.
+if (TOKEN && !/^(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})$/.test(TOKEN)) {
+  console.error("✗ SPONSORS_TOKEN is set but has an invalid format — refusing to use it");
+  process.exit(1);
+}
 const RAW = `https://raw.githubusercontent.com/${"bagidea"}/bagidea-office/main/web/`;
 
 // monthly $ -> tier (must match the tiers in sponsors.manual.json)
