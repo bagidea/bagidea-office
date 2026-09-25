@@ -24,6 +24,19 @@ ownership; updates you push are picked up when a user reinstalls.
 your repo (plugin.json + code)  ──PR──▶  web/plugins.json  ──▶  Plugins Hub  ──install──▶  user's office
 ```
 
+## What's on the Hub today
+
+| | plugin | by |
+|---|---|---|
+| 🕊️ | **Emmaus** — a Bible-counsel companion: tell Selah, a 3D counselor, what you're going through and get Scripture-grounded guidance, practical steps and a prayer, spoken aloud in Thai or English; every quoted verse is checked against the bundled corpus. The Hub's first **official** companion plugin (MIT; the bundled Bible texts keep their own terms) | [bagidea/emmaus](https://github.com/bagidea/emmaus) |
+| 🧪 | **Agent Workbench** — test and benchmark agents, save cases for regression | misternay |
+| 🎵 | **Music Player** · 🧮 **Calculator** · 👋 **Hello** (the starter template) · 🌐 **Web View** | bagidea |
+| 🪙 | **WAX Wallet** — a self-custody wallet for Antelope chains | bagidea |
+
+Not to be confused with the [official plugin **library**](library.md): those eight
+ship *with* the office (Campaign Board, Content Pipeline, GitHub Triage, …) and
+install by copy; Hub plugins live in their authors' repos and install by clone.
+
 ---
 
 ## 1 · Build & publish

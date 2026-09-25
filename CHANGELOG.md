@@ -4,6 +4,19 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [Unreleased]
+
+**Added**
+- **🕊️ Emmaus on the Plugins Hub** — the first *official* companion plugin:
+  a Bible-counsel companion (tell Selah, a 3D counselor, what you're going
+  through; Scripture-grounded guidance, practical steps and a prayer, spoken
+  aloud in Thai or English; every quoted verse checked against the bundled
+  corpus). Catalog entry in `web/plugins.json` with the description in all 14
+  languages; the Hub page and the office's 🧩 Plugins Hub read the catalog live
+  ([#58](https://github.com/bagidea/bagidea-office/pull/58);
+  repo: [bagidea/emmaus](https://github.com/bagidea/emmaus), MIT — the bundled
+  Bible texts keep their own terms).
+
 ## [1.6.4] — 🎨 Every dropdown wears the theme
 
 **Fixed**

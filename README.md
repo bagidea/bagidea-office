@@ -819,7 +819,7 @@ The full step-by-step guides, with screenshots:
 | [Budgets](docs/guide/budget.md) | 💸 caps in money per day / agent / project · warn at 80 %, stop at 100 % · the morning digest |
 | [Tools Hub](docs/guide/tools-hub.md) | the 53-entry catalog · MCP servers · Blender/Godot/Unity/Unreal/Roblox · Codex · submitting one |
 | [Plugins](docs/guide/plugins.md) | the extension system · music player · writing your own |
-| [Plugin Hub](docs/guide/plugin-hub.md) | browse, install and publish community plugins |
+| [Plugin Hub](docs/guide/plugin-hub.md) | browse, install and publish community plugins · 🕊️ **Emmaus**, the first official companion plugin (Bible counsel, 3D, voice) |
 | [Showcase](docs/guide/showcase.md) | get your office, project or plugin featured |
 | [Office Editor](docs/guide/editor.md) | furniture/walls · swap rooms · import your own models & images |
 | [Channels](docs/guide/channels.md) | connect Telegram / Discord / LINE / Slack / WhatsApp / Messenger |
