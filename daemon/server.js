@@ -41,6 +41,7 @@ const projtrust = require("./projecttrust");
 const joborder = require("./joborder");
 const { wireWorkspaceSettings } = require("./wire-hooks-runtime");
 const { killTree } = require("./kill-tree");   // cross-platform child reap (issue #15 review)
+const devmode = require("./devmode");           // 🛠 Dev Mode: redacted tool detail for task.progress
 
 // Issue #15 (Bug 1) — main runs need both a hard wall-clock cap and an idle
 // detector, or a stuck CLI retry loop pins a task in "started" until the CLI
@@ -307,7 +308,8 @@ function rosterEvt() {
     proposalMin: Number(reg.proposalMin !== undefined ? reg.proposalMin : 120),
     maxStaff: MAX_STAFF, staffCount: staffCount(),
     lang: reg.lang || "en", daylight: reg.daylight ?? "auto",
-    monitor: reg.monitor || 0, monitors: monitorCount() };
+    monitor: reg.monitor || 0, monitors: monitorCount(),
+    devMode: reg.devMode === true };
 }
 
 // Relaunch the whole stack (shell → daemon → godot) detached, so it survives
@@ -971,10 +973,14 @@ let onBroadcastHook = null;   // set once triggers exist (event triggers listen 
 function broadcast(evt, journal = true) {
   evt.ts = Date.now();
   const json = JSON.stringify(evt);
-  if (journal) fs.appendFile(JOURNAL, json + "\n", () => {});
+  // journal may be an OBJECT: the leaner event to persist instead of evt
+  // (Dev Mode task.progress ships tool input live, but never to disk).
+  const persistedJson = journal && journal !== true
+    ? JSON.stringify({ ...journal, ts: evt.ts }) : json;
+  if (journal) fs.appendFile(JOURNAL, persistedJson + "\n", () => {});
   const frame = wsFrame(json);
   for (const s of wsClients) s.write(frame);
-  if (evt.type !== "world.pos") console.log("[oep] →", json);
+  if (evt.type !== "world.pos") console.log("[oep] →", persistedJson);
   if (onBroadcastHook) { try { onBroadcastHook(evt); } catch (e) { console.error("[trigger] event hook", e && e.message); } }
 }
 
@@ -2630,8 +2636,13 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
             entry.log.push({ who: "tool", text: b.name, ts: Date.now() });
             while (entry.log.length > 200) entry.log.shift();
             saveSess();
-            broadcast({ type: "task.progress", agent, task, tool: b.name,
-              session: entry.key });
+            // 🛠 Dev Mode: the live frame carries the (redacted) tool input plus a
+            // human summary (detail/label/kind) ONLY while reg.devMode is on. The
+            // journal always gets the plain event — tool arguments are never
+            // persisted (entry.log above stays name-only too).
+            const progress = { type: "task.progress", agent, task, tool: b.name,
+              session: entry.key };
+            broadcast(devmode.progressEvent(progress, b.input, reg.devMode === true), progress);
             watchdog.touch();   // issue #15: a tool call is forward progress
           } else if (b.type === "text" && b.text.trim()) {
             lastText = b.text;
@@ -3449,8 +3460,11 @@ function runSub(parentId, subId, taskText, entry, onDone) {
             entry.log.push({ who: "tool", text: b.name, ts: Date.now() });
             while (entry.log.length > 200) entry.log.shift();
             saveSess();
-            broadcast({ type: "subagent.progress", agent: parentId, sub: subId,
-              tool: b.name, session: entry.key });
+            // Match the main-agent path: live Dev Mode details are redacted;
+            // the persisted event and session log remain name-only.
+            const progress = { type: "subagent.progress", agent: parentId, sub: subId,
+              tool: b.name, session: entry.key };
+            broadcast(devmode.progressEvent(progress, b.input, reg.devMode === true), progress);
           } else if (b.type === "text" && b.text.trim()) {
             lastText = b.text;
             entry.log.push({ who: "agent", text: b.text.slice(0, 8000), ts: Date.now() });
@@ -6931,6 +6945,23 @@ end tell`;
     readBody(req, (body) => {
       try {
         reg.ghostWorktrees = !!JSON.parse(body).enabled;
+        saveReg();
+        pushRoster();
+        res.writeHead(200);
+        res.end("ok");
+      } catch {
+        res.writeHead(400);
+        res.end("bad json");
+      }
+    });
+
+  } else if (req.method === "POST" && req.url === "/registry/devmode") {
+    // 🛠 Dev Mode: show detailed panels, scroll bars, verbose logging for debugging.
+    // Owner-only, opt-in, default off.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        reg.devMode = !!JSON.parse(body).enabled;
         saveReg();
         pushRoster();
         res.writeHead(200);
