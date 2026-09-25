@@ -4722,7 +4722,30 @@ function serveMedia(res, full, req) {
   });
 }
 
+// Portable definitions only: sessions, secrets and machine-specific execution
+// settings stay local. The transfer service owns the transactional disk commit.
+const officeTransfer = require("./office-transfer")({ workspace: WORKSPACE, daemonDir: __dirname, reg, maxStaff: MAX_STAFF });
+const handleOfficeTransfer = require("./office-transfer-http")({
+  transfer: officeTransfer,
+  onImported: () => {
+    // Existing file watchers must follow disabled/replaced trigger definitions.
+    // This never starts a workflow; unaffected enabled watchers are restored.
+    triggers.stopAll();
+    triggers.startAll();
+    try {
+      retrieval.init({ indexFile: RETRIEVAL_INDEX, memDir: MEM_DIR, officeMd: OFFICE_MD,
+        projectsDir: path.join(WORKSPACE, "projects"), meetingsDir: path.join(WORKSPACE, "meetings"), skills: reg.skills });
+      retrievalOk = true;
+    } catch (e) { retrievalOk = false; console.error("[transfer] retrieval refresh:", e.message); }
+    pushRoster();
+    broadcast({ type: "ui.sound", on: reg.sound !== false }, false);
+    broadcast({ type: "ui.daylight", hour: reg.daylight ?? "auto" }, false);
+    broadcast({ type: "ui.lang", lang: reg.lang || "en" }, false);
+  },
+});
+
 const server = http.createServer((req, res) => {
+  if (handleOfficeTransfer(req, res)) return;
   if (req.method === "GET" && (req.url.split("?")[0] === "/" || req.url.split("?")[0] === "/index.html")) {
     res.writeHead(200, {
       "content-type": "text/html; charset=utf-8",
