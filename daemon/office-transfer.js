@@ -79,6 +79,21 @@ function selected(value, fallback = CATEGORIES) {
   if (!Array.isArray(value) || !value.length || value.some((s) => !CATEGORIES.includes(s))) fail("select at least one valid category");
   return [...new Set(value)];
 }
+// Optional per-item export selection: { category: [itemId, ...] }. A selected
+// category without a list exports everything in it; a listed category exports
+// exactly the listed items, which must still exist when the ZIP is built.
+function pickedItems(value, categories) {
+  const out = new Map();
+  if (value === undefined || value === null) return out;
+  object(value, "item selection");
+  for (const [category, ids] of Object.entries(value)) {
+    if (!categories.includes(category)) fail("item selection names a category that is not selected: " + category);
+    if (!Array.isArray(ids) || ids.length > 5000 || ids.some((x) => typeof x !== "string" || !x || x.length > 4200)) fail("item selection must be a bounded list of item IDs");
+    if (!ids.length) fail("select at least one item in " + category + ", or deselect that category");
+    out.set(category, new Set(ids));
+  }
+  return out;
+}
 function counts(entries) {
   const out = Object.fromEntries(CATEGORIES.map((c) => [c, 0]));
   for (const e of entries) out[e.category]++;
@@ -344,8 +359,22 @@ module.exports = function officeTransfer(options) {
     for (const m of Object.values(reg.mcpServers || {})) collect(m.env, true);
     return [...values].sort((a, b) => b.length - a.length);
   }
-  function source(categories) {
-    const office = { version: VERSION }, secrets = secretValues();
+  // Sanitize each item, never the ID-keyed maps themselves: an agent, skill,
+  // server or workflow whose ID reads like "token", "key" or "env" is still an
+  // item to export, not a credential field.
+  function sanitizeOffice(office, secrets) {
+    const each = (items) => Object.fromEntries(Object.entries(items).map(([key, value]) => [key, sanitize(value, secrets)]));
+    const out = { version: office.version };
+    if (office.team) out.team = { agents: each(office.team.agents), roles: sanitize(office.team.roles, secrets) };
+    if (office.skills) out.skills = { definitions: each(office.skills.definitions), tests: each(office.skills.tests) };
+    if (office.mcp) out.mcp = { servers: each(office.mcp.servers) };
+    if (office.workflows) out.workflows = { definitions: each(office.workflows.definitions), triggers: sanitize(office.workflows.triggers, secrets) };
+    if (office.settings) out.settings = { preferences: sanitize(office.settings.preferences, secrets) };
+    return out;
+  }
+  function source(categories, picks = new Map()) {
+    let office = { version: VERSION };
+    const secrets = secretValues();
     if (categories.includes("team")) office.team = { agents: Object.fromEntries(Object.entries(reg.agents || {}).filter(([aid, a]) => aid !== "ceo" && !a.isUser).map(([aid, a]) => [aid, cleanAgent(a, aid)])), roles: reg.roles || [] };
     if (categories.includes("skills")) office.skills = { definitions: map(reg.skills || {}, "skills", cleanSkill), tests: Object.fromEntries(Object.entries(reg.skillTests || {}).filter(([sid]) => own(reg.skills || {}, sid)).map(([sid, tests]) => [sid, cleanTests(tests)])) };
     if (categories.includes("mcp")) office.mcp = { servers: map(reg.mcpServers || {}, "MCP", cleanMcp, 200) };
@@ -354,11 +383,70 @@ module.exports = function officeTransfer(options) {
       office.workflows = { definitions, triggers: (reg.triggers || []).filter((t) => own(definitions, t.workflowId)).map(cleanTrigger) };
     }
     if (categories.includes("settings")) office.settings = { preferences: cleanPreferences(reg) };
-    const docs = categories.includes("settings") ? readMarkdown().map((d) => ({ ...d, content: redactText(d.content, secrets) })) : [];
+    let docs = categories.includes("settings") ? readMarkdown().map((d) => ({ ...d, content: redactText(d.content, secrets) })) : [];
+    office = sanitizeOffice(office, secrets);
+    if (picks.size) docs = pickSource(office, docs, picks);
     let bytes = 0;
     function budget(v) { if (typeof v === "string") bytes += Buffer.byteLength(v); else if (v && typeof v === "object") for (const item of Object.values(v)) budget(item); if (bytes > zip.MAX_TOTAL_BYTES / 2) fail("office configuration exceeds the portable archive size limit"); }
     budget(office); budget(docs);
-    return { office: cleanOffice(sanitize(office, secrets), categories), docs };
+    return { office: cleanOffice(office, categories), docs };
+  }
+  // What the export picker lists, with the same item IDs as the import preview.
+  // `needs` names other items an entry depends on (custom skills, MCP servers,
+  // agents, a trigger's workflow) so a partial export can say what it leaves
+  // out. Built-in skills and the Director exist in every office, so they are
+  // never reported as needed.
+  function catalog(office, docs) {
+    const items = [], add = (category, itemId, label, extra = {}) => items.push({ category, id: itemId, label: String(label || itemId), ...extra });
+    const agents = office.team?.agents || {}, skills = office.skills?.definitions || {}, servers = office.mcp?.servers || {}, flows = office.workflows?.definitions || {};
+    const builtinSkill = (sid) => !!(SKILL_LIBRARY[sid] || reg.skills?.[sid]?.builtin);
+    for (const [aid, a] of Object.entries(agents)) {
+      const needs = [...a.skills.filter((s) => own(skills, s) && !builtinSkill(s)).map((s) => "skills:" + s),
+        ...a.tools.filter((x) => x.startsWith("mcp:") && own(servers, x.slice(4))).map((x) => "mcp:" + x.slice(4))];
+      add("team", aid, a.name, { note: aid === "main" ? "Director" : a.role, needs });
+    }
+    if (office.team?.roles.length) add("team", "roles:all", "Team roles", { note: office.team.roles.join(", ").slice(0, 160) });
+    for (const [sid, s] of Object.entries(skills)) add("skills", sid, s.name, builtinSkill(sid) ? { note: "Built-in", builtin: true } : {});
+    for (const mid of Object.keys(servers)) add("mcp", mid, mid, { note: servers[mid].url ? "URL server" : "Command server" });
+    for (const [wid, w] of Object.entries(flows)) {
+      const needs = new Set();
+      for (const n of w.nodes) {
+        const aid = (/^@([\w-]+)\s*:/.exec(n.text || "") || [])[1] || n.cfg?.agent;
+        if (typeof aid === "string" && aid !== "main" && own(agents, aid)) needs.add("team:" + aid);
+      }
+      add("workflows", wid, w.name, { note: w.nodes.length + " steps", needs: [...needs] });
+    }
+    for (const t of office.workflows?.triggers || []) add("workflows", "trigger:" + t.id, t.name || t.id, { note: "Trigger (" + t.kind + ") for " + (flows[t.workflowId]?.name || t.workflowId), parent: t.workflowId, needs: ["workflows:" + t.workflowId] });
+    if (office.settings && Object.keys(office.settings.preferences).length) add("settings", "preferences", "Office preferences", { note: Object.keys(office.settings.preferences).length + " settings" });
+    for (const d of docs) add("settings", "markdown:" + d.path, d.path, { note: "Markdown" });
+    return items;
+  }
+  // Keep only the listed items. Every listed ID must still be exportable, so a
+  // stale picker fails loudly instead of silently producing a smaller ZIP.
+  function pickSource(office, docs, picks) {
+    const available = new Map(CATEGORIES.map((c) => [c, new Set()]));
+    for (const item of catalog(office, docs)) available.get(item.category).add(item.id);
+    for (const [category, ids] of picks) for (const itemId of ids) {
+      if (!available.get(category).has(itemId)) fail("selected item " + itemId + " is no longer in " + category + ". Refresh contents and choose again.");
+    }
+    const keep = (category, itemId) => !picks.has(category) || picks.get(category).has(itemId);
+    const only = (o, category) => Object.fromEntries(Object.entries(o).filter(([key]) => keep(category, key)));
+    if (office.team) {
+      office.team = { agents: only(office.team.agents, "team"), roles: keep("team", "roles:all") ? office.team.roles : [] };
+    }
+    if (office.skills) {
+      const definitions = only(office.skills.definitions, "skills");
+      office.skills = { definitions, tests: Object.fromEntries(Object.entries(office.skills.tests).filter(([sid]) => own(definitions, sid))) };
+    }
+    if (office.mcp) office.mcp = { servers: only(office.mcp.servers, "mcp") };
+    if (office.workflows) {
+      const definitions = only(office.workflows.definitions, "workflows");
+      const triggers = office.workflows.triggers.filter((t) => keep("workflows", "trigger:" + t.id));
+      for (const t of triggers) if (!own(definitions, t.workflowId)) fail("trigger " + t.id + " needs workflow " + t.workflowId + "; select that workflow too");
+      office.workflows = { definitions, triggers };
+    }
+    if (office.settings && !keep("settings", "preferences")) office.settings = { preferences: {} };
+    return docs.filter((d) => keep("settings", "markdown:" + d.path));
   }
   function entriesFor(data) {
     const { office, docs } = data, entries = [];
@@ -374,11 +462,12 @@ module.exports = function officeTransfer(options) {
     return entries;
   }
   function summary() {
-    const data = source(CATEGORIES), entries = entriesFor(data);
-    return { categories: counts(entries), workspace, limits: { maxArchiveBytes: zip.MAX_ARCHIVE_BYTES }, warnings: ["Credentials, channel connections, machine paths, permission approvals and runtime history are excluded."] };
+    const data = source(CATEGORIES), entries = entriesFor(data), items = Object.fromEntries(CATEGORIES.map((c) => [c, []]));
+    for (const { category, ...item } of catalog(data.office, data.docs)) items[category].push(item);
+    return { categories: counts(entries), items, workspace, limits: { maxArchiveBytes: zip.MAX_ARCHIVE_BYTES }, warnings: ["Credentials, channel connections, machine paths, permission approvals and runtime history are excluded."] };
   }
-  function exportArchive(categoriesArray) {
-    const categories = selected(categoriesArray), data = source(categories), files = [];
+  function exportArchive(categoriesArray, itemSelection) {
+    const categories = selected(categoriesArray), data = source(categories, pickedItems(itemSelection, categories)), files = [];
     const add = (name, category, value) => files.push({ name, category, data: Buffer.from(value) });
     add("office.json", "configuration", JSON.stringify(data.office, null, 2));
     for (const [sid, s] of Object.entries(data.office.skills?.definitions || {})) add("skills/" + sid + "/SKILL.md", "skills", frontmatter(s, sid));

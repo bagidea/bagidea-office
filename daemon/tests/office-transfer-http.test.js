@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const http = require("node:http");
 const { once } = require("node:events");
 const createHttp = require("../office-transfer-http");
+const { JSON_LIMIT, EXPORT_JSON_LIMIT } = createHttp;
 const { MAX_ARCHIVE_BYTES } = require("../office-zip");
 
 async function server(t, overrides = {}) {
@@ -122,7 +123,8 @@ test("transfer HTTP: preview expiring while the import body uploads cannot commi
 
 test("transfer HTTP: body limits reject chunked and declared oversized requests", async (t) => {
   const s = await server(t);
-  assert.equal((await s.request("/office-transfer/export", { method: "POST", body: "x".repeat(17 * 1024) })).status, 413);
+  assert.equal((await s.request("/office-transfer/import", { method: "POST", body: "x".repeat(JSON_LIMIT + 1024) })).status, 413);
+  assert.equal((await s.request("/office-transfer/export", { method: "POST", body: "x".repeat(EXPORT_JSON_LIMIT + 1) })).status, 413);
   const r = await new Promise((resolve, reject) => {
     const req = http.request(s.base + "/office-transfer/preview", { method: "POST",
       headers: { "x-bagidea-ui": "1", "content-length": MAX_ARCHIVE_BYTES + 1 } }, (res) => {
@@ -132,7 +134,7 @@ test("transfer HTTP: body limits reject chunked and declared oversized requests"
   });
   assert.equal(r, 413);
   const chunked = await new Promise((resolve, reject) => {
-    const req = http.request(s.base + "/office-transfer/export", { method: "POST", headers: { "x-bagidea-ui": "1" } }, (res) => {
+    const req = http.request(s.base + "/office-transfer/import", { method: "POST", headers: { "x-bagidea-ui": "1" } }, (res) => {
       res.resume(); res.on("end", () => resolve(res.statusCode));
     });
     req.on("error", reject); req.write("a".repeat(9000)); req.end("b".repeat(9000));
@@ -147,4 +149,13 @@ test("transfer HTTP: refresh errors report a completed import instead of encoura
   assert.equal(r.status, 200); assert.equal(result.ok, true);
   assert.match(result.warnings[0], /Imported successfully/);
   assert.equal((await apply(s, p.token)).status, 409);
+});
+
+test("transfer HTTP: export forwards the per-item selection", async (t) => {
+  let seen;
+  const s = await server(t, { transfer: { exportArchive: (categories, items) => { seen = { categories, items }; return Buffer.from([0x50, 0x4b]); } } });
+  const items = { team: Array.from({ length: 3000 }, (_, i) => "agent-" + i) };
+  const r = await s.request("/office-transfer/export", { method: "POST", body: JSON.stringify({ categories: ["team"], items }) });
+  assert.equal(r.status, 200);
+  assert.deepEqual(seen, { categories: ["team"], items });
 });

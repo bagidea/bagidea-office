@@ -251,3 +251,76 @@ test("Codex and shared agent Markdown instructions are restored to their working
   assert.equal(fs.readFileSync(path.join(dst.workspace, ".codex/settings/personal.md"), "utf8"), "# Personal preferences");
   assert.equal(fs.readFileSync(path.join(dst.workspace, ".agents/rules/review.md"), "utf8"), "# Review instructions");
 });
+
+test("summary lists every exportable item with its dependencies, matching the category counts", (t) => {
+  const src = source(t), s = src.transfer.summary(), ids = (c) => s.items[c].map((i) => i.id);
+  for (const c of createTransfer.CATEGORIES) assert.equal(s.items[c].length, s.categories[c], c);
+  assert.deepEqual(ids("team").sort(), ["alice", "main", "roles:all"]);
+  assert.deepEqual(s.items.team.find((i) => i.id === "alice").needs, ["skills:research", "mcp:search"]);
+  assert.deepEqual(s.items.workflows.find((i) => i.id === "research_flow").needs, ["team:alice"]);
+  const trigger = s.items.workflows.find((i) => i.id === "trigger:weekly");
+  assert.equal(trigger.parent, "research_flow"); assert.deepEqual(trigger.needs, ["workflows:research_flow"]);
+  assert.deepEqual(ids("settings").sort(), ["markdown:OFFICE.md", "markdown:settings/style.md", "preferences"]);
+  assert.ok(!JSON.stringify(s.items).includes("secret"));
+});
+
+test("per-item export keeps only the chosen items and imports cleanly", (t) => {
+  const src = source(t), dst = fixture(t);
+  const archive = src.transfer.exportArchive(["team", "skills", "mcp", "settings"], { team: ["alice"], settings: ["markdown:settings/style.md"] });
+  const files = zip.decode(archive), office = JSON.parse(files.find((f) => f.name === "office.json").data);
+  assert.deepEqual(Object.keys(office.team.agents), ["alice"]); assert.deepEqual(office.team.roles, []);
+  assert.deepEqual(Object.keys(office.skills.definitions), ["research"]);
+  assert.deepEqual(office.settings.preferences, {});
+  assert.deepEqual(files.filter((f) => f.name.startsWith("workspace/")).map((f) => f.name), ["workspace/settings/style.md"]);
+  const plan = dst.transfer.previewArchive(archive);
+  assert.equal(plan.categories.team, 1); assert.equal(plan.categories.settings, 1);
+  const out = dst.transfer.importArchive(plan, { conflict: "skip" });
+  assert.equal(out.imported.team, 1); assert.equal(dst.reg.agents.alice.name, "Alice");
+  assert.deepEqual(dst.reg.roles, ["Director"]);
+  assert.equal(fs.existsSync(path.join(dst.workspace, "OFFICE.md")), false);
+  assert.equal(fs.readFileSync(path.join(dst.workspace, "settings/style.md"), "utf8"), "# Style\nUse short sentences.");
+});
+
+test("per-item export keeps triggers with their workflow and drops deselected ones", (t) => {
+  const src = source(t), office = (a) => JSON.parse(zip.decode(a).find((f) => f.name === "office.json").data);
+  assert.deepEqual(office(src.transfer.exportArchive(["workflows"], { workflows: ["research_flow"] })).workflows.triggers, []);
+  const both = office(src.transfer.exportArchive(["workflows"], { workflows: ["research_flow", "trigger:weekly"] })).workflows;
+  assert.deepEqual(both.triggers.map((x) => [x.id, x.enabled]), [["weekly", false]]);
+  assert.throws(() => src.transfer.exportArchive(["workflows"], { workflows: ["trigger:weekly"] }), /needs workflow research_flow/);
+});
+
+test("per-item export rejects stale, empty and out-of-scope selections", (t) => {
+  const src = source(t);
+  assert.throws(() => src.transfer.exportArchive(["team"], { team: ["bob"] }), /no longer in team/);
+  assert.throws(() => src.transfer.exportArchive(["team"], { skills: ["research"] }), /not selected: skills/);
+  assert.throws(() => src.transfer.exportArchive(["team"], { team: [] }), /at least one item in team/);
+  assert.throws(() => src.transfer.exportArchive(["team"], { team: "alice" }), /bounded list/);
+  assert.throws(() => src.transfer.exportArchive(["team"], ["alice"]), /item selection must be an object/);
+  assert.throws(() => src.transfer.exportArchive(["team"], { team: ["ceo"] }), /no longer in team/);
+});
+
+test("items whose IDs read like credential words are still listed, exported and importable", (t) => {
+  const src = fixture(t, { skills: { env: { name: "Env", description: "Environment notes", content: "Keep .env files local." }, cookie: { name: "Cookie", description: "c", content: "Bake." } },
+    mcpServers: { token: { command: "npx token-tool" } },
+    triggers: [{ id: "nightly", kind: "schedule", workflowId: "secret", enabled: true, cfg: { everyMin: 60 } }] });
+  src.reg.agents.key = agent("Key", { skills: ["cookie"] });
+  src.write("workflows/secret.json", JSON.stringify({ id: "secret", name: "Secret santa", nodes: [{ id: "a", type: "action", text: "@key: Draw names" }], edges: [] }));
+  const s = src.transfer.summary(), ids = (c) => s.items[c].map((i) => i.id).sort();
+  assert.ok(ids("team").includes("key")); assert.deepEqual(ids("skills"), ["cookie", "env"]);
+  assert.deepEqual(ids("mcp"), ["token"]); assert.deepEqual(ids("workflows"), ["secret", "trigger:nightly"]);
+  const archive = src.transfer.exportArchive(["team", "skills", "mcp", "workflows"], { team: ["key"], skills: ["cookie", "env"], workflows: ["secret", "trigger:nightly"] });
+  const office = JSON.parse(zip.decode(archive).find((f) => f.name === "office.json").data);
+  assert.equal(office.skills.definitions.env.content, "Keep .env files local.");
+  assert.deepEqual(Object.keys(office.workflows.definitions), ["secret"]);
+  const dst = fixture(t), out = dst.transfer.importArchive(dst.transfer.previewArchive(archive), { conflict: "skip" });
+  assert.equal(out.imported.workflows, 2); assert.equal(dst.reg.agents.key.name, "Key"); assert.equal(dst.reg.mcpServers.token.command, "npx token-tool");
+});
+
+test("a Markdown file with a long path can be picked by its summary ID", (t) => {
+  const src = fixture(t), rel = "rules/" + "a".repeat(150) + "/" + "b".repeat(150) + "/" + "c".repeat(150) + "/" + "d".repeat(140) + ".md";
+  try { src.write(rel, "# Deep rule"); } catch (e) { t.skip("filesystem rejects long paths: " + e.code); return; }
+  const target = src.transfer.summary().items.settings.find((i) => i.id === "markdown:" + rel);
+  assert.ok(target && target.id.length > 600);
+  const files = zip.decode(src.transfer.exportArchive(["settings"], { settings: [target.id] }));
+  assert.deepEqual(files.filter((f) => f.name.startsWith("workspace/")).map((f) => f.name), ["workspace/" + rel]);
+});

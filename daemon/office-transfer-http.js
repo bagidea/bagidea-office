@@ -6,6 +6,8 @@ const { MAX_ARCHIVE_BYTES } = require("./office-zip");
 const PREVIEW_TTL_MS = 10 * 60 * 1000;
 const MAX_PREVIEWS = 3;
 const JSON_LIMIT = 16 * 1024;
+// An export request may list every item it keeps (see office-transfer pickedItems).
+const EXPORT_JSON_LIMIT = 1024 * 1024;
 
 module.exports = function createTransferHttp({ transfer, onImported = () => {}, now = Date.now }) {
   const previews = new Map();
@@ -69,11 +71,11 @@ module.exports = function createTransferHttp({ transfer, onImported = () => {}, 
         return json(res, 200, { token, categories: plan.categories, entries: plan.entries, warnings: plan.warnings });
       }
       let options;
-      try { options = JSON.parse((await read(req, JSON_LIMIT)).toString("utf8")); }
+      try { options = JSON.parse((await read(req, route === "/office-transfer/export" ? EXPORT_JSON_LIMIT : JSON_LIMIT)).toString("utf8")); }
       catch (e) { if (e.status) throw e; throw new Error("Expected a JSON request."); }
       if (!options || typeof options !== "object" || Array.isArray(options)) throw new Error("Expected an options object.");
       if (route === "/office-transfer/export") {
-        const data = transfer.exportArchive(options.categories);
+        const data = transfer.exportArchive(options.categories, options.items);
         res.writeHead(200, { "content-type": "application/zip", "content-length": data.length,
           "content-disposition": `attachment; filename="bagidea-office-${new Date(now()).toISOString().slice(0, 10)}.zip"`,
           "cache-control": "no-store", "x-content-type-options": "nosniff" });
@@ -119,3 +121,5 @@ module.exports = function createTransferHttp({ transfer, onImported = () => {}, 
 
 module.exports.PREVIEW_TTL_MS = PREVIEW_TTL_MS;
 module.exports.MAX_PREVIEWS = MAX_PREVIEWS;
+module.exports.JSON_LIMIT = JSON_LIMIT;
+module.exports.EXPORT_JSON_LIMIT = EXPORT_JSON_LIMIT;

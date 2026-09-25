@@ -15,7 +15,7 @@ history.
 | **Agent team** | Portable agent definitions, personas, roles and skill/tool assignments. |
 | **Skills** | Skill definitions and their `SKILL.md` instructions. |
 | **MCP tools** | Portable MCP server definitions; credentials must be supplied on the destination. |
-| **Workflows** | Workflow definitions. Imported triggers stay disabled until you enable them. |
+| **Workflows** | Your workflows from the Workflow builder and their triggers. Imported triggers stay disabled until you enable them. The built-in `example-` workflows come with every office and are not exported. |
 | **Settings & Markdown** | Supported portable office settings and eligible Markdown files in the working folders. |
 
 Eligible Markdown includes `.md` files at the working-folder root and below
@@ -28,10 +28,28 @@ arbitrary extraction to another path.
 ## Export
 
 1. Open **Export / Import**. The export section loads counts from the current office.
-2. Leave all categories selected for a complete portable configuration, or select
-   only the categories you need.
+2. Leave everything selected for a complete portable configuration, or narrow it:
+   - Tick or untick a whole category. A category that is only partly selected
+     shows a dash and an "n of m" count.
+   - Open **Choose items** on a category to pick individual agents, skills, MCP
+     servers, workflows, triggers, Markdown files or the office preferences.
+     **All** and **None** apply to the items the filter currently shows. Skills
+     also offer **Custom only**, which leaves out the built-in skills every
+     office already has.
+   - **Select all** and **Clear all** apply to every category.
+
+   A trigger always travels with its workflow: it can only be selected while its
+   workflow is selected. If a selected item uses something you left out (for
+   example, an agent's custom skill or MCP server, or an agent that a workflow
+   step is assigned to), a note below the categories lists it. The export still
+   works; make sure those items exist in the destination office. A category with
+   nothing to export is shown greyed out.
 3. Click **Download ZIP** and save the archive from your browser or desktop
-   WebView's downloads. Use **Refresh contents** after changing the office.
+   WebView's downloads. Use **Refresh contents** after changing the office; your
+   choices are kept for items that still exist. A fully ticked category exports
+   everything it holds when you click **Download ZIP**, including items added
+   since the list loaded. In a partly selected category, if an item you chose was
+   removed in the meantime, the export stops and asks you to refresh.
 
 Provider credentials, API keys and connection secrets are excluded. Credentials
 embedded in custom prose are not a supported way to configure a service; review
