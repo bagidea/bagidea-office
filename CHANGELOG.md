@@ -4,7 +4,7 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
-## [Unreleased]
+## [1.6.5] — 🕊️ The Hub's first official companion
 
 **Added**
 - **🕊️ Emmaus on the Plugins Hub** — the first *official* companion plugin:
