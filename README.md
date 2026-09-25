@@ -89,6 +89,11 @@ interesting part of building it.
 ### 🆕 Recently shipped
 BagIdea Office is updated **constantly** — every office gets a 🔄 banner and one-click `bagidea update`. The latest:
 
+- **v1.6.7 — 🎤 the pitch deck catches up:** the [pitch deck](https://bagidea.github.io/bagidea-office/pitch/) had 14 slides and one 19-card wall for everything since v1.0; it's 25 slides now, one per capability — world, chain of command, security, brains, memory & learning, autonomy, the engine, the board, Codex, voice & channels, plugins & tools, the library and teams, who it's for, an at-a-glance checklist, the developer surface — with every figure re-checked against the code and a status slide that fetches the version and star count live.
+- **v1.6.6 — 🙏 every contributor, everywhere:** the README's contributor table and the website's contributor grid had stopped at v1.0; @kmmao, @sbrasesco, @binyangzhu000-sudo and @f2dac are on both now, CONTRIBUTORS.md files them correctly, and a `Co-authored-by` commit puts the people whose PR commits were authored by an AI tool onto GitHub's Contributors graph as well.
+- **v1.6.5 — 🕊️ the Hub's first official companion:** **Emmaus** is on the Plugins Hub — a Bible-counsel companion: tell Selah, a 3D counselor, what you're going through and get Scripture-grounded guidance, practical steps and a prayer, spoken aloud in Thai or English; every quoted verse is checked against the bundled corpus ([bagidea/emmaus](https://github.com/bagidea/emmaus), MIT; the Bible texts keep their own terms). Described in all 14 languages; the Hub guide now lists what's on the Hub and how it differs from the built-in library.
+- **v1.6.4 — 🎨 every dropdown wears the theme:** the 📋 TASKS owner picker (and the CONNECT tab's custom-provider kind picker) rendered as the browser's white select — the theme rules covered `.field` controls and `.assistrow` inputs, not `.assistrow` selects. Selects join the rules, and every select inside the modal gets the theme as a floor.
+- **v1.6.3 — 🧱 local models survive the first tool call:** Claude Code now puts reminder entries with `role: "system"` inside the message list (the agent-type list, `<total_tokens>`), and the proxy forwarded them mid-conversation — block-form ones even became *assistant* turns. Cloud APIs shrugged; strict chat templates (Qwen3.5 and friends on LM Studio / llama.cpp / Ollama / vLLM) answered "System message must be at the beginning" with a hard 500 on every turn after the first tool call. The proxy now emits one system message at index 0 and folds the rest into the adjacent user turn as a `<system-reminder>`, order and tool ids untouched. Contributed by @f2dac in [#56](https://github.com/bagidea/bagidea-office/pull/56). Also: the release-plan doc now says what actually happens (releases are cut from `main` on a `VERSION` bump).
 - **v1.6.2 — 🌐 a twentieth brain, and reports that come home:** **Atlas Cloud** joins the built-in providers (an OpenAI-compatible aggregator, 400+ models behind one key, routed through the built-in proxy; contributed by @binyangzhu000-sudo in [#54](https://github.com/bagidea/bagidea-office/pull/54)) — the count is 20 everywhere, in 14 languages. And a real bug from [#41](https://github.com/bagidea/bagidea-office/pull/41) (@sbrasesco): a **delegated result could come back to the wrong thread** — the delegate filter froze the session at build time, when a fresh thread has no key yet, so the report-back resolved "the latest thread" 4.5 s later, which a job or a heartbeat may have moved. It now resolves the thread at dispatch time, so the result lands where the order was given.
 - **v1.6.1 — 🧾 a run that dies says so:** a run killed by the watchdog, an adapter error, a dead API key or a run that ended with no result was broadcast to a live viewer only — the persistent session history showed a trail that just stopped ([#52](https://github.com/bagidea/bagidea-office/issues/52)). Each abnormal end now writes one visible `⚠ Run ended abnormally — …` line with the reason into the history, so a later reader (the API, another session, a dispatcher) sees why.
 - **v1.6.0 — 🧪 it learns, carefully:** the last piece of the v2 plan, and the sweep that tells the world about all of it. **Skill regression**: a skill that corrects itself can correct itself wrong, so a skill can now carry **test cases** (a task, and what the answer must or must not match); when the office proposes a correction to one of its own skills, every case runs against the new text first, and a correction that breaks a case is **refused** — visibly, with a notification saying why. The 🧪 **Skill Regression** plugin (eighth in the library) is where you write the cases and see the runs; `GET/POST /skills/tests` for scripts. And the **website, the docs site and the pitch deck** now describe everything v1.1–v1.5 added — seven new feature cards and six new guide links, in all 14 languages, guarded by a test.
@@ -817,7 +822,7 @@ The full step-by-step guides, with screenshots:
 | [Budgets](docs/guide/budget.md) | 💸 caps in money per day / agent / project · warn at 80 %, stop at 100 % · the morning digest |
 | [Tools Hub](docs/guide/tools-hub.md) | the 53-entry catalog · MCP servers · Blender/Godot/Unity/Unreal/Roblox · Codex · submitting one |
 | [Plugins](docs/guide/plugins.md) | the extension system · music player · writing your own |
-| [Plugin Hub](docs/guide/plugin-hub.md) | browse, install and publish community plugins |
+| [Plugin Hub](docs/guide/plugin-hub.md) | browse, install and publish community plugins · 🕊️ **Emmaus**, the first official companion plugin (Bible counsel, 3D, voice) |
 | [Showcase](docs/guide/showcase.md) | get your office, project or plugin featured |
 | [Office Editor](docs/guide/editor.md) | furniture/walls · swap rooms · import your own models & images |
 | [Channels](docs/guide/channels.md) | connect Telegram / Discord / LINE / Slack / WhatsApp / Messenger |
@@ -874,7 +879,7 @@ this makes them employable"*).
       runs after failures; never a built-in, never one you edited, previous version kept
 - [x] **🎨 Media Studio** — make / change / animate in one window; an edit never
       overwrites its input
-- [x] **🧰 Tools Hub rebuilt** — 43 verified entries incl. Blender, Godot, Unity, Unreal
+- [x] **🧰 Tools Hub rebuilt** — 53 verified entries incl. Blender, Godot, Unity, Unreal
       and Roblox Studio; the catalog is fetched live
 - [x] **🌐 Fourteen languages, end to end** — the tool catalog translated in all of them,
       guarded by tests that fail when a "translation" is the English copied through
@@ -905,6 +910,20 @@ platform we couldn't reach.
     </td>
     <td align="center" valign="top" width="120">
       <a href="https://github.com/bmdy5"><img src="https://github.com/bmdy5.png?size=100" width="72" alt="@bmdy5"><br><sub><b>@bmdy5</b></sub></a><br><sub>Markdown rendering</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/kmmao"><img src="https://github.com/kmmao.png?size=100" width="72" alt="@kmmao"><br><sub><b>@kmmao</b></sub></a><br><sub>macOS occlusion fix</sub>
+    </td>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/sbrasesco"><img src="https://github.com/sbrasesco.png?size=100" width="72" alt="@sbrasesco"><br><sub><b>@sbrasesco</b></sub></a><br><sub>Report-back thread fix</sub>
+    </td>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/binyangzhu000-sudo"><img src="https://github.com/binyangzhu000-sudo.png?size=100" width="72" alt="@binyangzhu000-sudo"><br><sub><b>@binyangzhu000-sudo</b></sub></a><br><sub>Atlas Cloud provider</sub>
+    </td>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/f2dac"><img src="https://github.com/f2dac.png?size=100" width="72" alt="@f2dac"><br><sub><b>@f2dac</b></sub></a><br><sub>Local-model proxy fix</sub>
     </td>
   </tr>
 </table>

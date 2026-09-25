@@ -44,8 +44,8 @@ You can set the office to open itself when you boot — supported on all 3 OSes
 The notification system is tied to the `VERSION` file on `main` so users only get
 things that are truly ready:
 
-1. Develop on the **`dev`** branch (keep pushing to dev — it doesn't affect users)
-2. Once you're confident there are no bugs, merge `dev` → `main`
+1. Work lands on **`main`** behind CI (three OSes, two Node versions) — a plain commit on `main` does **not** reach users, because the updater only looks at `VERSION`
+2. A release = a `VERSION` bump + tag once CI is green; `dev` is kept in sync with `main` for anyone who branched from it
 3. Release a new version = **bump `VERSION`** (semver) on `main` and push
    → users' machines see it's newer and the 🔄 bar appears
 

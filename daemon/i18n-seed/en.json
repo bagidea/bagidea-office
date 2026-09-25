@@ -623,5 +623,21 @@
  "🧠 ค่าใช้จ่ายสมอง วันนี้ (ประมาณการจาก token)": "🧠 Brain spend today (estimated from tokens)",
  "เลิกประชุมเลย?": "End the meeting?",
  "กดอีกครั้ง / ปล่อยปุ่มเพื่อส่ง": "Press again / release to send",
- "ปล่อยปุ่มเพื่อส่ง": "Release to send"
+ "ปล่อยปุ่มเพื่อส่ง": "Release to send",
+ "🛠 DEV MODE — โหมดนักพัฒนา: แสดงแผงละเอียด พร้อม scroll bar บันทึกงานแบบเต็มรูปแบบ สำหรับการดีบักและตรวจสอบงานรายละเอียด": "🛠 DEV MODE — Developer mode: show detailed panels with scroll bars, full verbose logging for debugging and detailed work inspection",
+ "🛠 เปิด Dev Mode — แผงละเอียดและ scroll bar พร้อมใช้งาน": "🛠 Dev Mode ON — detailed panels and scroll bars ready",
+ "🛠 ปิด Dev Mode — กลับมาสู่โหมดปกติ": "🛠 Dev Mode OFF — back to normal mode",
+ "🛠 แผงดีบัก DEV MODE": "🛠 DEV MODE DEBUG",
+ "📊 สตรีมเหตุการณ์": "📊 Event Stream",
+ "🔧 การเรียกใช้เครื่องมือ": "🔧 Tool Calls",
+ "📨 ข้อความจาก agent": "📨 Agent Messages",
+ "⚡ ประสิทธิภาพ": "⚡ Performance",
+ "🧹 ล้าง Log ทั้งหมด": "🧹 Clear all logs",
+ "📤 ส่งออก Log": "📤 Export logs",
+ "❌ เปิด/ปิด Dev Mode ไม่สำเร็จ:": "❌ Dev Mode toggle failed:",
+ "🧹 ล้าง Dev Mode log แล้ว": "🧹 Dev Mode logs cleared",
+ "ไม่มี log ให้ส่งออก": "No logs to export",
+ "📤 คัดลอก Dev Mode log ไปที่คลิปบอร์ดแล้ว": "📤 Dev Mode logs copied to the clipboard",
+ "📥 ดาวน์โหลด Dev Mode log แล้ว": "📥 Dev Mode logs downloaded",
+ "ไม่มีรายละเอียดที่บันทึกไว้สำหรับการเรียกนี้": "Detailed input was not captured for this call."
 }

@@ -48,6 +48,134 @@ test("toOpenAI: array system blocks join into one system message", () => {
   assert.strictEqual(o.messages[0].content, "A\nB");
 });
 
+// --- system-role entries inside messages[] (Claude Code ≥ 2.1.2xx) --------------
+// Strict chat templates (Qwen3.5+ on LM Studio / llama.cpp / Ollama) raise
+// "System message must be at the beginning." for any system past index 0.
+const noStraySystem = (o) => {
+  o.messages.forEach((m, i) => assert.ok(i === 0 || m.role !== "system", `system at index ${i}: ` + JSON.stringify(o.messages)));
+};
+
+test("toOpenAI: mid-conversation system messages fold into the adjacent user turn", () => {
+  const o = toOpenAI({ system: "TOP", messages: [
+    { role: "user", content: "hi" },
+    { role: "system", content: "Available agent types: claude" },
+    { role: "assistant", content: "hello" },
+    { role: "user", content: "next" },
+    { role: "system", content: "<total_tokens>99</total_tokens>" },
+  ] }, "qwen");
+  noStraySystem(o);
+  assert.deepStrictEqual(o.messages.map((m) => m.role), ["system", "user", "assistant", "user"]);
+  assert.strictEqual(o.messages[0].content, "TOP");
+  assert.strictEqual(o.messages[1].content, "hi\n\n<system-reminder>\nAvailable agent types: claude\n</system-reminder>");
+  assert.strictEqual(o.messages[3].content, "next\n\n<system-reminder>\n<total_tokens>99</total_tokens>\n</system-reminder>");
+});
+
+test("toOpenAI: leading system entries in messages[] join the top system prompt (one system at index 0)", () => {
+  const o = toOpenAI({ system: [{ type: "text", text: "TOP" }], messages: [
+    { role: "system", content: "S1" },
+    { role: "system", content: [{ type: "text", text: "S2" }] },   // block form must not become an assistant turn
+    { role: "user", content: "hi" },
+  ] }, "qwen");
+  noStraySystem(o);
+  assert.deepStrictEqual(o.messages.map((m) => m.role), ["system", "user"]);
+  assert.strictEqual(o.messages[0].content, "TOP\n\nS1\n\nS2");
+  assert.strictEqual(o.messages[1].content, "hi");
+});
+
+test("toOpenAI: no top-level system → first system entry in messages[] becomes the system message", () => {
+  const o = toOpenAI({ messages: [{ role: "system", content: "only" }, { role: "user", content: "hi" }] }, "qwen");
+  assert.deepStrictEqual(o.messages, [{ role: "system", content: "only" }, { role: "user", content: "hi" }]);
+});
+
+test("toOpenAI: system after an assistant turn waits for the next user turn (prepended, order kept)", () => {
+  const o = toOpenAI({ messages: [
+    { role: "user", content: "a" },
+    { role: "assistant", content: "b" },
+    { role: "system", content: "ctx" },
+    { role: "user", content: [{ type: "text", text: "c" }, { type: "image", source: { type: "url", url: "http://x/i.png" } }] },
+  ] }, "qwen");
+  noStraySystem(o);
+  assert.deepStrictEqual(o.messages.map((m) => m.role), ["user", "assistant", "user"]);
+  assert.deepStrictEqual(o.messages[2].content[0], { type: "text", text: "<system-reminder>\nctx\n</system-reminder>" });
+  assert.strictEqual(o.messages[2].content[1].text, "c");
+});
+
+test("toOpenAI: system right after a tool result (the real LM Studio failure) → final user turn", () => {
+  // Exact shape the office proxy sent on the turn after the first tool call.
+  const o = toOpenAI({ system: "TOP", messages: [
+    { role: "user", content: "<system-reminder>date</system-reminder>\n\nlist files" },
+    { role: "system", content: "Available agent types for the Agent tool: claude" },
+    { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "Bash", input: { command: "ls" } }] },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "total 22" }] },
+    { role: "system", content: [{ type: "text", text: "<total_tokens>14972048 tokens left</total_tokens>" }] },
+  ] }, "qwen");
+  noStraySystem(o);
+  assert.deepStrictEqual(o.messages.map((m) => m.role), ["system", "user", "assistant", "tool", "user"]);
+  assert.strictEqual(o.messages[0].content, "TOP");
+  assert.ok(o.messages[1].content.endsWith("<system-reminder>\nAvailable agent types for the Agent tool: claude\n</system-reminder>"));
+  assert.strictEqual(o.messages[3].tool_call_id, "t1");
+  assert.strictEqual(o.messages[4].content, "<system-reminder>\n<total_tokens>14972048 tokens left</total_tokens>\n</system-reminder>");
+});
+
+test("toOpenAI: empty system entries are dropped", () => {
+  const o = toOpenAI({ messages: [{ role: "user", content: "hi" }, { role: "system", content: "   " }] }, "qwen");
+  assert.deepStrictEqual(o.messages, [{ role: "user", content: "hi" }]);
+});
+
+test("toOpenAI: pending system context preserves parallel tool replies and the input", () => {
+  const input = { system: "TOP", messages: [
+    { role: "user", content: "inspect" },
+    { role: "assistant", content: [
+      { type: "tool_use", id: "a", name: "read", input: {} },
+      { type: "tool_use", id: "b", name: "read", input: {} },
+    ] },
+    { role: "system", content: "first context" },
+    { role: "user", content: [
+      { type: "tool_result", tool_use_id: "a", content: "A" },
+      { type: "tool_result", tool_use_id: "b", content: "B" },
+    ] },
+    { role: "system", content: "second context" },
+  ] };
+  const before = structuredClone(input);
+  const o = toOpenAI(input, "qwen");
+  noStraySystem(o);
+  assert.deepStrictEqual(o.messages.map((m) => m.role), ["system", "user", "assistant", "tool", "tool", "user"]);
+  assert.deepStrictEqual(o.messages.slice(3, 5).map((m) => m.tool_call_id), ["a", "b"]);
+  assert.strictEqual(o.messages[5].content, "<system-reminder>\nfirst context\n</system-reminder>\n\n<system-reminder>\nsecond context\n</system-reminder>");
+  assert.deepStrictEqual(input, before);
+  assert.deepStrictEqual(toOpenAI(input, "qwen"), o, "retries must not duplicate context");
+});
+
+test("toOpenAI: adjacent reminders preserve user images and text", () => {
+  const input = { messages: [
+    { role: "user", content: [
+      { type: "text", text: "look" },
+      { type: "image", source: { type: "url", url: "https://example.test/image.png" } },
+    ] },
+    { role: "system", content: [{ type: "text", text: "context" }] },
+  ] };
+  const before = structuredClone(input);
+  const o = toOpenAI(input, "qwen");
+  assert.deepStrictEqual(o.messages, [{ role: "user", content: [
+    { type: "text", text: "look" },
+    { type: "image_url", image_url: { url: "https://example.test/image.png" } },
+    { type: "text", text: "<system-reminder>\ncontext\n</system-reminder>" },
+  ] }]);
+  assert.deepStrictEqual(input, before);
+});
+
+test("toOpenAI: pending context precedes the next string user turn", () => {
+  const o = toOpenAI({ messages: [
+    { role: "user", content: "hi" },
+    { role: "assistant", content: "hello" },
+    { role: "system", content: "one" },
+    { role: "system", content: "two" },
+    { role: "user", content: "next" },
+  ] }, "qwen");
+  noStraySystem(o);
+  assert.strictEqual(o.messages[2].content, "<system-reminder>\none\n</system-reminder>\n\n<system-reminder>\ntwo\n</system-reminder>\n\nnext");
+});
+
 test("toOpenAI: assistant tool_use → tool_calls; user tool_result → tool message", () => {
   const o = toOpenAI({ messages: [
     { role: "assistant", content: [{ type: "text", text: "let me check" },

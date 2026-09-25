@@ -4,6 +4,84 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [1.6.7] — 🎤 The pitch deck catches up
+
+**Changed**
+- **The pitch deck now describes the whole office.** It had 14 slides and
+  one 19-card wall for everything since v1.0; it has 25 slides now, one per
+  capability — the living world, the chain of command, spatialized security
+  and run location, the 20 swappable brains, memory and learning (three-tier
+  memory, semantic recall, auto-learned and self-correcting skills, skill
+  regression, the 15 skill packs, the File & Media Toolkit), work that
+  doesn't wait (AUTO, standing jobs, heartbeat, the inbox, notification
+  rules, budgets), the workflow engine, the task board and calendar, Codex,
+  voice / channels / media, plugins and tools, the eight official plugins
+  and five teams, who it's for, an everything-at-a-glance checklist, the
+  developer surface, and a status slide whose version and star count are
+  fetched live. Every figure was re-checked against the code (20 providers,
+  53 tools, 7 Hub entries, 8 library plugins, 376 tests). Also fixed the
+  README roadmap's "43 verified entries" for the Tools Hub (it's 53).
+
+## [1.6.6] — 🙏 Every contributor, everywhere
+
+**Fixed**
+- **Contributors were credited in one place and missing from the other two.**
+  The README's contributor table and the website's contributor grid had not
+  been updated since v1.0; @kmmao, @sbrasesco, @binyangzhu000-sudo and @f2dac
+  appear on both now, and CONTRIBUTORS.md lists them under *Community
+  contributors* (three had been filed under *Plugin authors*). Also the reason
+  a contributor can be missing from GitHub's own graph: #56's commit was
+  authored by an AI tool, so the graph credited "codex" instead of the person —
+  the crediting commit carries `Co-authored-by` trailers for @f2dac, @sbrasesco,
+  @kmmao and @bmdy5 so they show up there too, and the maintainer notes in
+  CONTRIBUTORS.md say to check the commit author before merging.
+
+## [1.6.5] — 🕊️ The Hub's first official companion
+
+**Added**
+- **🕊️ Emmaus on the Plugins Hub** — the first *official* companion plugin:
+  a Bible-counsel companion (tell Selah, a 3D counselor, what you're going
+  through; Scripture-grounded guidance, practical steps and a prayer, spoken
+  aloud in Thai or English; every quoted verse checked against the bundled
+  corpus). Catalog entry in `web/plugins.json` with the description in all 14
+  languages; the Hub page and the office's 🧩 Plugins Hub read the catalog live
+  ([#58](https://github.com/bagidea/bagidea-office/pull/58);
+  repo: [bagidea/emmaus](https://github.com/bagidea/emmaus), MIT — the bundled
+  Bible texts keep their own terms).
+
+## [1.6.4] — 🎨 Every dropdown wears the theme
+
+**Fixed**
+- **A dropdown outside a `.field` rendered as the browser's white control.**
+  The theme rules covered `.field` controls and `.assistrow` inputs and
+  textareas — not `.assistrow` selects. The 📋 TASKS owner picker (and the
+  CONNECT tab's custom-provider kind picker, which sits in a bare row) fell
+  back to the native white select. Selects now join the assistrow rules, and
+  every select inside the modal gets the theme as a floor, so no future row
+  can regress. Guarded by `ui-select-theme.test.js`.
+
+## [1.6.3] — 🧱 Local models survive the first tool call
+
+**Fixed**
+- **Local models died on the first tool call.** Claude Code (≥ 2.1.2xx) puts
+  reminder entries with `role: "system"` inside `messages[]` (the agent-type
+  list, `<total_tokens>`, …). The proxy forwarded them as mid-conversation
+  system messages — and turned block-form ones into *assistant* turns. OpenAI
+  tolerates that; strict chat templates (Qwen3.5 and friends on LM Studio /
+  llama.cpp / Ollama / vLLM) answer "System message must be at the beginning"
+  with a hard 500 on every turn after the first tool call. `toOpenAI` now
+  emits at most one system message, at index 0: leading entries join the top
+  system prompt, later ones fold into the adjacent user turn as a
+  `<system-reminder>` (or the next user turn, or a final one after tool
+  replies), message order and tool-call ids untouched, the input never mutated.
+  Nine new tests. Contributed by @f2dac
+  ([#56](https://github.com/bagidea/bagidea-office/pull/56)).
+
+**Changed**
+- `docs/guide/updates.md` describes the release plan as it actually is:
+  releases are cut from `main`; `dev` is kept in sync
+  ([#55](https://github.com/bagidea/bagidea-office/pull/55), @f2dac).
+
 ## [1.6.2] — 🌐 A twentieth brain, and reports that come home
 
 **Added**

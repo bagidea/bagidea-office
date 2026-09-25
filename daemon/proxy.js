@@ -84,19 +84,58 @@ function sigRemember(id, sig, cache) {
   c.set(id, sig);
 }
 
+// Flatten an Anthropic system value (string, or [{type:"text",text}] blocks) to text.
+function sysText(c) {
+  if (typeof c === "string") return c;
+  if (Array.isArray(c)) return c.map((b) => (b && b.type === "text" && b.text) || "").filter(Boolean).join("\n");
+  return "";
+}
+// A system message that arrives mid-conversation is context, not the user
+// speaking — wrap it the way claude itself wraps user-turn context.
+function foldSys(text) { return `<system-reminder>\n${text}\n</system-reminder>`; }
+function appendText(msg, text) {
+  if (Array.isArray(msg.content)) msg.content.push({ type: "text", text });
+  else msg.content = (msg.content ? msg.content + "\n\n" : "") + text;
+}
+function prependText(msg, text) {
+  if (Array.isArray(msg.content)) msg.content.unshift({ type: "text", text });
+  else msg.content = text + (msg.content ? "\n\n" + msg.content : "");
+}
+
 // --- Anthropic request → OpenAI Chat Completions request (pure, testable) ----
 // opts.gemini: attach remembered (or dummy) thought signatures to tool_calls.
 // opts.sigs:   signature cache override (tests) — defaults to the module cache.
+//
+// System placement: the result has AT MOST ONE system message, always at index 0.
+// Claude Code (≥ 2.1.2xx) puts reminder/context entries with role "system" INSIDE
+// messages[] (agent-type list, <total_tokens>, …). OpenAI tolerates that, but
+// strict chat templates (Qwen3.5+ and friends) raise "System message must be at
+// the beginning." for any system message past index 0 — on LM Studio / llama.cpp
+// / Ollama / vLLM that's a hard 500 on every turn after the first tool call.
+// Leading system entries join the top system prompt; later ones fold into the
+// nearest user turn (previous user if adjacent, else the next one, else a final
+// user message) so message ORDER is untouched and the upstream's KV-prefix cache
+// keeps working across turns.
 function toOpenAI(a, model, opts) {
   const msgs = [];
-  if (a.system) {
-    const sys = typeof a.system === "string"
-      ? a.system
-      : a.system.map((b) => (b && b.text) || "").join("\n");
-    if (sys) msgs.push({ role: "system", content: sys });
-  }
+  const sysParts = [];
+  const top = sysText(a.system);
+  if (top) sysParts.push(top);
+  let pending = [];   // folded system text waiting for the next user turn
   for (const m of a.messages || []) {
-    if (typeof m.content === "string") { msgs.push({ role: m.role, content: m.content }); continue; }
+    if (m.role === "system") {
+      const s = sysText(m.content).trim();
+      if (!s) continue;
+      if (!msgs.length) sysParts.push(s);
+      else if (msgs[msgs.length - 1].role === "user") appendText(msgs[msgs.length - 1], foldSys(s));
+      else pending.push(foldSys(s));
+      continue;
+    }
+    if (typeof m.content === "string") {
+      const om = { role: m.role, content: m.content };
+      if (om.role === "user" && pending.length) { prependText(om, pending.join("\n\n")); pending = []; }
+      msgs.push(om); continue;
+    }
     const parts = [], toolCalls = [], toolResults = [];
     for (const b of m.content || []) {
       if (b.type === "text") parts.push({ type: "text", text: b.text || "" });
@@ -123,7 +162,9 @@ function toOpenAI(a, model, opts) {
       for (const tr of toolResults) msgs.push(tr);          // tool replies first
       if (parts.length) {
         const onlyText = parts.every((p) => p.type === "text");
-        msgs.push({ role: "user", content: onlyText ? parts.map((p) => p.text).join("\n") : parts });
+        const um = { role: "user", content: onlyText ? parts.map((p) => p.text).join("\n") : parts };
+        if (pending.length) { prependText(um, pending.join("\n\n")); pending = []; }
+        msgs.push(um);
       }
     } else {
       const am = { role: "assistant" };
@@ -134,6 +175,10 @@ function toOpenAI(a, model, opts) {
       msgs.push(am);
     }
   }
+  // System context that arrived after the last user turn (typically right after a
+  // tool result) has no user message to ride on → becomes the final user turn.
+  if (pending.length) msgs.push({ role: "user", content: pending.join("\n\n") });
+  if (sysParts.length) msgs.unshift({ role: "system", content: sysParts.join("\n\n") });
   const out = { model, messages: msgs, stream: !!a.stream };
   if (a.max_tokens) out.max_tokens = a.max_tokens;
   if (a.stream) out.stream_options = { include_usage: true };
