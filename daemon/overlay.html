@@ -233,6 +233,18 @@
     align-self: flex-start; font-size: 10px; color: rgba(150,165,195,0.65);
     padding: 0 0 0 30px; animation: chipIn 0.25s ease both;
   }
+  /* 🛠 Dev Mode: the tool marker becomes a collapsible row whose body (the
+     command / skill / file / search / redacted input) scrolls and is selectable. */
+  details.toolrow.dev { align-self: stretch; max-width: 100%; padding-right: 12px; }
+  .toolrow.dev summary { cursor: pointer; user-select: none; }
+  .toolrow.dev summary:hover { color: var(--accent); }
+  .dev-detail {
+    max-height: 160px; overflow: auto; margin: 4px 0 2px; padding: 6px 8px;
+    font-family: ui-monospace, Consolas, monospace; font-size: 10px; line-height: 1.4;
+    color: var(--dim); background: rgba(0,0,0,0.25); border: 1px solid var(--line); border-radius: 6px;
+    white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere;
+    user-select: text; -webkit-user-select: text; cursor: text;
+  }
   /* "agent is typing" — a status bubble: optional icon + live label, then three
      bouncing dots. Carries what the agent is doing right now (thinking / reading
      a file / running a command / waiting for approval) instead of mute dots. */
@@ -326,6 +338,35 @@
   #activity .act b { color: #cfe3ff; font-weight: 600; }
   #activity .act .t { color: rgba(160,170,190,0.55); font-size: 10px; margin-right: 5px; }
 
+  /* ---- 🛠 DEV MODE DEBUG PANEL ------------------------------------------- */
+  #devModeTitle { font-size: 10.5px; letter-spacing: 2px; color: var(--accent); margin: 12px 0 8px; }
+  #devModePanel { font-size: 11px; }
+  .dev-section { margin-bottom: 12px; }
+  .dev-section h3 { font-size: 10px; letter-spacing: 1px; color: var(--accent); margin: 0 0 6px; display: flex; align-items: center; gap: 6px; }
+  .dev-section h3::before { content: "▸"; font-size: 8px; color: var(--dim); }
+  .dev-log {
+    max-height: 180px; overflow-y: auto; overflow-x: auto;
+    background: rgba(0,0,0,0.25); border: 1px solid var(--line); border-radius: 8px; padding: 6px;
+    font-family: ui-monospace, Consolas, monospace; font-size: 10px; line-height: 1.4;
+  }
+  .dev-entry { padding: 3px 6px; border-radius: 4px; margin-bottom: 2px; white-space: pre-wrap; word-break: break-all; }
+  .dev-entry:hover { background: rgba(94,200,255,0.1); }
+  .dev-entry .time { color: rgba(160,170,190,0.6); font-size: 9px; margin-right: 6px; }
+  .dev-entry .type { font-weight: 600; }
+  .dev-entry .type.event { color: #5ec8ff; }
+  .dev-entry .type.tool { color: #ffb054; }
+  .dev-entry .type.agent { color: #c084fc; }
+  .dev-entry .type.perf { color: #4ade80; }
+  .dev-entry .detail { color: var(--dim); font-size: 9.5px; margin-top: 2px; }
+  .dev-controls { display: flex; gap: 6px; margin-top: 8px; }
+  .dev-btn {
+    flex: 1; background: rgba(94,200,255,0.15); border: 1px solid var(--accent); color: var(--accent);
+    padding: 6px 10px; border-radius: 6px; font-size: 10px; cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .dev-btn:hover { background: var(--accent); color: var(--bg); }
+  .dev-btn:active { transform: scale(0.98); }
+
   /* ---- 📂 in-house folder picker ----------------------------------------- */
   #fsPick {
     display: none; position: fixed; inset: 0; z-index: 300;
@@ -383,6 +424,9 @@
      they were left in (the "modal stuck in feed mode" report). */
   body.feedmode #modal, body.feedmode #fsPick, body.feedmode #sessMenu,
   body.feedmode #dayMenu { display: none !important; }
+  /* Dev Mode panel must also be hidden in feed mode */
+  body.feedmode #devModeTitle,
+  body.feedmode #devModePanel { display: none !important; }
   /* The feed's ghost-over-your-desktop translucency is the SHELL's job, not this
      stylesheet's — one uniform alpha on the window (see set_feed_alpha). v0.9.51
      and v0.9.52 tried to do it here, on a per-pixel-transparent window, and the
@@ -1041,6 +1085,31 @@
     <div id="brains"></div>
     <h2>📜 OFFICE LOG</h2>
     <div id="activity"></div>
+    <!-- 🛠 Dev Mode panel: Thai source text, translated by the i18n DOM walker
+         (static HTML — no ${tr()} here, that only works inside JS templates). -->
+    <h2 id="devModeTitle" style="display:none">🛠 แผงดีบัก DEV MODE</h2>
+    <div id="devModePanel" style="display:none">
+      <div class="dev-section">
+        <h3>📊 สตรีมเหตุการณ์</h3>
+        <div id="devEventLog" class="dev-log"></div>
+      </div>
+      <div class="dev-section">
+        <h3>🔧 การเรียกใช้เครื่องมือ</h3>
+        <div id="devToolLog" class="dev-log"></div>
+      </div>
+      <div class="dev-section">
+        <h3>📨 ข้อความจาก agent</h3>
+        <div id="devAgentLog" class="dev-log"></div>
+      </div>
+      <div class="dev-section">
+        <h3>⚡ ประสิทธิภาพ</h3>
+        <div id="devPerfLog" class="dev-log"></div>
+      </div>
+      <div class="dev-controls">
+        <button class="dev-btn" id="devClearLogs">🧹 ล้าง Log ทั้งหมด</button>
+        <button class="dev-btn" id="devExportLogs">📤 ส่งออก Log</button>
+      </div>
+    </div>
   </aside>
   <div id="sideTab" title="Security / Mission / Office Log">🛡<br>◀</div>
 </main>
@@ -1309,6 +1378,122 @@
     "กำลังทำงาน…": { en: "Working…", zh: "正在运行…", ja: "作業中…" },
     "ทำงานอยู่…": { en: "Working…", zh: "运行中…", ja: "稼働中…" },
     "ขอใช้": { en: "Requesting", zh: "请求使用", ja: "リクエスト" },
+    // 🛠 DEV MODE
+    "ไม่มีรายละเอียดที่บันทึกไว้สำหรับการเรียกนี้": {"en":"Detailed input was not captured for this call.","zh":"未记录此次调用的详细输入。","ja":"この呼び出しの詳細な入力は記録されていません。","es":"No se registró la entrada detallada de esta llamada.","hi":"इस कॉल के लिए विस्तृत इनपुट रिकॉर्ड नहीं किया गया था।","ar":"لم يتم تسجيل المدخلات التفصيلية لهذا الاستدعاء.","pt":"A entrada detalhada desta chamada não foi registrada.","ru":"Подробные входные данные этого вызова не были записаны.","de":"Für diesen Aufruf wurden keine detaillierten Eingaben erfasst.","fr":"Les données détaillées de cet appel n’ont pas été enregistrées.","ko":"이 호출의 상세 입력이 기록되지 않았습니다.","id":"Input terperinci untuk panggilan ini tidak direkam.","vi":"Đầu vào chi tiết cho lần gọi này chưa được ghi lại."},
+    "🛠 DEV MODE — โหมดนักพัฒนา: แสดงแผงละเอียด พร้อม scroll bar บันทึกงานแบบเต็มรูปแบบ สำหรับการดีบักและตรวจสอบงานรายละเอียด": {
+      en: "🛠 DEV MODE — Developer mode: show detailed panels with scroll bars, full verbose logging for debugging and detailed work inspection",
+      zh: "🛠 开发模式 — 显示带滚动条的详细面板，完整的详细日志记录，用于调试和详细工作检查",
+      ja: "🛠 開発者モード — スクロールバー付きの詳細パネルを表示、詳細なデバッグ用ログと作業検査を完全記録",
+      es: "🛠 MODO DEV — Modo desarrollador: mostrar paneles detallados con barras de desplazamiento, registro completo detallado para depuración e inspección de trabajo",
+      hi: "🛠 देव मोड — डेवलपर मोड: स्क्रॉल बार के साथ विस्तृत पैनल दिखाएं, डिबगिंग और विस्तृत कार्य निरीक्षण के लिए पूर्ण वर्बोज लॉगिंग",
+      ar: "🛠 وضع المطور — وضع المطور: إظهار لوحات تفصيلية مع أشرطة تمرير، تسجيل تفصيلي كامل للتصحيح والفحص الدقيق للعمل",
+      pt: "🛠 MODO DEV — Modo desenvolvedor: mostrar painéis detalhados com barras de rolagem, registro verbose completo para depuração e inspeção detalhada do trabalho",
+      ru: "🛠 РЕЖИМ РАЗРАБОТЧИКА — Режим разработчика: показывать детальные панели с полосами прокрутки, полное подробное логирование для отладки и детальной проверки работы",
+      de: "🛠 DEV MODE — Entwicklermodus: detaillierte Panels mit Scrollbalken anzeigen, vollständiges ausführliches Logging für Debugging und detaillierte Arbeitsprüfung",
+      fr: "🛠 MODE DEV — Mode développeur : afficher les panneaux détaillés avec barres de défilement, journalisation verbeuse complète pour le débogage et l'inspection détaillée du travail",
+      ko: "🛠 개발자 모드 — 개발자 모드: 스크롤바가 있는 상세 패널 표시, 디버깅 및 상세 작업 검사를 위한 전체 상세 로깅",
+      id: "🛠 MODE DEV — Mode pengembang: tampilkan panel detail dengan scroll bar, logging verbose penuh untuk debugging dan inspeksi kerja detail",
+      vi: "🛠 CHẾ ĐỘ DEV — Chế độ nhà phát triển: hiển thị các panel chi tiết có thanh cuộn, ghi log chi tiết đầy đủ cho gỡ lỗi và kiểm tra công việc chi tiết" },
+    "🛠 เปิด Dev Mode — แผงละเอียดและ scroll bar พร้อมใช้งาน": {
+      en: "🛠 Dev Mode ON — detailed panels and scroll bars ready",
+      zh: "🛠 开发模式已开启 — 详细面板和滚动条已就绪",
+      ja: "🛠 開発者モード ON — 詳細パネルとスクロールバーが使用可能",
+      es: "🛠 Dev Mode ON — paneles detallados y barras de desplazamiento listos",
+      hi: "🛠 देव मोड चालू — विस्तृत पैनल और स्क्रॉल बार तैयार",
+      ar: "🛠 تفعيل وضع المطور — لوحات تفصيلية وأشرطة تمرير جاهزة",
+      pt: "🛠 Modo Dev ON — painéis detalhados e barras de rolagem prontos",
+      ru: "🛠 Режим разработчика ВКЛ — детальные панели и полосы прокрутки готовы",
+      de: "🛠 Dev Mode AN — detaillierte Panels und Scrollbalken bereit",
+      fr: "🛠 Dev Mode ON — panneaux détaillés et barres de défilement prêts",
+      ko: "🛠 개발자 모드 켜기 — 상세 패널 및 스크롤바 준비 완료",
+      id: "🛠 Dev Mode ON — panel detail dan scroll bar siap",
+      vi: "🛠 Bật Dev Mode — các panel chi tiết và thanh cuộn sẵn sàng" },
+    "🛠 ปิด Dev Mode — กลับมาสู่โหมดปกติ": {
+      en: "🛠 Dev Mode OFF — back to normal mode",
+      zh: "🛠 开发模式已关闭 — 返回正常模式",
+      ja: "🛠 開発者モード OFF — 通常モードに戻る",
+      es: "🛠 Dev Mode OFF — volver al modo normal",
+      hi: "🛠 देव मोड बंद — सामान्य मोड पर वापस",
+      ar: "🛠 إيقاف وضع المطور — العودة إلى الوضع العادي",
+      pt: "🛠 Modo Dev OFF — voltar ao modo normal",
+      ru: "🛠 Режим разработчика ВЫКЛ — возврат к обычному режиму",
+      de: "🛠 Dev Mode AUS — zurück zum Normalmodus",
+      fr: "🛠 Dev Mode OFF — retour au mode normal",
+      ko: "🛠 개발자 모드 끄기 — 일반 모드로 돌아가기",
+      id: "🛠 Dev Mode OFF — kembali ke mode normal",
+      vi: "🛠 Tắt Dev Mode — quay về chế độ bình thường" },
+    "🛠 แผงดีบัก DEV MODE": {
+      en: "🛠 DEV MODE DEBUG", zh: "🛠 开发模式调试面板", ja: "🛠 開発モード デバッグ",
+      es: "🛠 DEPURACIÓN DEV MODE", hi: "🛠 DEV MODE डीबग", ar: "🛠 تصحيح وضع المطور",
+      pt: "🛠 DEPURAÇÃO DEV MODE", ru: "🛠 ОТЛАДКА DEV MODE", de: "🛠 DEV MODE DEBUG",
+      fr: "🛠 DÉBOGAGE DEV MODE", ko: "🛠 개발자 모드 디버그", id: "🛠 DEBUG DEV MODE",
+      vi: "🛠 GỠ LỖI DEV MODE" },
+    "📊 สตรีมเหตุการณ์": {
+      en: "📊 Event Stream", zh: "📊 事件流", ja: "📊 イベントストリーム",
+      es: "📊 Flujo de eventos", hi: "📊 इवेंट स्ट्रीम", ar: "📊 تدفق الأحداث",
+      pt: "📊 Fluxo de eventos", ru: "📊 Поток событий", de: "📊 Ereignis-Stream",
+      fr: "📊 Flux d'événements", ko: "📊 이벤트 스트림", id: "📊 Aliran peristiwa",
+      vi: "📊 Luồng sự kiện" },
+    "🔧 การเรียกใช้เครื่องมือ": {
+      en: "🔧 Tool Calls", zh: "🔧 工具调用", ja: "🔧 ツール呼び出し",
+      es: "🔧 Llamadas a herramientas", hi: "🔧 टूल कॉल", ar: "🔧 استدعاءات الأدوات",
+      pt: "🔧 Chamadas de ferramentas", ru: "🔧 Вызовы инструментов", de: "🔧 Tool-Aufrufe",
+      fr: "🔧 Appels d'outils", ko: "🔧 도구 호출", id: "🔧 Panggilan alat",
+      vi: "🔧 Lệnh gọi công cụ" },
+    "📨 ข้อความจาก agent": {
+      en: "📨 Agent Messages", zh: "📨 代理消息", ja: "📨 エージェントメッセージ",
+      es: "📨 Mensajes de agentes", hi: "📨 एजेंट संदेश", ar: "📨 رسائل الوكلاء",
+      pt: "📨 Mensagens dos agentes", ru: "📨 Сообщения агентов", de: "📨 Agenten-Nachrichten",
+      fr: "📨 Messages des agents", ko: "📨 에이전트 메시지", id: "📨 Pesan agen",
+      vi: "📨 Tin nhắn của agent" },
+    "⚡ ประสิทธิภาพ": {
+      en: "⚡ Performance", zh: "⚡ 性能", ja: "⚡ パフォーマンス",
+      es: "⚡ Rendimiento", hi: "⚡ प्रदर्शन", ar: "⚡ الأداء",
+      pt: "⚡ Desempenho", ru: "⚡ Производительность", de: "⚡ Leistung",
+      fr: "⚡ Performance", ko: "⚡ 성능", id: "⚡ Kinerja",
+      vi: "⚡ Hiệu năng" },
+    "🧹 ล้าง Log ทั้งหมด": {
+      en: "🧹 Clear all logs", zh: "🧹 清除全部日志", ja: "🧹 すべてのログを消去",
+      es: "🧹 Borrar todos los registros", hi: "🧹 सभी लॉग साफ़ करें", ar: "🧹 مسح كل السجلات",
+      pt: "🧹 Limpar todos os registros", ru: "🧹 Очистить все логи", de: "🧹 Alle Logs löschen",
+      fr: "🧹 Effacer tous les journaux", ko: "🧹 모든 로그 지우기", id: "🧹 Hapus semua log",
+      vi: "🧹 Xóa tất cả log" },
+    "📤 ส่งออก Log": {
+      en: "📤 Export logs", zh: "📤 导出日志", ja: "📤 ログを書き出す",
+      es: "📤 Exportar registros", hi: "📤 लॉग निर्यात करें", ar: "📤 تصدير السجلات",
+      pt: "📤 Exportar registros", ru: "📤 Экспорт логов", de: "📤 Logs exportieren",
+      fr: "📤 Exporter les journaux", ko: "📤 로그 내보내기", id: "📤 Ekspor log",
+      vi: "📤 Xuất log" },
+    "❌ เปิด/ปิด Dev Mode ไม่สำเร็จ:": {
+      en: "❌ Dev Mode toggle failed:", zh: "❌ 切换开发模式失败：", ja: "❌ 開発モードの切り替えに失敗:",
+      es: "❌ No se pudo cambiar Dev Mode:", hi: "❌ Dev Mode टॉगल विफल:", ar: "❌ فشل تبديل وضع المطور:",
+      pt: "❌ Falha ao alternar o Dev Mode:", ru: "❌ Не удалось переключить Dev Mode:", de: "❌ Dev Mode konnte nicht umgeschaltet werden:",
+      fr: "❌ Échec du basculement du Dev Mode :", ko: "❌ 개발자 모드 전환 실패:", id: "❌ Gagal mengubah Dev Mode:",
+      vi: "❌ Bật/tắt Dev Mode thất bại:" },
+    "🧹 ล้าง Dev Mode log แล้ว": {
+      en: "🧹 Dev Mode logs cleared", zh: "🧹 已清除开发模式日志", ja: "🧹 開発モードのログを消去しました",
+      es: "🧹 Registros de Dev Mode borrados", hi: "🧹 Dev Mode लॉग साफ़ कर दिए गए", ar: "🧹 تم مسح سجلات وضع المطور",
+      pt: "🧹 Registros do Dev Mode limpos", ru: "🧹 Логи Dev Mode очищены", de: "🧹 Dev-Mode-Logs gelöscht",
+      fr: "🧹 Journaux du Dev Mode effacés", ko: "🧹 개발자 모드 로그를 지웠습니다", id: "🧹 Log Dev Mode telah dihapus",
+      vi: "🧹 Đã xóa log Dev Mode" },
+    "ไม่มี log ให้ส่งออก": {
+      en: "No logs to export", zh: "没有可导出的日志", ja: "書き出すログがありません",
+      es: "No hay registros para exportar", hi: "निर्यात करने के लिए कोई लॉग नहीं", ar: "لا توجد سجلات للتصدير",
+      pt: "Não há registros para exportar", ru: "Нет логов для экспорта", de: "Keine Logs zum Exportieren",
+      fr: "Aucun journal à exporter", ko: "내보낼 로그가 없습니다", id: "Tidak ada log untuk diekspor",
+      vi: "Không có log để xuất" },
+    "📤 คัดลอก Dev Mode log ไปที่คลิปบอร์ดแล้ว": {
+      en: "📤 Dev Mode logs copied to the clipboard", zh: "📤 已将开发模式日志复制到剪贴板", ja: "📤 開発モードのログをクリップボードにコピーしました",
+      es: "📤 Registros de Dev Mode copiados al portapapeles", hi: "📤 Dev Mode लॉग क्लिपबोर्ड पर कॉपी हो गए", ar: "📤 تم نسخ سجلات وضع المطور إلى الحافظة",
+      pt: "📤 Registros do Dev Mode copiados para a área de transferência", ru: "📤 Логи Dev Mode скопированы в буфер обмена", de: "📤 Dev-Mode-Logs in die Zwischenablage kopiert",
+      fr: "📤 Journaux du Dev Mode copiés dans le presse-papiers", ko: "📤 개발자 모드 로그를 클립보드에 복사했습니다", id: "📤 Log Dev Mode disalin ke papan klip",
+      vi: "📤 Đã sao chép log Dev Mode vào clipboard" },
+    "📥 ดาวน์โหลด Dev Mode log แล้ว": {
+      en: "📥 Dev Mode logs downloaded", zh: "📥 已下载开发模式日志", ja: "📥 開発モードのログをダウンロードしました",
+      es: "📥 Registros de Dev Mode descargados", hi: "📥 Dev Mode लॉग डाउनलोड हो गए", ar: "📥 تم تنزيل سجلات وضع المطور",
+      pt: "📥 Registros do Dev Mode baixados", ru: "📥 Логи Dev Mode загружены", de: "📥 Dev-Mode-Logs heruntergeladen",
+      fr: "📥 Journaux du Dev Mode téléchargés", ko: "📥 개발자 모드 로그를 다운로드했습니다", id: "📥 Log Dev Mode diunduh",
+      vi: "📥 Đã tải xuống log Dev Mode" },
   };
   function uiLang() {
     try {
@@ -1331,7 +1516,10 @@
 
   // Dynamic content (chat, feed, agent names, thread titles, live counters)
   // must NOT be machine-translated — only UI chrome. Skip these subtrees.
-  const NO_I18N = new Set(["log", "feed", "feedTasks", "rail", "companion", "nowStrip", "threadName", "pttTxt", "inp"]);
+  // Dev Mode log bodies are data (tool inputs, agent text) — never sent to the
+  // translation API; the panel's headings/buttons around them still translate.
+  const NO_I18N = new Set(["log", "feed", "feedTasks", "rail", "companion", "nowStrip", "threadName", "pttTxt", "inp",
+    "devEventLog", "devToolLog", "devAgentLog", "devPerfLog"]);
   function inNoI18n(node) {
     let el = node.nodeType === 1 ? node : node.parentElement;
     while (el) { if (el.id && NO_I18N.has(el.id)) return true; el = el.parentElement; }
@@ -1431,6 +1619,7 @@
   // Live registry from the daemon (roster.sync) — identity source of truth.
   let ROSTER = {}, REGROLES = [], REGSKILLS = {}, REGTOOLS = [], AUTOSKILLS = true, VERIFY = false, AUTOAPPROVE = false;
   let AUTOPILOT = false, AUTOPILOTMAX = 8;   // 🤖 keep-going mode + its round budget
+  let DEV_MODE = false;   // 🛠 Dev Mode — detailed panels, scroll bars, verbose logging
   let BUILTIN_DESC = {}, REGMCP = {}, SOUND = true, HEARTBEAT = 0;
   let REGBACKENDS = {}, REGBACKEND = "local";
   let GHOSTWT = false;
@@ -1574,15 +1763,21 @@
     groupView = null;  // leaving a meeting log view
     if (typeof hideSpeakBar === "function") hideSpeakBar();
     target = id;
+    refreshTargetChrome();
+    refreshThreadBar(true);  // clicking a seat always shows that agent's latest thread
+  }
+
+  // Registry updates change names/settings, not the conversation being viewed.
+  function refreshTargetChrome() {
+    const id = target;
     document.getElementById("compName").textContent = nameOf(id);
     document.getElementById("compRole").textContent = roleOf(id);
     body(document.getElementById("compBody"), id);
-    setComposerHint(id);
+    if (!groupView) setComposerHint(id);
     // 📞 calling is for the MAIN agent only (it speaks for the office).
     // The realtime call always reaches the main agent — offer it from the CEO seat too.
     document.getElementById("liveBtn").style.display = (id === "main" || id === "ceo") ? "" : "none";
     renderRail();
-    refreshThreadBar(true);  // clicking a seat always shows that agent's latest thread
   }
 
   // ---- chat ---------------------------------------------------------------
@@ -1680,11 +1875,20 @@
     if (tool.startsWith("mcp__")) return tr("กำลังใช้ปลั๊กอิน") + " " + tool.split("__").pop();
     return tr("กำลังใช้") + " " + tool;
   }
-  // Tiny inline tool-call marker inside a conversation.
-  function addToolRow(name) {
-    const d = document.createElement("div");
-    d.className = "toolrow";
-    d.textContent = "⚙ " + name;
+  // Every tool/skill row follows Dev Mode, including name-only saved history.
+  // Details stay in redacted, bounded DOM-associated memory across toggles.
+  // Calls captured without debug input show an explicit unavailable message.
+  function addToolRow(name, ev) {
+    ev = ev || {};
+    // detail is a string: string path of redactSecrets (mask, no 1 KB cut — the
+    // row's own cap is 2000, same as the daemon's); input is an object.
+    let body = ev.detail ? maskInString(String(ev.detail)) : "";
+    if (!body && ev.input) { try { body = JSON.stringify(redactSecrets(ev.input), null, 1); } catch { body = ""; } }
+    body = String(body).slice(0, 2000);
+    const data = { name: maskInString(String(name)), body,
+      label: ev.label ? maskInString(String(ev.label)).slice(0, 60) : "",
+      kind: ev.kind ? String(ev.kind).replace(/[^a-z]/gi, "") : "", open: false };
+    const d = renderDevToolRow(data);
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
   }
@@ -1702,6 +1906,302 @@
     box.prepend(d);
     while (box.children.length > 40) box.removeChild(box.lastChild);
   }
+
+  // 🛠 DEV MODE DEBUG LOGGING — detailed panels with scroll bars for debugging
+  // (daemon/tests/devmode.test.js lifts this whole block — up to renderMissions —
+  // into node:vm with a fake document, so keep it self-contained.)
+  const DEV_LOG_LIMIT = 200;
+  // Only redacted, bounded data lives here; detached conversation rows can be GC'd.
+  const devToolRows = new WeakMap();
+  let devModePending = false;
+  let devModeRevision = 0;
+  function renderDevToolRow(data) {
+    const row = document.createElement(DEV_MODE ? "details" : "div");
+    row.className = "toolrow";
+    if (DEV_MODE) {
+      row.className += " dev" + (data.kind ? " " + data.kind : "");
+      row.open = data.open;
+      const summary = document.createElement("summary");
+      summary.textContent = "⚙ " + data.name + (data.label ? " · " + data.label : "");
+      const pre = document.createElement("pre");
+      pre.className = "dev-detail";
+      pre.textContent = data.body || tr("ไม่มีรายละเอียดที่บันทึกไว้สำหรับการเรียกนี้");
+      row.appendChild(summary);
+      row.appendChild(pre);
+    } else row.textContent = "⚙ " + data.name;
+    devToolRows.set(row, data);
+    return row;
+  }
+  function syncDevModeUI() {
+    for (const id of ["devModeTitle", "devModePanel"]) {
+      const el = document.getElementById(id);
+      if (el) el.style.display = DEV_MODE ? "block" : "none";
+    }
+    const sw = document.getElementById("devModeSw");
+    if (sw) {
+      sw.classList.toggle("on", DEV_MODE);
+      sw.disabled = devModePending;
+      sw.setAttribute("aria-checked", String(DEV_MODE));
+      sw.setAttribute("aria-disabled", String(devModePending));
+    }
+  }
+  function setDevMode(enabled) {
+    const changed = DEV_MODE !== (enabled === true);
+    DEV_MODE = enabled === true;
+    syncDevModeUI();
+    if (!changed) return;
+    const scrollTop = log.scrollTop;
+    for (const row of log.querySelectorAll(".toolrow")) {
+      const data = devToolRows.get(row);
+      if (!data) continue;
+      if (row.tagName === "DETAILS") data.open = row.open;
+      row.replaceWith(renderDevToolRow(data));
+    }
+    log.scrollTop = scrollTop;
+  }
+  // HTML-escape for log entries: tool names / inputs / agent text are untrusted.
+  function esc(x) { return String(x === undefined || x === null ? "" : x).replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c])); }
+
+  // 🔒 Secret redaction — a verbatim mirror of daemon/devmode.js. The daemon
+  // already redacts task.progress input before it leaves the process; this is
+  // defence in depth, and it also covers text that only exists client-side.
+  // Bounded: depth ≤ 10, breadth ≤ 100, strings ≤ 1024 chars, circular-safe.
+  const MAX_REDACT_DEPTH = 10;
+  const MAX_REDACT_BREADTH = 100;
+  const MAX_REDACT_STRING = 1024;
+  // Key names that mark a value as secret. Keys are normalised (camelCase →
+  // snake_case, lower-cased) and must match on a word boundary, so
+  // input_tokens / max_tokens / keyboard are NOT secrets but apiKey /
+  // access_token / x-api-key / set-cookie are.
+  const SECRET_KEY_RE = /(^|[^a-z0-9])(api[_-]?key|apikey|x-api-key|authorization|bearer|token|access[_-]?token|refresh[_-]?token|passw(?:or)?d|secret|client[_-]?secret|private[_-]?key|credentials?|cookie|set-cookie)(?![a-z0-9])/;
+  function isSecretKey(k) { return SECRET_KEY_RE.test(String(k).replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase()); }
+  // FULL replacement: any non-empty secret becomes the fixed placeholder
+  // "••••••" — never a character of the secret, never its length. (The old
+  // first-8 + last-4 form leaked 12 characters of every secret.) Empty / null /
+  // undefined → "". Numbers, booleans and bigints under a secret key are
+  // stringified first, so they get the placeholder too.
+  const SECRET_MASK = "••••••";
+  function maskSecret(v) {
+    v = String(v === undefined || v === null ? "" : v);
+    return v ? SECRET_MASK : "";
+  }
+  // Settings-page key recognition (pre-existing, NOT a Dev Mode redaction path):
+  // the Office Settings modal shows first 8 + •••••• + last 4 of a configured
+  // API key so the owner can tell WHICH key is set. Dev Mode never calls this.
+  const maskKey = (v) => { v = String(v || ""); if (!v) return ""; return v.length <= 10 ? "•".repeat(v.length) : v.slice(0, 8) + "••••••" + v.slice(-4); };
+  // CLI-flag replacement helper: keeps the flag (`head`) and the quotes, masks
+  // the inside. Exactly one of dq / sq / uq is defined (double-, single-, unquoted).
+  function maskFlagValue(m, head, dq, sq, uq) {
+    if (dq !== undefined) return head + '"' + maskSecret(dq) + '"';
+    if (sq !== undefined) return head + "'" + maskSecret(sq) + "'";
+    return head + maskSecret(uq);
+  }
+  // Values that look like credentials even under an innocent key name (a Bash
+  // command with `Authorization: Bearer sk-…`, a URL with ?api_key=…). Every
+  // rule substitutes the fixed placeholder, so a span an earlier rule already
+  // masked is simply re-masked by a later one (idempotent). One ordering
+  // constraint: the URL rules run BEFORE the key=value rule, so the userinfo of
+  // `https://x-access-token:ghp_…@github.com/…` is consumed as a whole and the
+  // key=value rule cannot swallow the host after `token:`.
+  const SECRET_VALUE_PATTERNS = [
+    [/\b(Bearer|Basic)\s+([A-Za-z0-9\-._~+\/=]{8,})/g, (m, scheme, tok) => scheme + " " + maskSecret(tok)],
+    [/\b(sk-[A-Za-z0-9_\-]{8,})/g, (m, tok) => maskSecret(tok)],
+    [/\b((?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,})/g, (m, tok) => maskSecret(tok)],
+    [/\b(xox[abpr]-[A-Za-z0-9\-]{10,})/g, (m, tok) => maskSecret(tok)],
+    [/\b(AIza[0-9A-Za-z\-_]{30,})/g, (m, tok) => maskSecret(tok)],
+    [/\b(AKIA[0-9A-Z]{16})\b/g, (m, tok) => maskSecret(tok)],
+    // URL / connection-string credentials: scheme://user[:pass]@host →
+    // scheme://••••••@host (any scheme; whole userinfo incl. username).
+    [/\b([a-z][a-z0-9+.\-]*:\/\/)([^\s\/@]+)@(?=[A-Za-z0-9\[])/gi, (m, scheme) => scheme + SECRET_MASK + "@"],
+    // Bare user:pass@host (no scheme): contiguous userinfo, user part starts
+    // with a letter/underscore (not a clock time), `@` followed by a host char.
+    [/(^|[\s"'=,(\[])(?!mailto:)([A-Za-z_][^\s"'\/@:=,(\[]*:[^\s"'\/@]+)@(?=[A-Za-z0-9\[])/g, (m, pre) => pre + SECRET_MASK + "@"],
+    // key=value / key: value pairs inside free text (query strings, env lines, JSON-ish)
+    [/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|private[_-]?key|x-api-key|authorization|token|secret|passw(?:or)?d)\s*[=:]\s*["']?)(?!(?:Bearer|Basic)\b)([^\s"'&;,]{6,})/gi,
+      (m, head, val) => head + maskSecret(val)],
+    // CLI header flags (-H / --header): secret-ish header NAME → the header
+    // VALUE is masked as a whole, scheme word included: `-H 'Authorization: ••••••'`.
+    [/((?:^|\s)(?:-H|--[Hh]eader)(?:\s+|=))(?:"([^"]*)"|'([^']*)'|(?!-)(\S+))/g, (m, head, dq, sq, uq) => {
+      const q = dq !== undefined ? '"' : sq !== undefined ? "'" : "";
+      const val = dq !== undefined ? dq : sq !== undefined ? sq : uq;
+      const i = val.indexOf(":");
+      if (i < 1 || !isSecretKey(val.slice(0, i).trim()) || !val.slice(i + 1).trim()) return m;
+      return head + q + val.slice(0, i + 1) + " " + maskSecret(val.slice(i + 1)) + q;
+    }],
+    // CLI long flags whose NEXT argument is the secret (--password x, --token=x,
+    // --api-key "x"…); a value starting with `-` is another flag. The flag name
+    // must end at whitespace or `=`, so --port / --token-file do not match.
+    [/((?:^|\s)--(?:password|passwd|passphrase|pass|pwd|token|api[-_]?key|apikey|secret|client[-_]?secret|access[-_]?token|refresh[-_]?token|auth[-_]?token|auth|bearer|key|private[-_]?key|cookie|credentials?)(?:\s+|=))(?:"([^"]*)"|'([^']*)'|(?!-)(\S+))/gi,
+      maskFlagValue],
+    // CLI short flags -p / -P / -k + whitespace + non-flag, non-URL token;
+    // preceded by whitespace/start so `top-p 0.9` is untouched.
+    [/((?:^|\s)-[pPk]\s+)(?:"([^"]*)"|'([^']*)'|(?!-)(?![A-Za-z][A-Za-z0-9+.\-]*:\/\/)(\S+))/g, maskFlagValue],
+    // CLI -u / --user user:pass (curl): whole value goes; `:` required so
+    // `git push -u origin` / `mysql -u root` are untouched.
+    [/((?:^|\s)(?:-u|--user)(?:\s+|=))(?:"([^"\s]*:[^"]*)"|'([^'\s]*:[^']*)'|(?!-)(\S*:\S*))/g, maskFlagValue],
+  ];
+  function maskInString(s) {
+    let out = String(s);
+    for (const [re, fn] of SECRET_VALUE_PATTERNS) out = out.replace(re, fn);
+    return out;
+  }
+  // Returns a NEW structure (never mutates). `force` masks every string leaf —
+  // used below a key that is itself secret-ish (credentials: { user, password }).
+  function redactSecrets(obj, depth = 0, ancestors = new Set(), force = false) {
+    if (obj === null || obj === undefined) return obj;
+    const t = typeof obj;
+    if (t === "string") {
+      if (force) return maskSecret(obj);
+      const s = maskInString(obj);   // mask BEFORE truncating
+      return s.length > MAX_REDACT_STRING ? s.slice(0, MAX_REDACT_STRING) + "…<truncated>" : s;
+    }
+    if (t === "number" || t === "boolean") return force ? maskSecret(obj) : obj;
+    if (t === "bigint") return force ? maskSecret(obj) : obj.toString();
+    if (t === "function" || t === "symbol") return "<" + t + ">";
+    if (depth > MAX_REDACT_DEPTH) return "<max-depth>";
+    if (ancestors.has(obj)) return "<circular>";
+    if (ArrayBuffer.isView(obj)) return "<binary " + obj.byteLength + " bytes>";
+    if (obj instanceof Date) return isNaN(obj) ? "<invalid date>" : obj.toISOString();
+    ancestors.add(obj);
+    try {
+      if (Array.isArray(obj)) {
+        const out = obj.slice(0, MAX_REDACT_BREADTH).map((v) => redactSecrets(v, depth + 1, ancestors, force));
+        if (obj.length > MAX_REDACT_BREADTH) out.push("<+" + (obj.length - MAX_REDACT_BREADTH) + " more>");
+        return out;
+      }
+      let keys;
+      try { keys = Object.keys(obj); } catch { return "<unreadable>"; }
+      const out = {};
+      for (let i = 0; i < keys.length; i++) {
+        if (i >= MAX_REDACT_BREADTH) { out["<more>"] = "+" + (keys.length - MAX_REDACT_BREADTH) + " keys"; break; }
+        const k = keys[i];
+        let v;
+        try { v = obj[k]; } catch { out[k] = "<unreadable>"; continue; }
+        const secret = force || isSecretKey(k);
+        if (secret && v !== null && v !== undefined && typeof v !== "object") out[k] = maskSecret(v);
+        else out[k] = redactSecrets(v, depth + 1, ancestors, secret);
+      }
+      return out;
+    } finally {
+      ancestors.delete(obj);
+    }
+  }
+  // Redacted, display-ready text for any payload: strings are masked (and cut
+  // at 1 KB AFTER masking); objects are redacted then JSON-stringified.
+  function devSafeText(v) {
+    if (v === undefined || v === null) return "";
+    const r = redactSecrets(v);
+    if (typeof r === "string") return r;
+    try { return JSON.stringify(r, null, 1); } catch { return String(r); }
+  }
+  function devStamp(withMs) {
+    const t = new Date();
+    const hh = String(t.getHours()).padStart(2, "0");
+    const mm = String(t.getMinutes()).padStart(2, "0");
+    const ss = String(t.getSeconds()).padStart(2, "0");
+    return `${hh}:${mm}:${ss}` + (withMs ? "." + String(t.getMilliseconds()).padStart(3, "0") : "");
+  }
+
+  function devLogEvent(type, label, detail) {
+    if (!DEV_MODE) return;
+    const log = document.getElementById("devEventLog");
+    if (!log) return;
+    const d = document.createElement("div");
+    d.className = "dev-entry";
+    const safeLabel = devSafeText(label);     // redact BEFORE escape/truncate
+    const safeDetail = devSafeText(detail);
+    d.innerHTML = `<span class="time">${devStamp(true)}</span><span class="type event">${esc(safeLabel)}</span>${safeDetail ? `<div class="detail">${esc(safeDetail)}</div>` : ""}`;
+    log.appendChild(d);
+    while (log.children.length > DEV_LOG_LIMIT) log.removeChild(log.firstChild);
+    log.scrollTop = log.scrollHeight;
+  }
+  function devLogTool(agent, tool, input, output, duration) {
+    if (!DEV_MODE) return;
+    const log = document.getElementById("devToolLog");
+    if (!log) return;
+    const d = document.createElement("div");
+    d.className = "dev-entry";
+    let detail = `<b>Agent:</b> ${esc(nameOf(agent))} · <b>Tool:</b> ${esc(tool)}`;
+    if (duration !== undefined && duration !== null) detail += ` · <b>Duration:</b> ${esc(duration)}ms`;
+    // Redact BEFORE stringify/truncate; depth/breadth/string bounds live in redactSecrets.
+    const inputStr = devSafeText(input);
+    const outputStr = devSafeText(output);
+    if (inputStr) detail += `<div class="detail"><b>Input:</b> ${esc(inputStr.slice(0, 500))}${inputStr.length > 500 ? "…" : ""}</div>`;
+    if (outputStr) detail += `<div class="detail"><b>Output:</b> ${esc(outputStr.slice(0, 500))}${outputStr.length > 500 ? "…" : ""}</div>`;
+    d.innerHTML = `<span class="time">${devStamp()}</span><span class="type tool">${esc(tool)}</span>${detail}`;
+    log.appendChild(d);
+    while (log.children.length > DEV_LOG_LIMIT) log.removeChild(log.firstChild);
+    log.scrollTop = log.scrollHeight;
+  }
+  function devLogAgent(agent, event, detail) {
+    if (!DEV_MODE) return;
+    const log = document.getElementById("devAgentLog");
+    if (!log) return;
+    const d = document.createElement("div");
+    d.className = "dev-entry";
+    const safeEvent = devSafeText(event);
+    const safeDetail = devSafeText(detail);   // masked first, then cut at 1 KB
+    d.innerHTML = `<span class="time">${devStamp()}</span><span class="type agent">${esc(nameOf(agent))}</span><div class="detail">${esc(safeEvent)}${safeDetail ? " — " + esc(safeDetail.slice(0, 500)) + (safeDetail.length > 500 ? "…" : "") : ""}</div>`;
+    log.appendChild(d);
+    while (log.children.length > DEV_LOG_LIMIT) log.removeChild(log.firstChild);
+    log.scrollTop = log.scrollHeight;
+  }
+  function devLogPerf(metric, value, detail) {
+    if (!DEV_MODE) return;
+    const log = document.getElementById("devPerfLog");
+    if (!log) return;
+    const d = document.createElement("div");
+    d.className = "dev-entry";
+    const safeValue = devSafeText(value);     // objects (token usage) → redacted JSON
+    const safeDetail = devSafeText(detail);
+    d.innerHTML = `<span class="time">${devStamp()}</span><span class="type perf">${esc(metric)}: ${esc(safeValue)}</span>${safeDetail ? `<div class="detail">${esc(safeDetail)}</div>` : ""}`;
+    log.appendChild(d);
+    while (log.children.length > DEV_LOG_LIMIT) log.removeChild(log.firstChild);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function wireDevLogControls() {
+    // Dev Mode panel controls — buttons are in sidebar (#devModePanel), NOT modalCard
+    const devClear = document.getElementById("devClearLogs");
+    if (devClear) devClear.onclick = () => {
+      const logs = ["devEventLog", "devToolLog", "devAgentLog", "devPerfLog"];
+      logs.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ""; });
+      addChip(tr("🧹 ล้าง Dev Mode log แล้ว"));
+    };
+    const devExport = document.getElementById("devExportLogs");
+    if (devExport) devExport.onclick = () => {
+      const logs = ["devEventLog", "devToolLog", "devAgentLog", "devPerfLog"];
+      let output = "";
+      logs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.children.length) {
+          output += `=== ${id} ===\n`;
+          for (const child of el.children) output += child.textContent + "\n";
+          output += "\n";
+        }
+      });
+      if (!output) output = tr("ไม่มี log ให้ส่งออก");
+      // Try clipboard first, fallback to download
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(output).then(() =>
+          addChip(tr("📤 คัดลอก Dev Mode log ไปที่คลิปบอร์ดแล้ว"))
+        ).catch(() => downloadFallback(output));
+      } else {
+        downloadFallback(output);
+      }
+      function downloadFallback(text) {
+        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `devmode-logs-${Date.now()}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        addChip(tr("📥 ดาวน์โหลด Dev Mode log แล้ว"));
+      }
+    };
+  }
+  wireDevLogControls();
 
   function renderMissions() {
     missionsEl.innerHTML = "";
@@ -2944,7 +3444,7 @@
     // which used to snap modalCard back to the top — same jump the OFFICE OPS tabs fixed.
     const _wasScroll = modalCard.scrollTop;
     // Mask a secret so the user can recognise which key is set, without exposing it.
-    const maskKey = (v) => { v = String(v || ""); if (!v) return ""; return v.length <= 10 ? "•".repeat(v.length) : v.slice(0, 8) + "••••••" + v.slice(-4); };
+    // Uses global maskKey (defined with DEV MODE logging)
     // ── MAIN keys: dedicated, labeled, feature-aware.
     const MAINS = [
       ["OPENAI_API_KEY", "OpenAI", "🎤 ถอดเสียง (Whisper) · 🖼 สร้างภาพ", "platform.openai.com/api-keys"],
@@ -3372,6 +3872,8 @@
           <div class="knob"></div> ${tr("🔓 อนุมัติอัตโนมัติ: ให้ทุกคำขอใช้เครื่องมือผ่านเองโดยไม่ต้องกด Allow — เหมาะตอนสั่งงานทิ้งไว้แล้วไม่ได้เฝ้า (ยังเห็นใน feed ว่าอนุมัติอะไรบ้าง · ปิดไว้ = ปลอดภัยกว่า)")}</div>
         <div class="switch ${GHOSTWT ? "on" : ""}" id="ghostWtSw">
           <div class="knob"></div> ${tr("👻 GHOST ISOLATION — แยกที่ทำงานให้ร่างผี: ตอนแตกร่างทำงานขนาน ให้แต่ละตัวมี checkout ของ git เป็นของตัวเอง จะได้ไม่แก้ไฟล์ทับกัน — งานที่ทำเสร็จจะมาเป็น branch ให้ merge แทนที่จะแก้ลงในโฟลเดอร์ตรงๆ (ใช้ได้เฉพาะโปรเจกต์ที่เป็น git)")}</div>
+        <div class="switch ${DEV_MODE ? "on" : ""}" id="devModeSw" role="switch" tabindex="0" aria-checked="${DEV_MODE}" aria-disabled="${devModePending}">
+          <div class="knob"></div> ${tr("🛠 DEV MODE — โหมดนักพัฒนา: แสดงแผงละเอียด พร้อม scroll bar บันทึกงานแบบเต็มรูปแบบ สำหรับการดีบักและตรวจสอบงานรายละเอียด")}</div>
         <input id="tFilter" class="filterbox" placeholder="🔍 ค้นหาเครื่องมือ / MCP server…">
         <div class="field"><label>⚡ SYSTEM TOOLS — ความสามารถกลางของออฟฟิศ (agents เรียกใช้เองได้)</label>
           <div id="systools"></div></div>
@@ -3781,6 +4283,32 @@
         await api("/registry/ghostworktrees", { enabled: !GHOSTWT });
         GHOSTWT = !GHOSTWT;
         e.currentTarget.classList.toggle("on", GHOSTWT);
+      };
+      const dmsw = modalCard.querySelector("#devModeSw");
+      if (dmsw) dmsw.onclick = async (e) => {
+        const sw = e.currentTarget;  // Capture BEFORE await
+        if (devModePending) return;  // Includes a settings modal reopened mid-request.
+        const nextMode = !DEV_MODE;
+        const revision = devModeRevision;
+        devModePending = true;
+        syncDevModeUI();
+        try {
+          await api("/registry/devmode", { enabled: nextMode }, true);
+          // A newer roster snapshot wins over a delayed HTTP response.
+          if (revision === devModeRevision) setDevMode(nextMode);
+          addChip(DEV_MODE
+            ? tr("🛠 เปิด Dev Mode — แผงละเอียดและ scroll bar พร้อมใช้งาน")
+            : tr("🛠 ปิด Dev Mode — กลับมาสู่โหมดปกติ"));
+        } catch (err) {
+          addChip(tr("❌ เปิด/ปิด Dev Mode ไม่สำเร็จ:") + " " + esc(err && err.message || err));
+        } finally {
+          devModePending = false;
+          sw.disabled = false;
+          syncDevModeUI();
+        }
+      };
+      if (dmsw) dmsw.onkeydown = (e) => {
+        if (e.key === " " || e.key === "Enter") { e.preventDefault(); dmsw.click(); }
       };
       wireFilter(modalCard.querySelector("#tFilter"), list, ml);
     } else if (tab === "connect") {
@@ -6187,12 +6715,13 @@
     }
   }
 
-  async function api(url, body) {
+  async function api(url, body, checkStatus = false) {
     const r = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
       body: JSON.stringify(body),
     });
+    if (checkStatus && !r.ok) throw new Error(`HTTP ${r.status}`);
     try { return await r.json(); } catch { return {}; }
   }
 
@@ -6301,7 +6830,9 @@
       addLog(`👻 <b>${gname}</b> ${ev.ok ? "งานเสร็จ ✓ กลับเข้าร่าง" : "ล้มเหลว ✗ กลับเข้าร่าง"}`);
     else if (ev.type === "subagent.progress") {
       addLog(`⚙ <b>${ev.tool || "…"}</b> — 👻 ${gname}`);
-      if (groupView && ev.session === groupView) { addToolRow(ev.tool || "…"); showTyping("⚙", toolLabel(ev.tool)); }
+      devLogEvent("subagent.progress", `Tool: ${ev.tool || "…"}`, `Agent: ${gname}`);
+      devLogTool(subId, ev.tool, ev.input, null, null);
+      if (groupView && ev.session === groupView) { addToolRow(ev.tool || "…", ev); showTyping("⚙", toolLabel(ev.tool)); }
     }
     else if (ev.type === "chat.message") {
       if (groupView && ev.session === groupView) addMsg("agent", pid, ev.text, ev.ts);
@@ -6346,6 +6877,8 @@
       AUTOAPPROVE = ev.autoApprove === true;
       AUTOPILOT = ev.autoPilot === true;
       if (ev.autoPilotMax) AUTOPILOTMAX = ev.autoPilotMax;
+      devModeRevision++;
+      setDevMode(ev.devMode === true);
       SOUND = ev.sound !== false;
       if (typeof ev.monitor === "number") monMode = ev.monitor;
       if (typeof ev.monitors === "number") monCount = Math.max(1, ev.monitors);
@@ -6368,7 +6901,7 @@
       gateVoiceUI();
       for (const id of Object.keys(ROSTER)) ensureAgent(id);
       renderRail();
-      setTarget(target);   // refresh name/role if the target was edited
+      refreshTargetChrome();   // keep live debug rows and the current group/thread view
       return;
     }
     if (ev.type === "roster.removed") {
@@ -6505,11 +7038,13 @@
     else if (ev.type === "task.progress") {
       if (!ev.replay) {
         addLog(`⚙ <b>${ev.tool || "…"}</b> — ${nameOf(ev.agent)}`);
+        devLogEvent("task.progress", `Tool: ${ev.tool || "…"}`, `Agent: ${nameOf(ev.agent)}`);
+        devLogTool(ev.agent, ev.tool, ev.input, null, null);
         // Inline marker inside the conversation it belongs to.
         if (!groupView &&
             (ev.agent === target || (target === "ceo" && ev.agent === "main")) &&
             ev.session && ev.session === CUR[target]) {
-          addToolRow(ev.tool || "…");
+          addToolRow(ev.tool || "…", ev);       // Dev Mode: expandable command/skill/file detail
           showTyping("⚙", toolLabel(ev.tool));  // name the tool the agent is running now
         }
       }
@@ -6525,6 +7060,9 @@
       if (missions[key]) { missions[key].state = "done"; renderMissions(); }
       ensureAgent(ev.agent, "idle");
       if (viewingLive(ev)) hideTyping();
+      devLogEvent("task.completed", `Task completed`, `Agent: ${nameOf(ev.agent)}`);
+      devLogAgent(ev.agent, "Task completed", ev.text || "");   // redacted + cut inside, never pre-sliced
+      if (ev.usage) devLogPerf("Token usage", ev.usage, `Model: ${ev.model || "unknown"}`);
       // Live context-usage meter for the thread the user is watching.
       if (!ev.replay && ev.usage && ev.agent === sessAgent() && !groupView &&
           (!ev.session || !CUR[target] || ev.session === CUR[target]))
@@ -6536,6 +7074,8 @@
       if (missions[key]) { missions[key].state = "failed"; renderMissions(); }
       ensureAgent(ev.agent, "idle");
       if (viewingLive(ev)) hideTyping();
+      devLogEvent("task.failed", `Task failed`, `Agent: ${nameOf(ev.agent)}`);
+      devLogAgent(ev.agent, "Task failed", ev.error || "No error details");
     }
     else if (ev.type === "thread.switch") {
       // Auto-compact / recovery moved this agent's work onto a fresh thread. If the
