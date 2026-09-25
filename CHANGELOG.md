@@ -4,6 +4,20 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [1.6.6] — 🙏 Every contributor, everywhere
+
+**Fixed**
+- **Contributors were credited in one place and missing from the other two.**
+  The README's contributor table and the website's contributor grid had not
+  been updated since v1.0; @kmmao, @sbrasesco, @binyangzhu000-sudo and @f2dac
+  appear on both now, and CONTRIBUTORS.md lists them under *Community
+  contributors* (three had been filed under *Plugin authors*). Also the reason
+  a contributor can be missing from GitHub's own graph: #56's commit was
+  authored by an AI tool, so the graph credited "codex" instead of the person —
+  the crediting commit carries `Co-authored-by` trailers for @f2dac, @sbrasesco,
+  @kmmao and @bmdy5 so they show up there too, and the maintainer notes in
+  CONTRIBUTORS.md say to check the commit author before merging.
+
 ## [1.6.5] — 🕊️ The Hub's first official companion
 
 **Added**

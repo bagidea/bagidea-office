@@ -89,6 +89,7 @@ interesting part of building it.
 ### 🆕 Recently shipped
 BagIdea Office is updated **constantly** — every office gets a 🔄 banner and one-click `bagidea update`. The latest:
 
+- **v1.6.6 — 🙏 every contributor, everywhere:** the README's contributor table and the website's contributor grid had stopped at v1.0; @kmmao, @sbrasesco, @binyangzhu000-sudo and @f2dac are on both now, CONTRIBUTORS.md files them correctly, and a `Co-authored-by` commit puts the people whose PR commits were authored by an AI tool onto GitHub's Contributors graph as well.
 - **v1.6.5 — 🕊️ the Hub's first official companion:** **Emmaus** is on the Plugins Hub — a Bible-counsel companion: tell Selah, a 3D counselor, what you're going through and get Scripture-grounded guidance, practical steps and a prayer, spoken aloud in Thai or English; every quoted verse is checked against the bundled corpus ([bagidea/emmaus](https://github.com/bagidea/emmaus), MIT; the Bible texts keep their own terms). Described in all 14 languages; the Hub guide now lists what's on the Hub and how it differs from the built-in library.
 - **v1.6.4 — 🎨 every dropdown wears the theme:** the 📋 TASKS owner picker (and the CONNECT tab's custom-provider kind picker) rendered as the browser's white select — the theme rules covered `.field` controls and `.assistrow` inputs, not `.assistrow` selects. Selects join the rules, and every select inside the modal gets the theme as a floor.
 - **v1.6.3 — 🧱 local models survive the first tool call:** Claude Code now puts reminder entries with `role: "system"` inside the message list (the agent-type list, `<total_tokens>`), and the proxy forwarded them mid-conversation — block-form ones even became *assistant* turns. Cloud APIs shrugged; strict chat templates (Qwen3.5 and friends on LM Studio / llama.cpp / Ollama / vLLM) answered "System message must be at the beginning" with a hard 500 on every turn after the first tool call. The proxy now emits one system message at index 0 and folds the rest into the adjacent user turn as a `<system-reminder>`, order and tool ids untouched. Contributed by @f2dac in [#56](https://github.com/bagidea/bagidea-office/pull/56). Also: the release-plan doc now says what actually happens (releases are cut from `main` on a `VERSION` bump).
@@ -908,6 +909,20 @@ platform we couldn't reach.
     </td>
     <td align="center" valign="top" width="120">
       <a href="https://github.com/bmdy5"><img src="https://github.com/bmdy5.png?size=100" width="72" alt="@bmdy5"><br><sub><b>@bmdy5</b></sub></a><br><sub>Markdown rendering</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/kmmao"><img src="https://github.com/kmmao.png?size=100" width="72" alt="@kmmao"><br><sub><b>@kmmao</b></sub></a><br><sub>macOS occlusion fix</sub>
+    </td>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/sbrasesco"><img src="https://github.com/sbrasesco.png?size=100" width="72" alt="@sbrasesco"><br><sub><b>@sbrasesco</b></sub></a><br><sub>Report-back thread fix</sub>
+    </td>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/binyangzhu000-sudo"><img src="https://github.com/binyangzhu000-sudo.png?size=100" width="72" alt="@binyangzhu000-sudo"><br><sub><b>@binyangzhu000-sudo</b></sub></a><br><sub>Atlas Cloud provider</sub>
+    </td>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/f2dac"><img src="https://github.com/f2dac.png?size=100" width="72" alt="@f2dac"><br><sub><b>@f2dac</b></sub></a><br><sub>Local-model proxy fix</sub>
     </td>
   </tr>
 </table>

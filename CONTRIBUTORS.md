@@ -56,6 +56,20 @@ early macOS support, when the project was Windows-only:
   `CGMainDisplayID()`, so a fullscreen app on the primary throttled a wallpaper living
   on a second monitor ([#43](https://github.com/bagidea/bagidea-office/pull/43)).
 
+- **[@binyangzhu000-sudo](https://github.com/binyangzhu000-sudo)** (nb213) — **Atlas Cloud**, the 20th
+  built-in model provider, routed through the built-in proxy
+  ([#54](https://github.com/bagidea/bagidea-office/pull/54), v1.6.2).
+- **[@sbrasesco](https://github.com/sbrasesco)** (Sergio Brasesco) — measured, against a running
+  daemon, that a delegated result came back to the **wrong thread** (the delegate filter froze
+  the session at build time) and first fixed it; the fix on `main` is his diagnosis
+  ([#41](https://github.com/bagidea/bagidea-office/pull/41), v1.6.2). Also the per-agent
+  security probing that found two real write channels.
+- **[@f2dac](https://github.com/f2dac)** (aKushmaneWitDaProoze) — **local models survive the first
+  tool call**: the proxy now folds Claude Code's `role: system` reminders into the adjacent
+  user turn, so strict chat templates on LM Studio / llama.cpp / Ollama / vLLM stop answering
+  500 after a tool call ([#56](https://github.com/bagidea/bagidea-office/pull/56), v1.6.3) —
+  plus the 92-commit `dev` sync ([#55](https://github.com/bagidea/bagidea-office/pull/55)).
+
 > Want to be on this list? Open a PR — see [docs/guide/plugin-hub.md](docs/guide/plugin-hub.md)
 > for plugins, or fix anything in the repo. Every merged contribution is credited here
 > and on GitHub's Contributors graph.
@@ -77,9 +91,6 @@ Your plugin's own code lives in your own repo, where you're of course the author
   [#26](https://github.com/bagidea/bagidea-office/pull/26)) — the **first community plugin**
   in the Hub: test & benchmark agents — run prompts, capture responses, measure token usage,
   and save runs as reusable regression test cases.
-- **[@binyangzhu000-sudo](https://github.com/binyangzhu000-sudo)** — the Atlas Cloud model provider, routed through the built-in proxy ([#54](https://github.com/bagidea/bagidea-office/pull/54)).
-- **[@sbrasesco](https://github.com/sbrasesco)** (Sergio Brasesco) — found and first fixed the report-back that landed in the wrong thread, and the security probing behind it ([#41](https://github.com/bagidea/bagidea-office/pull/41)).
-- **[@f2dac](https://github.com/f2dac)** — the proxy's system-message normalization for strict chat templates, so local models on LM Studio / llama.cpp / Ollama survive the first tool call ([#56](https://github.com/bagidea/bagidea-office/pull/56)), and the dev-branch sync ([#55](https://github.com/bagidea/bagidea-office/pull/55)).
 
 ## Built with Claude Code
 
@@ -95,6 +106,12 @@ GitHub only lists someone as a contributor when a commit **authored by them** (w
 GitHub-linked email) lands on the default branch. A squash-merge that re-authors the
 commit to the maintainer **erases the contributor's credit** (this is why an earlier
 merged PR didn't show up).
+
+When merging a community PR, preserve authorship — and check **who the commit says
+wrote it**. A PR whose commit was authored by an AI tool (`Codex <codex@users.noreply…>`,
+say) credits the tool on the graph, not the person who did the work; add a
+`Co-authored-by: <login> <id+login@users.noreply.github.com>` trailer on the merge or on
+the next commit so the person appears on the Contributors graph too.
 
 When merging a community PR, preserve authorship:
 
