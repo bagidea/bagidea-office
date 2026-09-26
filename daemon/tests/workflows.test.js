@@ -251,6 +251,31 @@ test("triggers: a webhook needs its token, verifies an HMAC when a secret is set
   assert.strictEqual(tr.webhook(token, { "x-hub-signature-256": sig }, body).status, 409);
 });
 
+test("triggers: enabling an imported webhook creates a working local token once", () => {
+  const { tr, reg, started } = mkTriggers();
+  reg.triggers.push({ id: "imported-hook", kind: "webhook", workflowId: "wf_t", enabled: false, cfg: {}, lastRun: 0, runs: 0 });
+  assert.strictEqual(tr.update("imported-hook", { name: "Imported hook" }).cfg.token, undefined, "editing a disabled import does not activate its URL");
+  const enabled = tr.update("imported-hook", { enabled: true });
+  assert.match(enabled.cfg.token, /^[a-f0-9]{24}$/);
+  assert.strictEqual(reg.triggers[0].cfg.token, enabled.cfg.token, "the generated token is persisted in the registry");
+  assert.strictEqual(started.length, 0, "enabling the hook never starts a workflow");
+  const body = Buffer.from('{"event":"restored"}');
+  assert.strictEqual(tr.webhook(enabled.cfg.token, {}, body).status, 200);
+  assert.strictEqual(started[0].opts.trigger.event, "restored");
+  tr.update("imported-hook", { enabled: false });
+  assert.strictEqual(tr.webhook(enabled.cfg.token, {}, body).status, 409);
+  assert.strictEqual(tr.update("imported-hook", { enabled: true }).cfg.token, enabled.cfg.token, "re-enabling preserves the existing URL");
+  assert.strictEqual(tr.update("imported-hook", { name: "Renamed hook" }).cfg.token, enabled.cfg.token);
+
+  reg.triggers.push({ id: "second-import", kind: "webhook", workflowId: "wf_t", enabled: false, cfg: {} });
+  assert.notStrictEqual(tr.update("second-import", { enabled: true }).cfg.token, enabled.cfg.token, "each restored hook receives a distinct token");
+  const existing = tr.add({ kind: "webhook", workflowId: "wf_t", enabled: false, cfg: { token: "configured-token", secret: "s3cret" } });
+  const preserved = tr.update(existing.id, { enabled: true });
+  assert.strictEqual(preserved.cfg.token, "configured-token", "configured tokens are never replaced");
+  assert.strictEqual(preserved.cfg.secret, "•••");
+  assert.strictEqual(tr.webhook(preserved.cfg.token, {}, body).status, 401, "existing HMAC protection remains active");
+});
+
 test("triggers: a file landing in a watched folder fires once, after the write settles", async () => {
   const dir = tmpdir();
   const { tr, started } = mkTriggers();

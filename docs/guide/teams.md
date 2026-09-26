@@ -8,6 +8,10 @@ office on a customer's machine, or starting a real project on day one, needs a
 
 ⚙ → AGENTS → **👥 HIRE A TEAM**, or `bagidea hire --team <id>`.
 
+To move your configured team, skills, MCP tools, workflows and portable settings
+to another office, use **📦 EXPORT / IMPORT BAGIDEA OFFICE** below the team picker.
+See the [Export / Import guide](export-import.md) for ZIP previews and conflict handling.
+
 | template | agents | built for |
 |---|---|---|
 | 💻 **dev-shop** | Mira (tech lead) · Theo (backend) · Lina (frontend) · Ravi (QA) | shipping software; pairs with GitHub Triage and Codex |
