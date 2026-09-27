@@ -223,8 +223,7 @@ test("server.js: history joins saved details, one call can be fetched, and delet
   assert.match(serverSrc, /const toolDetails = createToolDetails\(\{ dir: path\.join\((?:__dirname|STATE_DIR), "tooldetail"\) \}\);/, "the store lives with the daemon's state files");
   assert.ok(serverSrc.indexOf("toolDetails.sweep(sess)") > serverSrc.indexOf("maintenance.pruneSessions(sess)"), "the boot sweep runs after the thread prune");
   assert.match(serverSrc, /try \{ sess = JSON\.parse\(fs\.readFileSync\(SESSIONS, "utf8"\)\); sessLoaded = true; \} catch \{\}/);
-  const listen = serverSrc.indexOf('server.listen(OEP_PORT, "127.0.0.1", () => {');
-  assert.ok(listen > 0 && /^\s*console\.log\([^\n]*\n\s*sweepToolDetails\(\);/.test(serverSrc.slice(listen + 48, listen + 200)),
+  assert.match(serverSrc, /server\.listen\(OEP_PORT, "127\.0\.0\.1", \(\) => \{\s*console\.log\([^\n]*\n\s*sweepToolDetails\(\);/,
     "only the process that owns the port sweeps (a duplicate launch exits on EADDRINUSE first)");
   assert.strictEqual(serverSrc.split("sweepToolDetails()").length - 1, 2, "defined once, called once (in the listen callback)");
   assert.match(serverSrc, /const ownsStore = String\(OEP_PORT\) === "8787" \|\| !!process\.env\.OEP_STATE_DIR;\s*if \(!sessLoaded \|\| !ownsStore\) return;/,
