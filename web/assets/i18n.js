@@ -105,6 +105,7 @@ const I18N = {
     dn_codex:"Codex",
     dn_library:"Official plugins",
     dn_teams:"Team templates",
+    dn_export:"Export / Import",
 
     tour_eyebrow:"A look around", tour_title:"See it in action",
     tour_brain_h:"Any model, per agent", tour_brain_p:"Pick the provider and model for each agent in ⚙ CONNECT → 🧠 MODELS/PROVIDERS. Every message is tagged with its model and the thread bar shows a live context-usage meter — and auto-compact keeps even small models running long sessions, hands-free.",
@@ -346,6 +347,7 @@ const I18N = {
     dn_codex:"Codex",
     dn_library:"Offizielle Plugins",
     dn_teams:"Team-Vorlagen",
+    dn_export:"Exportieren / Importieren",
 
     tour_eyebrow:"Ein Rundgang", tour_title:"Sehen Sie es in Aktion",
     tour1_h:"Ein live Desktop-Hintergrundbild", tour1_p:"Es läuft hinter Ihren echten Desktop-Icons mit einem optionalen Aktivitäts-Feed an der Seite — sauber beim Streamen, lebendig wenn Agents arbeiten.",
@@ -653,6 +655,7 @@ const I18N = {
     dn_codex:"Codex",
     dn_library:"plugin ทางการ",
     dn_teams:"เทมเพลตทีม",
+    dn_export:"ส่งออก / นำเข้า",
 
     tour_eyebrow:"ชมรอบ ๆ", tour_title:"ดูตอนใช้งานจริง",
     tour_brain_h:"ทุกโมเดล เลือกต่อ agent", tour_brain_p:"เลือก provider + โมเดลให้แต่ละ agent ที่ ⚙ CONNECT → 🧠 MODELS/PROVIDERS · ทุกข้อความติดแท็กโมเดล แถบ thread โชว์ context ที่ใช้แบบสด · auto-compact ทำให้โมเดลเล็กก็คุยยาวได้เองไม่ต้องดูแล",

@@ -285,7 +285,12 @@ function markdownPath(relative) {
 module.exports = function officeTransfer(options) {
   const { reg } = options;
   const io = options.fs || fs;
-  const workspace = path.resolve(options.workspace), daemonDir = path.resolve(options.daemonDir);
+  // The roots are the daemon's own install path. Resolve them once, so an
+  // install that sits under a symlink or junction (/home on NFS, macOS
+  // /var → /private/var, a dev-drive junction) is not mistaken for an
+  // attacker-planted link by the per-segment walk in safeFile below.
+  const realRoot = (p) => { try { return io.realpathSync(path.resolve(p)); } catch { return path.resolve(p); } };
+  const workspace = realRoot(options.workspace), daemonDir = realRoot(options.daemonDir);
   const maxStaff = options.maxStaff || 18;
   const registryFile = path.join(daemonDir, "registry.json");
   const plans = new WeakMap();
@@ -302,8 +307,11 @@ module.exports = function officeTransfer(options) {
     const target = path.resolve(root, ...relative.split("/"));
     const rel = path.relative(root, target);
     if (!rel || rel.startsWith(".." + path.sep) || rel === ".." || isAbsolute(rel)) fail("destination escapes its working folder");
-    const parsed = path.parse(target), segments = target.slice(parsed.root.length).split(path.sep);
-    let current = parsed.root;
+    // Walk only the segments BELOW the root: the root itself was resolved
+    // once at construction, and a link in its ancestry is the install's own
+    // layout, not a destination an archive could have planted.
+    const segments = rel.split(path.sep);
+    let current = root;
     for (let i = 0; i < segments.length; i++) {
       current = path.join(current, segments[i]);
       let st; try { st = io.lstatSync(current); } catch (e) { if (e.code === "ENOENT") continue; throw e; }
@@ -664,7 +672,18 @@ module.exports = function officeTransfer(options) {
     for (const t of incomingTriggers) if (taking("workflows", "trigger:" + t.id)) {
       if (!own(changedWorkflows, t.workflowId) && !exists(workspace, "workflows/" + t.workflowId + ".json")) fail("trigger needs its workflow; include the Workflows category");
       const index = next.triggers.findIndex((x) => x.id === t.id);
-      if (index < 0) next.triggers.push(t); else next.triggers[index] = t;
+      if (index < 0) next.triggers.push(t);
+      else {
+        // A replaced webhook keeps this machine's token and secret: export
+        // strips both, and an integration posting to the old URL must not
+        // start getting 409 because its workflow was re-imported.
+        const old = next.triggers[index];
+        if (t.kind === "webhook" && old && old.kind === "webhook" && old.cfg) {
+          if (old.cfg.token) t.cfg.token = old.cfg.token;
+          if (old.cfg.secret !== undefined) t.cfg.secret = old.cfg.secret;
+        }
+        next.triggers[index] = t;
+      }
     }
     if (data.office.settings && Object.keys(data.office.settings.preferences).length && taking("settings", "preferences")) Object.assign(next, data.office.settings.preferences);
     for (const doc of data.docs) if (taking("settings", "markdown:" + doc.path)) stage(workspace, doc.path, doc.content);

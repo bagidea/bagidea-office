@@ -8,6 +8,12 @@ The archive carries selected office definitions and Markdown instructions. It
 does not back up the whole computer, user profile, project files or conversation
 history.
 
+> Not to be confused with **`bagidea export` / `bagidea import`** in the
+> [CLI](cli.md): that is a full backup of one machine's office — memory, projects,
+> plugins and **API keys included** — for moving the same office to a new
+> computer. This dialog is for sharing a *configuration* with another office,
+> and never carries a credential.
+
 ## Choose what to transfer
 
 | Category | Contents |

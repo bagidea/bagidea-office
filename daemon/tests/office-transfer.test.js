@@ -171,6 +171,32 @@ test("destination symlink ancestors reject before extraction including derived s
   assert.equal(JSON.stringify(dst.reg), before); assert.deepEqual(fs.readdirSync(outside), []);
 });
 
+test("a symlinked or junctioned INSTALL root is the install's own layout, not a planted link", (t) => {
+  // /home on NFS, macOS /var → /private/var, a dev-drive junction: the roots
+  // themselves may sit under a link. Only links BELOW the roots are refused.
+  const src = source(t), real = fixture(t), link = path.join(real.root, "linked-workspace");
+  try { fs.symlinkSync(real.workspace, link, process.platform === "win32" ? "junction" : "dir"); }
+  catch (e) { if (["EPERM", "EACCES"].includes(e.code)) return t.skip("symlinks unavailable"); throw e; }
+  const dst = createTransfer({ workspace: link, daemonDir: real.daemonDir, reg: real.reg });
+  assert.ok(dst.summary().categories, "summary works through a linked root");
+  const plan = dst.previewArchive(src.transfer.exportArchive());
+  assert.equal(dst.importArchive(plan, { conflict: "replace" }).ok, true);
+  assert.equal(fs.readFileSync(path.join(real.workspace, "OFFICE.md"), "utf8").includes("Office rules"), true);
+});
+
+test("replacing a webhook trigger keeps the destination's token and secret", (t) => {
+  const src = source(t);
+  src.reg.triggers.push({ id: "hook", kind: "webhook", workflowId: "research_flow", enabled: true, cfg: { token: "source-token", secret: "source-secret" }, lastRun: 0, runs: 0 });
+  const dst = fixture(t, { triggers: [{ id: "hook", kind: "webhook", workflowId: "research_flow", enabled: true, cfg: { token: "local-token", secret: "local-secret" }, lastRun: 0, runs: 3 }] });
+  dst.reg.agents.alice = agent("Alice"); dst.write("workflows/research_flow.json", JSON.stringify({ id: "research_flow", nodes: [], edges: [] }));
+  const archive = src.transfer.exportArchive(["workflows"]);
+  assert.ok(!archive.includes("source-token") && !archive.includes("source-secret"), "export strips the webhook token and secret");
+  assert.equal(dst.transfer.importArchive(dst.transfer.previewArchive(archive), { conflict: "replace" }).ok, true);
+  const hook = dst.reg.triggers.find((x) => x.id === "hook");
+  assert.equal(hook.cfg.token, "local-token"); assert.equal(hook.cfg.secret, "local-secret");
+  assert.equal(hook.enabled, false, "an imported trigger still arrives disabled");
+});
+
 test("Markdown junctions are omitted from exports", (t) => {
   const f = fixture(t), outside = path.join(f.root, "outside"); fs.mkdirSync(outside); fs.writeFileSync(path.join(outside, "secrets.md"), "never-export-me");
   try { fs.symlinkSync(outside, path.join(f.workspace, "settings"), process.platform === "win32" ? "junction" : "dir"); }

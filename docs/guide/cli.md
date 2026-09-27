@@ -112,6 +112,13 @@ Maintenance
 
 ## Moving your office to a new machine
 
+> 📦 **Moving a team to another office, not backing up a machine?** That is the
+> other tool: **⚙ → AGENTS → 📦 EXPORT / IMPORT BAGIDEA OFFICE** makes a portable
+> ZIP of agents, skills, MCP tools, workflows and Markdown — chosen item by item,
+> previewed before it is applied, and with **no credentials inside**. See the
+> [Export / Import guide](export-import.md). `bagidea export`, below, is the full
+> machine backup — keys included.
+
 `bagidea export` writes `bagidea-office-backup-YYYY-MM-DD.tgz` with everything that
 makes your office *yours*: the team (agents, roles, skills, brains, API keys), agent
 memory, meetings, projects, uploads and installed plugins. Junk (node_modules,

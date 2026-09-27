@@ -145,6 +145,7 @@ test("i18n: the v1.1–v1.5 capabilities are documented on the site, in every la
     "f_inbox_t", "f_inbox_d", "f_budget_t", "f_budget_d", "f_engine_t", "f_engine_d", "f_tasks_t", "f_tasks_d",
     "f_codex_t", "f_codex_d", "f_library_t", "f_library_d", "f_teams_t", "f_teams_d",
     "dn_inbox", "dn_budget", "dn_tasks", "dn_codex", "dn_library", "dn_teams",
+    "dn_export",   // v1.7: 📦 Export / Import BAGIDEA OFFICE (#61)
   ];
   for (const code of CODES) {
     const t = table(code);
