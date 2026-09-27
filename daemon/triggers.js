@@ -85,6 +85,13 @@ module.exports = function initTriggers(ctx) {
     if (patch.name !== undefined) t.name = String(patch.name).slice(0, 80);
     if (patch.workflowId && workflows.load(patch.workflowId)) t.workflowId = String(patch.workflowId);
     if (patch.cfg) t.cfg = { ...t.cfg, ...cleanCfg(t.kind, patch.cfg) };
+    // Portable imports intentionally omit webhook credentials and stay disabled.
+    // Give the hook its own local URL when the owner enables it, while keeping
+    // existing integrations' tokens stable across edits and enable/disable cycles.
+    if (t.kind === "webhook" && t.enabled) {
+      t.cfg ||= {};
+      if (!t.cfg.token) t.cfg.token = crypto.randomBytes(12).toString("hex");
+    }
     saveReg(); stopWatcher(t.id); startWatcher(t);
     return pub(t);
   }

@@ -811,6 +811,45 @@
     border: 1px dashed var(--line); border-radius: 10px;
   }
   .bigbtn:hover { background: rgba(94,200,255,0.16); }
+  #officeTransfer { font-size: 12px; }
+  #officeTransfer h3 { letter-spacing: 1px; }
+  #officeTransfer .transfer-hint { color: var(--dim); line-height: 1.5; margin: 6px 0 12px; }
+  #officeTransfer .transfer-section { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 14px; }
+  #officeTransfer h4 { margin: 0 0 8px; font-size: 13px; }
+  #officeTransfer fieldset { min-width: 0; border: 0; padding: 0; margin: 8px 0; }
+  #officeTransfer legend { color: var(--dim); margin-bottom: 6px; }
+  #officeTransfer .transfer-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  #officeTransfer .transfer-choice { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 12px; letter-spacing: 0; margin: 0; }
+  #officeTransfer .transfer-choice input { width: 16px; height: 16px; margin: 0; padding: 0; flex: none; accent-color: var(--accent); }
+  #officeTransfer .transfer-choice span { overflow-wrap: anywhere; }
+  #officeTransfer .transfer-count { color: var(--dim); }
+  #officeTransfer button:disabled { opacity: .45; cursor: default; transform: none; }
+  #officeTransfer input[type="file"] { font-size: 12px; max-width: 100%; }
+  #officeTransfer .transfer-entries { max-height: 220px; overflow-y: auto; border: 1px solid var(--line); border-radius: 9px; margin-top: 8px; }
+  #officeTransfer .transfer-entry { padding: 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; line-height: 1.4; }
+  #officeTransfer .transfer-entry:last-child { border-bottom: 0; }
+  #officeTransfer .transfer-entry small { display: block; color: var(--dim); margin-top: 3px; }
+  #officeTransfer .transfer-warnings { padding-left: 18px; color: #ffd28a; line-height: 1.5; overflow-wrap: anywhere; }
+  #officeTransfer .transfer-status { white-space: pre-line; overflow-wrap: anywhere; line-height: 1.5; margin: 8px 0; }
+  #officeTransfer .transfer-status[data-error="true"] { color: #ff938b; }
+  #officeTransfer .transfer-bulk { display: flex; gap: 6px; margin-bottom: 8px; }
+  #officeTransfer .transfer-bulk button, #officeTransfer .transfer-item-tools button, #officeTransfer .transfer-expand { padding: 4px 9px; font-size: 11px; }
+  #officeTransfer .transfer-expand { white-space: nowrap; flex: none; }
+  #officeTransfer .transfer-groups { display: flex; flex-direction: column; gap: 6px; }
+  #officeTransfer .transfer-group { border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; }
+  #officeTransfer .transfer-group[data-empty="true"] { opacity: .6; }
+  #officeTransfer .transfer-group-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
+  #officeTransfer .transfer-group-note { color: var(--dim); font-size: 11px; margin: 3px 0 0 22px; }
+  #officeTransfer .transfer-items { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+  #officeTransfer .transfer-item-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 7px; }
+  #officeTransfer .transfer-item-tools input[type="search"] { flex: 1 1 120px; min-width: 0; font: inherit; font-size: 12px; color: var(--text);
+    background: rgba(255,255,255,0.05); border: 1px solid var(--line); border-radius: 9px; padding: 4px 9px; outline: none; }
+  #officeTransfer .transfer-item-tools input[type="search"]:focus { border-color: var(--accent); }
+  #officeTransfer .transfer-item-list { max-height: 210px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; }
+  #officeTransfer .transfer-item { align-items: flex-start; }
+  #officeTransfer .transfer-item input { margin-top: 1px; }
+  #officeTransfer .transfer-item small { color: var(--dim); margin-left: 5px; }
+  #officeTransfer .transfer-item[data-locked="true"] { opacity: .55; }
   /* editor */
   .field { margin-bottom: 10px; }
   .field label { display: block; font-size: 10.5px; letter-spacing: 1.5px; color: var(--dim); margin-bottom: 4px; }
@@ -2317,7 +2356,7 @@
   window.setFeedMode = (on) => {
     if (on) {
       // Popups can't haunt the feed strip — tuck them away, remember them.
-      _feedSavedModal = modal.classList.contains("open");
+      _feedSavedModal = _feedSavedModal || modal.classList.contains("open");
       modal.classList.remove("open");
       document.getElementById("sessMenu").classList.remove("open");
       document.getElementById("dayMenu").classList.remove("open");
@@ -2911,7 +2950,7 @@
   // ---- settings / editor / ID card -----------------------------------------
   const modal = document.getElementById("modal");
   const modalCard = document.getElementById("modalCard");
-  function closeModal() { modal.classList.remove("open"); mapOpen = false; }
+  function closeModal() { _feedSavedModal = false; modal.classList.remove("open"); mapOpen = false; }
   modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
   document.getElementById("setBtn").onclick = () => openSettings("agents");
 
@@ -3287,6 +3326,439 @@
     }
   }
 
+  let deferredOfficeLanguage = "";
+  function officeTransferActive(root = modalCard.querySelector("#officeTransfer")) {
+    return !!root && root.isConnected && (modal.classList.contains("open") ||
+      (_feedSavedModal && document.body.classList.contains("feedmode")));
+  }
+  // Preserve import feedback when roster.sync arrives before the HTTP response.
+  // On real dismissal, adopt the same default language as ordinary roster sync.
+  function syncOfficeLanguage(language, allowDefer = true) {
+    try {
+      if (localStorage.getItem("lang")) { deferredOfficeLanguage = ""; return false; }
+      if (allowDefer && officeTransferActive()) {
+        deferredOfficeLanguage = language && language !== LANG ? language : "";
+        return false;
+      }
+      deferredOfficeLanguage = "";
+      if (language && language !== LANG) {
+        localStorage.setItem("lang", language);
+        if (language !== "en") { location.reload(); return true; }
+        LANG = language;
+      }
+    } catch {}
+    return false;
+  }
+
+  // Portable office archives. File names, preview paths and server errors are
+  // untrusted: render them through textContent, never through HTML interpolation.
+  function openOfficeTransfer() {
+    const categories = [
+      ["team", "Agent team"], ["skills", "Skills"], ["mcp", "MCP tools"],
+      ["workflows", "Workflows"], ["settings", "Settings & Markdown"],
+    ];
+    modal.classList.add("open");
+    modalCard.innerHTML = `<div id="officeTransfer" role="dialog" aria-labelledby="transferTitle">
+      <h3 id="transferTitle">📦 EXPORT / IMPORT <button type="button" class="x" id="transferClose" aria-label="Close export and import">✕</button></h3>
+      <b>BAGIDEA OFFICE</b>
+      <p class="transfer-hint">Move your agent team, skills, MCP tools, workflows and settings between offices in one ZIP.</p>
+      <p class="transfer-hint">Credentials are excluded from the export. Reconnect services after import. Imported workflow triggers stay disabled until you enable them.</p>
+      <section class="transfer-section" aria-labelledby="transferExportTitle">
+        <h4 id="transferExportTitle">Export ZIP</h4>
+        <fieldset><legend>Include in the archive</legend>
+          <div class="transfer-bulk"><button type="button" id="transferSelectAll">Select all</button><button type="button" id="transferSelectNone">Clear all</button></div>
+          <div class="transfer-groups" id="transferExportCategories"></div>
+        </fieldset>
+        <ul id="transferNeeds" class="transfer-warnings" aria-live="polite" hidden></ul>
+        <div id="transferSummary" class="transfer-hint" role="status" aria-live="polite">Loading office contents…</div>
+        <div class="btnrow"><button type="button" id="transferRefresh">Refresh contents</button><button type="button" class="primary" id="transferExport" disabled>Download ZIP</button></div>
+      </section>
+      <section class="transfer-section" aria-labelledby="transferImportTitle">
+        <h4 id="transferImportTitle">Import ZIP</h4>
+        <div class="field"><label for="transferFile">BAGIDEA OFFICE archive (.zip)</label><input type="file" id="transferFile" accept=".zip,application/zip" aria-describedby="transferFileHint"></div>
+        <p class="transfer-hint" id="transferFileHint">Choose a ZIP to preview its contents and destination folders before importing. Maximum size: 20 MB.</p>
+        <div id="transferPreview" hidden>
+          <fieldset><legend>Import these categories</legend><div class="transfer-choices" id="transferImportCategories"></div></fieldset>
+          <div class="field"><label for="transferConflict">When an item already exists</label><select id="transferConflict"><option value="skip">Keep existing items (skip conflicts)</option><option value="replace">Replace existing items from this ZIP</option></select></div>
+          <p class="transfer-hint">Protected items always stay unchanged. Files are restored to this office's working folders, as shown below.</p>
+          <div id="transferPreviewCount" class="transfer-hint"></div>
+          <div id="transferEntries" class="transfer-entries" aria-label="Import contents and destinations"></div>
+          <ul id="transferWarnings" class="transfer-warnings" hidden></ul>
+        </div>
+        <div class="btnrow"><button type="button" class="primary" id="transferImport" disabled>Import selected items</button></div>
+      </section>
+      <div id="transferStatus" class="transfer-status" role="status" aria-live="polite"></div>
+      <ul id="transferResultWarnings" class="transfer-warnings" hidden></ul>
+      <div class="btnrow"><button type="button" id="transferBack">Back to agents</button></div>
+    </div>`;
+    modalCard.scrollTop = 0;
+    const root = modalCard.querySelector("#officeTransfer");
+    const el = (id) => root.querySelector("#" + id);
+    let disposed = false, busy = null, summaryLoaded = false, summaryLoading = false;
+    let maxArchiveBytes = 20 * 1024 * 1024, preview = null, previewVersion = 0;
+    let previewController = null;
+    // Export picker state: the office's items per category (from /summary) and
+    // the IDs chosen in each. Refreshing keeps choices for items that still exist.
+    let exportItems = null;
+    const picked = new Map(categories.map(([key]) => [key, new Set()]));
+    // touched: categories the owner changed. Until then a category follows the
+    // office, so a refresh selects items that appeared since the last load.
+    const expanded = new Set(), filters = {}, touched = new Set();
+    const controller = new AbortController();
+    const alive = () => !disposed && officeTransferActive(root);
+    const dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      controller.abort();
+      if (previewController) previewController.abort();
+      observer.disconnect();
+      if (deferredOfficeLanguage) syncOfficeLanguage(deferredOfficeLanguage, false);
+    };
+    // Other settings, backdrop clicks and Escape can close/replace this modal.
+    // Feed mode only tucks it away: preserve requests/results for its return.
+    // Never let a late fetch paint over a subsequent screen or start a download.
+    const observer = new MutationObserver(() => { if (!alive()) dispose(); });
+    observer.observe(modal, { attributes: true, attributeFilter: ["class"] });
+    observer.observe(modalCard, { childList: true });
+    const count = (value) => Math.max(0, Number(value) || 0);
+    const selected = (id) => Array.from(el(id).querySelectorAll("input:checked")).map((input) => input.value);
+    const status = (message, error = false) => {
+      el("transferStatus").textContent = message;
+      el("transferStatus").dataset.error = String(error);
+    };
+    const warnings = (id, items) => {
+      const box = el(id);
+      box.replaceChildren();
+      for (const message of Array.isArray(items) ? items : []) {
+        const item = document.createElement("li"); item.textContent = String(message); box.appendChild(item);
+      }
+      box.hidden = !box.children.length;
+    };
+    // A fully ticked category sends no list, so it exports whatever the category
+    // holds at export time; only a partial category names its items.
+    const exportChoice = () => {
+      const chosen = categories.map(([key]) => key).filter((key) => picked.get(key).size);
+      const partial = chosen.filter((key) => exportItems && picked.get(key).size < exportItems[key].length);
+      return { categories: chosen, items: Object.fromEntries(partial.map((key) => [key, [...picked.get(key)]])) };
+    };
+    const updateControls = () => {
+      el("transferExport").disabled = !summaryLoaded || !!busy || !exportChoice().categories.length;
+      el("transferSelectAll").disabled = el("transferSelectNone").disabled = !summaryLoaded || !!busy;
+      el("transferRefresh").disabled = summaryLoading || !!busy;
+      // Let a new file replace an in-flight preview; previewVersion rejects its
+      // late response even if abort arrives after the server finished parsing.
+      el("transferFile").disabled = busy === "export" || busy === "import";
+      el("transferImport").disabled = !preview || !!busy || !selected("transferImportCategories").length;
+      el("transferConflict").disabled = !preview || !!busy;
+      root.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+        input.disabled = !!busy || input.dataset.empty === "true" || input.dataset.locked === "true";
+      });
+      root.querySelectorAll(".transfer-item-tools button").forEach((button) => { button.disabled = !!busy; });
+      el("transferExport").textContent = busy === "export" ? "Preparing ZIP…" : "Download ZIP";
+      el("transferImport").textContent = busy === "import" ? "Importing…" : "Import selected items";
+    };
+    const renderChoices = (id, counts, importing) => {
+      const box = el(id); box.replaceChildren();
+      for (const [key, title] of categories) {
+        const label = document.createElement("label"); label.className = "transfer-choice";
+        const input = document.createElement("input"); input.type = "checkbox"; input.value = key;
+        input.checked = !importing || count(counts[key]) > 0;
+        input.dataset.empty = String(importing && !count(counts[key]));
+        const name = document.createElement("span"); name.textContent = title + " ";
+        const amount = document.createElement("span"); amount.className = "transfer-count";
+        amount.textContent = "(" + (counts[key] === undefined ? "…" : count(counts[key])) + ")";
+        name.appendChild(amount); label.append(input, name); box.appendChild(label);
+        input.onchange = () => { updateControls(); if (importing) renderPreview(); };
+      }
+    };
+    const itemKey = (category, id) => category + ":" + id;
+    const categoryTitle = (key) => (categories.find(([k]) => k === key) || ["", key])[1];
+    const EMPTY_NOTES = { workflows: "No workflows in this office yet. Built-in example workflows come with every office and are not exported." };
+    const itemIndex = () => {
+      const byKey = new Map();
+      for (const [key] of categories) for (const item of exportItems[key]) byKey.set(itemKey(key, item.id), item);
+      return byKey;
+    };
+    // A trigger travels with its workflow: choosing a trigger chooses its
+    // workflow, and choosing or clearing a workflow does the same to its triggers.
+    const setPicked = (category, ids, on) => {
+      const set = picked.get(category), byKey = itemIndex();
+      touched.add(category);
+      for (const id of ids) {
+        const item = byKey.get(itemKey(category, id)); if (!item) continue;
+        if (on) { set.add(id); if (item.parent && byKey.has(itemKey(category, item.parent))) set.add(item.parent); } else set.delete(id);
+        if (category === "workflows" && !item.parent) {
+          for (const t of exportItems.workflows) if (t.parent === id) { if (on) set.add(t.id); else set.delete(t.id); }
+        }
+      }
+      syncExport();
+    };
+    const syncExport = () => {
+      if (!exportItems) return updateControls();
+      const byKey = itemIndex(), flows = picked.get("workflows");
+      for (const item of exportItems.workflows) if (item.parent && !flows.has(item.parent)) flows.delete(item.id);
+      for (const group of el("transferExportCategories").children) {
+        const key = group.dataset.category, items = exportItems[key], set = picked.get(key);
+        const box = group.querySelector('input[data-role="category"]');
+        group.querySelector('[data-role="count"]').textContent = items.length ? `(${set.size} of ${items.length})` : "(0)";
+        box.checked = !!items.length && set.size === items.length;
+        box.indeterminate = set.size > 0 && set.size < items.length;
+        for (const check of group.querySelectorAll("input[data-item]")) {
+          const item = byKey.get(itemKey(key, check.value)), locked = !!item.parent && !set.has(item.parent);
+          check.checked = set.has(check.value);
+          check.dataset.locked = String(locked); check.closest("label").dataset.locked = String(locked);
+          check.title = locked ? "Select its workflow first" : "";
+        }
+      }
+      // Soft dependencies: the destination office may already have them.
+      const needs = [];
+      for (const [key] of categories) for (const id of picked.get(key)) {
+        const item = byKey.get(itemKey(key, id));
+        if (!item || item.parent) continue;
+        const missing = item.needs.filter((need) => {
+          const split = need.indexOf(":");
+          return byKey.has(need) && !picked.get(need.slice(0, split))?.has(need.slice(split + 1));
+        }).map((need) => byKey.get(need).label);
+        if (!missing.length) continue;
+        const names = missing.slice(0, 3).map((name) => `“${name}”`).join(", ") + (missing.length > 3 ? ` and ${missing.length - 3} more` : "");
+        needs.push(`“${item.label}” in ${categoryTitle(key)} uses ${missing.length === 1 ? "an unselected item" : missing.length + " unselected items"}: ${names}.`);
+      }
+      const shown = needs.slice(0, 6);
+      if (needs.length > 6) shown.push(`…and ${needs.length - 6} more.`);
+      if (needs.length) shown.push("Select them too, or make sure they already exist in the destination office.");
+      warnings("transferNeeds", shown);
+      updateControls();
+    };
+    const renderExport = () => {
+      const box = el("transferExportCategories"); box.replaceChildren();
+      for (const [key, title] of categories) {
+        const items = exportItems ? exportItems[key] : null;
+        const group = document.createElement("div"); group.className = "transfer-group"; group.dataset.category = key;
+        group.dataset.empty = String(!!items && !items.length);
+        const head = document.createElement("div"); head.className = "transfer-group-head";
+        const label = document.createElement("label"); label.className = "transfer-choice";
+        const input = document.createElement("input"); input.type = "checkbox"; input.value = key; input.dataset.role = "category";
+        input.dataset.empty = String(!items || !items.length);
+        const name = document.createElement("span"); name.textContent = title + " ";
+        const amount = document.createElement("span"); amount.className = "transfer-count"; amount.dataset.role = "count";
+        amount.textContent = "(…)";
+        name.appendChild(amount); label.append(input, name); head.appendChild(label);
+        group.appendChild(head); box.appendChild(group);
+        if (!items || !items.length) {
+          if (items) {
+            const note = document.createElement("div"); note.className = "transfer-group-note";
+            note.textContent = EMPTY_NOTES[key] || "Nothing to export in this office yet."; group.appendChild(note);
+          }
+          continue;
+        }
+        input.onchange = () => setPicked(key, items.map((item) => item.id), input.checked);
+        const panel = document.createElement("div"); panel.className = "transfer-items"; panel.id = "transferItems-" + key;
+        const toggle = document.createElement("button"); toggle.type = "button"; toggle.className = "transfer-expand";
+        toggle.setAttribute("aria-controls", panel.id);
+        const showPanel = (open) => {
+          panel.hidden = !open; toggle.setAttribute("aria-expanded", String(open));
+          toggle.textContent = open ? "Hide items ▴" : "Choose items ▾";
+        };
+        toggle.onclick = () => { const open = panel.hidden; if (open) expanded.add(key); else expanded.delete(key); showPanel(open); };
+        showPanel(expanded.has(key)); head.appendChild(toggle);
+        const tools = document.createElement("div"); tools.className = "transfer-item-tools";
+        const list = document.createElement("div"); list.className = "transfer-item-list";
+        list.setAttribute("role", "group"); list.setAttribute("aria-label", title + " items");
+        // All/None act on the rows the filter currently shows.
+        const visible = () => Array.from(list.children).filter((row) => !row.hidden).map((row) => row.dataset.id);
+        const tool = (text, run) => {
+          const button = document.createElement("button"); button.type = "button"; button.textContent = text;
+          button.onclick = run; tools.appendChild(button);
+        };
+        tool("All", () => setPicked(key, visible(), true));
+        tool("None", () => setPicked(key, visible(), false));
+        if (items.some((item) => item.builtin) && items.some((item) => !item.builtin)) {
+          tool("Custom only", () => {
+            touched.add(key); picked.set(key, new Set(items.filter((item) => !item.builtin).map((item) => item.id))); syncExport();
+          });
+        }
+        const applyFilter = () => {
+          const query = String(filters[key] || "").trim().toLowerCase();
+          for (const row of list.children) row.hidden = !!query && !row.dataset.search.includes(query);
+        };
+        if (items.length <= 8) delete filters[key];
+        else {
+          const search = document.createElement("input"); search.type = "search";
+          search.placeholder = "Filter " + title.toLowerCase() + "…"; search.setAttribute("aria-label", "Filter " + title);
+          search.value = filters[key] || "";
+          search.oninput = () => { filters[key] = search.value; applyFilter(); };
+          tools.appendChild(search);
+        }
+        for (const item of items) {
+          const row = document.createElement("label"); row.className = "transfer-choice transfer-item";
+          row.dataset.id = item.id; row.dataset.search = [item.label, item.id, item.note].join(" ").toLowerCase();
+          const check = document.createElement("input"); check.type = "checkbox"; check.value = item.id; check.dataset.item = key;
+          check.onchange = () => setPicked(key, [item.id], check.checked);
+          const text = document.createElement("span"); text.textContent = item.label;
+          if (item.note) { const small = document.createElement("small"); small.textContent = item.note; text.appendChild(small); }
+          row.append(check, text); list.appendChild(row);
+        }
+        panel.append(tools, list); group.appendChild(panel); applyFilter();
+      }
+      syncExport();
+    };
+    const renderPreview = () => {
+      if (!preview) return;
+      const chosen = new Set(selected("transferImportCategories"));
+      const entries = preview.entries.filter((item) => chosen.has(item.category));
+      const box = el("transferEntries"); box.replaceChildren();
+      let conflicts = 0, protectedItems = 0;
+      for (const item of entries) {
+        const row = document.createElement("div"); row.className = "transfer-entry";
+        const title = document.createElement("b"); title.textContent = String(item.label || item.id || item.category);
+        const detail = document.createElement("small");
+        const label = (categories.find(([key]) => key === item.category) || ["", item.category])[1];
+        const action = item.protected ? "Protected · kept" : item.conflict
+          ? (el("transferConflict").value === "replace" ? "Already exists · replace" : "Already exists · skip") : "New";
+        detail.textContent = label + " · " + action;
+        row.append(title, detail);
+        const path = document.createElement("small");
+        path.textContent = "Destination: " + String(item.path || item.destination || "Office working folder");
+        row.appendChild(path); box.appendChild(row);
+        if (item.conflict) conflicts++;
+        if (item.protected) protectedItems++;
+      }
+      el("transferPreviewCount").textContent = `${entries.length} selected items · ${conflicts} conflicts · ${protectedItems} protected`;
+      box.hidden = !entries.length;
+    };
+    const readJson = async (response) => {
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(payload.error || "Request failed (" + response.status + ")"));
+      return payload;
+    };
+    const loadSummary = async () => {
+      summaryLoading = true; updateControls();
+      el("transferSummary").textContent = "Loading office contents…";
+      try {
+        const data = await readJson(await fetch("/office-transfer/summary", { headers: { "x-bagidea-ui": "1" }, signal: controller.signal }));
+        if (!alive()) return;
+        if (!data.categories || typeof data.categories !== "object" || !data.items || typeof data.items !== "object") throw new Error("Invalid office summary.");
+        const next = {};
+        for (const [key] of categories) {
+          next[key] = (Array.isArray(data.items[key]) ? data.items[key] : []).filter((item) => item && typeof item.id === "string" && item.id)
+            .map((item) => ({ id: item.id, label: String(item.label || item.id), note: item.note ? String(item.note) : "",
+              builtin: item.builtin === true, parent: typeof item.parent === "string" ? item.parent : "",
+              needs: Array.isArray(item.needs) ? item.needs.filter((need) => typeof need === "string" && need.includes(":")) : [] }));
+        }
+        // Keep choices across refreshes. A new item joins a category the owner has
+        // not changed, or one that is still fully selected.
+        for (const [key] of categories) {
+          const before = exportItems ? exportItems[key] : null, set = picked.get(key);
+          const wasAll = !before || !touched.has(key) || (before.length > 0 && set.size === before.length);
+          const known = new Set((before || []).map((item) => item.id));
+          picked.set(key, new Set(next[key].filter((item) => set.has(item.id) || (wasAll && !known.has(item.id))).map((item) => item.id)));
+        }
+        exportItems = next; renderExport();
+        summaryLoaded = true;
+        if (Number(data.limits && data.limits.maxArchiveBytes) > 0) maxArchiveBytes = Number(data.limits.maxArchiveBytes);
+        el("transferFileHint").textContent = `Choose a ZIP to preview its contents and destination folders before importing. Maximum size: ${Math.round(maxArchiveBytes / 1024 / 1024)} MB.`;
+        el("transferSummary").textContent = "Choose whole categories, or open Choose items to pick individual entries, then download your archive.";
+      } catch (error) {
+        if (alive()) { summaryLoaded = false; el("transferSummary").textContent = "Could not load office contents: " + error.message + ". Use Refresh contents to retry."; }
+      } finally { if (alive()) { summaryLoading = false; updateControls(); } }
+    };
+    el("transferExport").onclick = async () => {
+      if (busy || !summaryLoaded) return;
+      const choice = exportChoice(); if (!choice.categories.length) return;
+      busy = "export"; status("Preparing your ZIP…"); warnings("transferResultWarnings", []); updateControls();
+      try {
+        const response = await fetch("/office-transfer/export", {
+          method: "POST", headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
+          body: JSON.stringify(choice), signal: controller.signal,
+        });
+        if (!response.ok) await readJson(response);
+        const blob = await response.blob();
+        if (!alive()) return;
+        if (!blob.size) throw new Error("The exported archive is empty.");
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a"); link.href = url;
+        link.download = "bagidea-office-" + new Date().toISOString().slice(0, 10) + ".zip";
+        link.hidden = true; document.body.appendChild(link); link.click(); link.remove();
+        // WebView/browser downloads may consume the blob after this event turn.
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        status("ZIP prepared. Check your downloads to save the archive.");
+      } catch (error) { if (alive()) status("Export failed: " + error.message, true); }
+      finally { if (alive()) { busy = null; updateControls(); } }
+    };
+    el("transferFile").onchange = async () => {
+      if (busy === "import" || busy === "export") return;
+      const version = ++previewVersion;
+      if (previewController) previewController.abort();
+      preview = null; busy = null; el("transferPreview").hidden = true;
+      el("transferImportCategories").replaceChildren(); el("transferEntries").replaceChildren();
+      el("transferConflict").value = "skip"; status(""); warnings("transferResultWarnings", []); updateControls();
+      const file = el("transferFile").files[0]; if (!file) return;
+      if (!/\.zip$/i.test(file.name)) return status("Choose a BAGIDEA OFFICE .zip archive.", true);
+      if (!file.size || file.size > maxArchiveBytes) return status(`Choose a ZIP between 1 byte and ${Math.round(maxArchiveBytes / 1024 / 1024)} MB.`, true);
+      previewController = new AbortController();
+      busy = "preview"; status("Checking " + file.name + "…"); updateControls();
+      try {
+        const data = await readJson(await fetch("/office-transfer/preview", {
+          method: "POST", headers: { "content-type": "application/zip", "x-bagidea-ui": "1" },
+          body: file, signal: previewController.signal,
+        }));
+        if (!alive() || version !== previewVersion) return;
+        if (!data.token || !data.categories || !Array.isArray(data.entries)) throw new Error("Invalid archive preview. Choose the ZIP again.");
+        preview = data; renderChoices("transferImportCategories", data.categories, true); renderPreview();
+        warnings("transferWarnings", data.warnings); el("transferPreview").hidden = false;
+        status("Preview ready. Review the selected items and destinations, then import.");
+      } catch (error) {
+        if (alive() && version === previewVersion) {
+          el("transferFile").value = "";
+          status("Preview failed: " + error.message + " Choose the ZIP again to retry.", true);
+        }
+      }
+      finally { if (alive() && version === previewVersion) { busy = null; updateControls(); } }
+    };
+    el("transferImport").onclick = async () => {
+      if (!preview || busy) return;
+      const chosen = selected("transferImportCategories"); if (!chosen.length) return;
+      const token = preview.token;
+      busy = "import"; status("Importing selected items into the office working folders…"); updateControls();
+      try {
+        const result = await readJson(await uiPost("/office-transfer/import", {
+          token, categories: chosen, conflict: el("transferConflict").value === "replace" ? "replace" : "skip",
+        }));
+        if (!alive()) return;
+        if (result.ok !== true) throw new Error(String(result.error || "Import did not complete."));
+        const counts = categories.filter(([key]) => chosen.includes(key)).map(([key, label]) =>
+          `${label}: ${count((result.imported || {})[key])} imported, ${count((result.skipped || {})[key])} skipped`);
+        status("Import complete.\n" + counts.join("\n") + "\nReconnect required services and enable workflow triggers when ready.");
+        warnings("transferResultWarnings", result.warnings);
+        loadSummary();
+      } catch (error) { if (alive()) status("Import could not be confirmed: " + error.message + "\nRefresh contents and choose the ZIP again to preview before retrying.", true); }
+      finally {
+        if (alive()) {
+          // Tokens are single-use. A lost response must not permit a second apply.
+          preview = null; busy = null; el("transferPreview").hidden = true;
+          el("transferFile").value = ""; updateControls();
+        }
+      }
+    };
+    el("transferConflict").onchange = renderPreview;
+    el("transferRefresh").onclick = loadSummary;
+    el("transferSelectAll").onclick = () => {
+      if (!exportItems || busy) return;
+      for (const [key] of categories) { touched.add(key); picked.set(key, new Set(exportItems[key].map((item) => item.id))); }
+      syncExport();
+    };
+    el("transferSelectNone").onclick = () => {
+      if (!exportItems || busy) return;
+      for (const [key] of categories) { touched.add(key); picked.set(key, new Set()); }
+      syncExport();
+    };
+    el("transferBack").onclick = () => { dispose(); openSettings("agents"); };
+    el("transferClose").onclick = () => { dispose(); closeModal(); };
+    renderExport();
+    loadSummary();
+    el("transferClose").focus();
+  }
+
   function openSettings(tab) {
     modal.classList.add("open");
     const T = (t, label) => `<div class="tab ${tab === t ? "on" : ""}" data-t="${t}">${label}</div>`;
@@ -3341,7 +3813,8 @@
         <div id="staffCount" class="hint" style="text-align:center;margin:4px 0 6px;opacity:.75"></div>
         <button class="bigbtn" id="newAgent">＋ Hire a new agent</button>
         <button class="bigbtn" id="hireTeam" style="margin-top:6px">👥 HIRE A TEAM — ทีมสำเร็จรูป (dev shop · research lab · content studio · support · solo)</button>
-        <div id="teamPick"></div>`;
+        <div id="teamPick"></div>
+        <button class="bigbtn" id="officeTransferBtn" style="margin-top:8px">📦 EXPORT / IMPORT BAGIDEA OFFICE</button>`;
     } else if (tab === "skills") {
       bodyHtml = `<div class="switch ${AUTOSKILLS ? "on" : ""}" id="autoSw">
           <div class="knob"></div> Auto-learn: agents distill finished work into new skills</div>
@@ -3542,6 +4015,7 @@
       const nStaff = Object.keys(ROSTER).filter((x) => x !== "ceo").length;
       const scEl = modalCard.querySelector("#staffCount");
       if (scEl) scEl.textContent = `${nStaff} / ${MAXSTAFF} agents`;
+      modalCard.querySelector("#officeTransferBtn").onclick = openOfficeTransfer;
       // 👥 team templates (v1.5): a whole pre-built team in one click.
       modalCard.querySelector("#hireTeam").onclick = async () => {
         const pick = modalCard.querySelector("#teamPick");
@@ -6358,13 +6832,7 @@
       MAXSTAFF = Number(ev.maxStaff || 18);
       // Machine default language (registry) applies only when the user hasn't
       // pinned one in this webview. Reload once so the UI re-renders in it.
-      try {
-        if (!localStorage.getItem("lang") && ev.lang && ev.lang !== LANG) {
-          localStorage.setItem("lang", ev.lang);
-          if (ev.lang !== "en") return location.reload();
-          LANG = ev.lang;
-        }
-      } catch {}
+      if (syncOfficeLanguage(ev.lang)) return;
       gateVoiceUI();
       for (const id of Object.keys(ROSTER)) ensureAgent(id);
       renderRail();
