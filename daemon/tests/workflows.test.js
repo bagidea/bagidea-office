@@ -110,7 +110,10 @@ test("engine: an approval node waits in the inbox and resumes on approve, fails 
 
 test("engine: delay waits, persists resumeAt, and a fresh engine re-arms it after a 'restart'", async () => {
   const { wf, dir } = mk();
-  const run = wf.start(W([{ id: "t", type: "trigger" }, { id: "w", type: "delay", text: "60 ms" }, { id: "a", type: "action", text: "after" }],
+  // 400 ms, not 60: on a loaded CI runner a stall of more than 60 ms between
+  // start() and the first poll let the delay fire unseen, so "waiting" was
+  // never observed and the test timed out (seen on node 20).
+  const run = wf.start(W([{ id: "t", type: "trigger" }, { id: "w", type: "delay", text: "400 ms" }, { id: "a", type: "action", text: "after" }],
     [{ from: "t", to: "w" }, { from: "w", to: "a" }]));
   await until(() => wf.getRun(run.id).nodes.w.state === "waiting");
   const onDisk = JSON.parse(fs.readFileSync(path.join(dir, "runs", run.id + ".json"), "utf8"));
