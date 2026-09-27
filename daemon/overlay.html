@@ -1792,6 +1792,7 @@
   function addMsg(cls, who, text, ts, meta) {
     const d = document.createElement("div");
     d.className = "msg " + cls;
+    d.dataset.text = String(text || "").slice(0, 200);   // lets a pane reload tell it from saved history
     if (who) {
       const w = document.createElement("div");
       w.className = "who";
@@ -1875,19 +1876,26 @@
     if (tool.startsWith("mcp__")) return tr("กำลังใช้ปลั๊กอิน") + " " + tool.split("__").pop();
     return tr("กำลังใช้") + " " + tool;
   }
-  // Every tool/skill row follows Dev Mode, including name-only saved history.
-  // Details stay in redacted, bounded DOM-associated memory across toggles.
-  // Calls captured without debug input show an explicit unavailable message.
+  // Every tool/skill row follows Dev Mode, including saved history: history rows
+  // arrive with the daemon's saved detail joined in, and a row that has none yet
+  // but carries a call id fetches it when expanded. Details stay in redacted,
+  // bounded DOM-associated memory across toggles. Calls with no saved detail
+  // show an explicit unavailable message.
   function addToolRow(name, ev) {
     ev = ev || {};
     // detail is a string: string path of redactSecrets (mask, no 1 KB cut — the
     // row's own cap is 2000, same as the daemon's); input is an object.
     let body = ev.detail ? maskInString(String(ev.detail)) : "";
     if (!body && ev.input) { try { body = JSON.stringify(redactSecrets(ev.input), null, 1); } catch { body = ""; } }
+    if (!body && ev.captured === true) body = "{}";   // saved, but the tool ran with no input
     body = String(body).slice(0, 2000);
     const data = { name: maskInString(String(name)), body,
       label: ev.label ? maskInString(String(ev.label)).slice(0, 60) : "",
-      kind: ev.kind ? String(ev.kind).replace(/[^a-z]/gi, "") : "", open: false };
+      kind: ev.kind ? String(ev.kind).replace(/[^a-z]/gi, "") : "", open: false,
+      // where to ask for the saved detail later: call id + thread (bucket, key)
+      id: typeof ev.id === "string" ? ev.id.slice(0, 40) : "",
+      bucket: String(ev.bucket || (ev.sub ? "@sub" : ev.agent || "")).slice(0, 80),
+      key: typeof ev.session === "string" ? ev.session.slice(0, 80) : "" };
     const d = renderDevToolRow(data);
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
@@ -1915,6 +1923,9 @@
   const devToolRows = new WeakMap();
   let devModePending = false;
   let devModeRevision = 0;
+  // A row can fetch its saved detail when it has a call id and thread, no body
+  // yet, and no earlier "not found" answer.
+  const canFetchDetail = (data) => !data.body && !data.missing && !!(data.id && data.bucket && data.key);
   function renderDevToolRow(data) {
     const row = document.createElement(DEV_MODE ? "details" : "div");
     row.className = "toolrow";
@@ -1925,12 +1936,39 @@
       summary.textContent = "⚙ " + data.name + (data.label ? " · " + data.label : "");
       const pre = document.createElement("pre");
       pre.className = "dev-detail";
-      pre.textContent = data.body || tr("ไม่มีรายละเอียดที่บันทึกไว้สำหรับการเรียกนี้");
+      // "…" = expand to load; a failed load shows the fallback but can be retried
+      pre.textContent = data.body || (canFetchDetail(data) && !data.failed ? "…" : tr("ไม่มีรายละเอียดที่บันทึกไว้สำหรับการเรียกนี้"));
       row.appendChild(summary);
       row.appendChild(pre);
+      // Fetch on expand only — rendering (history, toggles, roster.sync) never fetches.
+      if (canFetchDetail(data)) row.ontoggle = () => { data.open = row.open; return row.open ? loadToolDetail(data) : undefined; };
     } else row.textContent = "⚙ " + data.name;
     devToolRows.set(row, data);
+    data.el = row;   // the element currently showing this call (toggles replace it)
     return row;
+  }
+  // Ask the daemon for one call's saved (already redacted) detail, then redraw
+  // the row in place. The answer is masked again here (defence in depth). Only a
+  // "not found" answer is final; a network error can be retried on the next expand.
+  function loadToolDetail(data) {
+    if (data.fetching || !canFetchDetail(data)) return;
+    data.fetching = true; data.failed = false;
+    const url = "/sessions/tool-detail?agent=" + encodeURIComponent(data.bucket) +
+      "&key=" + encodeURIComponent(data.key) + "&id=" + encodeURIComponent(data.id);
+    return fetch(url).then((r) => r.json()).then((d) => {
+      if (d && d.found === true) {
+        data.body = (d.detail ? maskInString(String(d.detail)) : "{}").slice(0, 2000);
+        if (!data.label && d.label) data.label = maskInString(String(d.label)).slice(0, 60);
+        if (!data.kind && d.kind) data.kind = String(d.kind).replace(/[^a-z]/gi, "");
+      } else data.missing = true;
+    }).catch(() => { data.failed = true; }).then(() => {
+      data.fetching = false;
+      const el = data.el;
+      if (el && el.parentNode && devToolRows.get(el) === data) {
+        if (el.tagName === "DETAILS") data.open = el.open;
+        el.replaceWith(renderDevToolRow(data));
+      }
+    });
   }
   function syncDevModeUI() {
     for (const id of ["devModeTitle", "devModePanel"]) {
@@ -2052,7 +2090,8 @@
     const t = typeof obj;
     if (t === "string") {
       if (force) return maskSecret(obj);
-      const s = maskInString(obj);   // mask BEFORE truncating
+      // mask BEFORE truncating — only what can reach the output, plus a 4096-char margin (as devmode.js)
+      const s = maskInString(obj.length > MAX_REDACT_STRING + 4096 ? obj.slice(0, MAX_REDACT_STRING + 4096) : obj);
       return s.length > MAX_REDACT_STRING ? s.slice(0, MAX_REDACT_STRING) + "…<truncated>" : s;
     }
     if (t === "number" || t === "boolean") return force ? maskSecret(obj) : obj;
@@ -6362,22 +6401,24 @@
     document.getElementById("inp").placeholder = bucket === "@sub"
       ? "งานของ sub-agent (อ่านอย่างเดียว) — คลิก agent ใน rail เพื่อกลับไปคุย"
       : "บันทึกการประชุม (อ่านอย่างเดียว) — คลิก agent ใน rail เพื่อกลับไปคุย";
-    log.innerHTML = "";
-    let live = false;
+    const load = beginPaneLoad(key);
+    let live = false, r = null;
     try {
-      const r = await fetch(`/sessions/log?agent=${encodeURIComponent(bucket)}&key=${encodeURIComponent(key)}`)
+      r = await fetch(`/sessions/log?agent=${encodeURIComponent(bucket)}&key=${encodeURIComponent(key)}`)
         .then((x) => x.json());
-      live = !!r.live;
-      for (const m of r.log || []) {
-        renderGroupMsg(m, faceId);
-      }
     } catch {}
+    if (!finishPaneLoad(load)) return;   // another view replaced this one meanwhile
+    live = !!(r && r.live);
+    for (const m of (r && r.log) || []) renderGroupMsg(m, faceId, bucket, key);
+    replayPaneLive(load, (r && r.log) || [], (ev) => routePaneLive(ev, faceId));
     // Load historical action items for finished meetings (if any)
     if (!live && bucket === "@group") {
       try {
         const actionsRes = await fetch(`/sessions/${encodeURIComponent(key)}/actions`);
+        if (groupView !== key || paneLoad) return;
         if (actionsRes.ok) {
           const { actions } = await actionsRes.json();
+          if (groupView !== key || paneLoad) return;
           if (actions && actions.length) {
             for (const a of actions) {
               const ownerName = (reg.agents[a.owner] || { name: a.owner }).name;
@@ -6394,8 +6435,8 @@
 
   // Render one message from a group/@sub transcript. Factored out so both the
   // history replay (above) and the live chat.message handler use one path.
-  function renderGroupMsg(m, faceId) {
-    if (m.who === "tool") addToolRow(m.text);
+  function renderGroupMsg(m, faceId, bucket, key) {
+    if (m.who === "tool") addToolRow(m.text, { ...m, bucket, session: key });   // saved detail joined in by the daemon
     else if (m.who === "you") addMsg("you", null, m.text, m.ts);
     else if (m.who === "ceo") addMsg("you", null, m.text, m.ts);   // CEO = you
     else addMsg("agent", faceId || m.who, m.text, m.ts, m.phase ? "· " + m.phase : "");
@@ -6443,27 +6484,99 @@
   // click away.
   function sessAgent() { return target === "ceo" ? "main" : target; }
 
+  // ── Pane loads: one history render at a time ─────────────────────────────
+  // A newer load (seat click, thread pick, thread.switch, task.completed
+  // refresh, opening a meeting) supersedes one still in flight, so a thread is
+  // never drawn twice or drawn over another view. The old content stays until
+  // the snapshot arrives; live events for the loading thread are held
+  // meanwhile and re-added after it unless the snapshot already has them.
+  let paneLoad = null;
+  function beginPaneLoad(key) {
+    // A reload of the same thread inherits what the load it replaces was holding.
+    const same = paneLoad && paneLoad.key === key ? paneLoad : null;
+    return (paneLoad = { key, t0: same ? same.t0 : Date.now(), live: same ? same.live : [],
+      before: same ? same.before : new Set(Array.from(log.children)) });
+  }
+  function finishPaneLoad(load) {
+    if (paneLoad !== load) return false;
+    paneLoad = null;
+    // What was drawn during the load and no history carries — the owner's
+    // just-sent bubble, a notice chip, the typing row — is put back afterwards.
+    load.extra = Array.from(log.children).filter((n) => !load.before.has(n));
+    log.innerHTML = "";
+    return true;
+  }
+  // true = the event was held for the loading thread (caller must not draw it)
+  function holdPaneLive(ev) {
+    if (!paneLoad || !ev || ev.session !== paneLoad.key) return false;
+    paneLoad.live.push(ev);
+    return true;
+  }
+  function replayPaneLive(load, snapshot, draw) {
+    const ids = new Set(snapshot.filter((m) => m && m.who === "tool" && m.id).map((m) => m.id));
+    // Messages match by opening text, one for one, and only against rows saved
+    // since the load began — an older reply with the same words is not this one.
+    const recent = new Map();
+    for (const m of snapshot) {
+      if (!m || m.who === "tool" || !m.text || (m.ts && m.ts < load.t0 - 10000)) continue;
+      const t = String(m.text).slice(0, 200);
+      recent.set(t, (recent.get(t) || 0) + 1);
+    }
+    const inSnapshot = (text) => {
+      const t = String(text || "").slice(0, 200), n = recent.get(t) || 0;
+      if (n) recent.set(t, n - 1);
+      return n > 0;
+    };
+    for (const ev of load.live) {
+      const isTool = ev.type === "task.progress" || ev.type === "subagent.progress";
+      if (isTool ? (!ev.id || ids.has(ev.id)) : inSnapshot(ev.text)) continue;
+      draw(ev);
+    }
+    let typing = null;
+    for (const node of load.extra || []) {
+      if (node.id === "typingRow") typing = node;
+      else if (node.classList.contains("chip")) log.appendChild(node);
+      else if (node.dataset && node.dataset.text !== undefined && !inSnapshot(node.dataset.text)) log.appendChild(node);
+    }
+    if (typing) log.appendChild(typing);   // the agent is still working: keep saying so, last
+    log.scrollTop = log.scrollHeight;
+  }
+  function routePaneLive(ev, faceId) {
+    if (ev.type === "task.progress" || ev.type === "subagent.progress") addToolRow(ev.tool || "…", ev);
+    else if (ev.isSummary) addMsg("agent", ev.agent, "📝\n" + ev.text, ev.ts, "· summary");
+    else if (ev.agent === "ceo") addMsg("you", null, ev.text, ev.ts);
+    else addMsg("agent", faceId || ev.agent, ev.text, ev.ts, ev.phase ? "· " + ev.phase : (ev.model ? "🧠 " + ev.model : ""));
+  }
+
   // The chat pane shows ONE conversation: the current thread of the current
   // agent — switching either reloads its history from the daemon.
   async function loadThreadLog(key) {
-    log.innerHTML = "";
-    if (!key) return;
+    const load = beginPaneLoad(key);
+    if (!key) { finishPaneLoad(load); return; }
+    const bucket = sessAgent();
+    let r = null;
     try {
-      const r = await fetch(`/sessions/log?agent=${encodeURIComponent(sessAgent())}&key=${encodeURIComponent(key)}`)
+      r = await fetch(`/sessions/log?agent=${encodeURIComponent(bucket)}&key=${encodeURIComponent(key)}`)
         .then((x) => x.json());
-      for (const m of r.log || []) {
-        if (m.who === "tool") addToolRow(m.text);
-        else addMsg(m.who === "you" ? "you" : "agent", m.who === "you" ? null : sessAgent(), m.text, m.ts,
-          m.who !== "you" && m.model ? "🧠 " + m.model : "");
-      }
     } catch {}
+    if (!finishPaneLoad(load)) return;   // a newer load owns the pane
+    for (const m of (r && r.log) || []) {
+      if (m.who === "tool") addToolRow(m.text, { ...m, bucket, session: key });   // saved detail joined in by the daemon
+      else addMsg(m.who === "you" ? "you" : "agent", m.who === "you" ? null : bucket, m.text, m.ts,
+        m.who !== "you" && m.model ? "🧠 " + m.model : "");
+    }
+    replayPaneLive(load, (r && r.log) || [], (ev) => routePaneLive(ev));
   }
 
   // force=true (agent click) always re-renders the pane — the log view is
   // shared, so "same thread as before" never means "still on screen".
   async function refreshThreadBar(force = false) {
+    // An open meeting / ghost log owns the pane until the owner leaves it
+    // (seat click, thread pick): a background refresh must not draw over it.
+    if (groupView && !force) return;
     if (SESS[target] === "new") {
       CUR[target] = null;
+      paneLoad = null;   // a pending history load must not draw over the fresh thread
       log.innerHTML = "";
       setThreadCtx(null);
       return setThreadLabel("🆕 thread ใหม่ — เริ่มเมื่อส่งข้อความแรก");
@@ -6832,10 +6945,13 @@
       addLog(`⚙ <b>${ev.tool || "…"}</b> — 👻 ${gname}`);
       devLogEvent("subagent.progress", `Tool: ${ev.tool || "…"}`, `Agent: ${gname}`);
       devLogTool(subId, ev.tool, ev.input, null, null);
-      if (groupView && ev.session === groupView) { addToolRow(ev.tool || "…", ev); showTyping("⚙", toolLabel(ev.tool)); }
+      if (groupView && ev.session === groupView) {
+        if (!holdPaneLive(ev)) addToolRow(ev.tool || "…", ev);
+        showTyping("⚙", toolLabel(ev.tool));
+      }
     }
     else if (ev.type === "chat.message") {
-      if (groupView && ev.session === groupView) addMsg("agent", pid, ev.text, ev.ts);
+      if (groupView && ev.session === groupView && !holdPaneLive(ev)) addMsg("agent", pid, ev.text, ev.ts);
     }
     else if (ev.type === "perm.requested") addPermCard({ ...ev, agent: gname });
     else if (ev.type === "perm.approved" || ev.type === "perm.denied") {
@@ -7017,7 +7133,8 @@
       // come from /sessions/log instead.
       if (!ev.replay && groupView && ev.session === groupView) {
         hideTyping();
-        if (ev.isSummary) {
+        if (holdPaneLive(ev)) { /* drawn after the meeting's history loads */ }
+        else if (ev.isSummary) {
           // Secretary's minutes — render distinctly, prefixed so it reads as a recap.
           addMsg("agent", ev.agent, "📝\n" + ev.text, ev.ts, "· summary");
         } else if (ev.agent === "ceo") {
@@ -7031,7 +7148,7 @@
           (ev.agent === target || (target === "ceo" && ev.agent === "main")) &&
           (!ev.session || !CUR[target] || ev.session === CUR[target])) {
         hideTyping();
-        addMsg("agent", ev.agent, ev.text, ev.ts, ev.model ? "🧠 " + ev.model : "");
+        if (!holdPaneLive(ev)) addMsg("agent", ev.agent, ev.text, ev.ts, ev.model ? "🧠 " + ev.model : "");
         uiSnd("msg");
       }
     }
@@ -7044,7 +7161,7 @@
         if (!groupView &&
             (ev.agent === target || (target === "ceo" && ev.agent === "main")) &&
             ev.session && ev.session === CUR[target]) {
-          addToolRow(ev.tool || "…", ev);       // Dev Mode: expandable command/skill/file detail
+          if (!holdPaneLive(ev)) addToolRow(ev.tool || "…", ev);   // Dev Mode: expandable command/skill/file detail
           showTyping("⚙", toolLabel(ev.tool));  // name the tool the agent is running now
         }
       }

@@ -192,13 +192,17 @@ test("devmode: task.progress payload carries input/detail ONLY when devMode is t
   assert.deepStrictEqual(devmode.progressEvent(base, undefined, true), { ...base, kind: "command" }, "no input → no input/detail keys (kind still classified)");
 });
 
-test("server.js: tool_use branch uses devmode.progressEvent gated on reg.devMode and journals the plain event", () => {
+test("server.js: tool_use branch keeps a name + call-id row, saves only the redacted summary, and journals the plain event", () => {
   assert.match(serverSrc, /const devmode = require\("\.\/devmode"\);/);
+  assert.match(serverSrc, /const createToolDetails = require\("\.\/tooldetail"\);/);
   const i = serverSrc.indexOf('if (b.type === "tool_use") {');
   assert.ok(i > 0);
-  const branch = serverSrc.slice(i, i + 1200);
-  assert.match(branch, /entry\.log\.push\(\{ who: "tool", text: b\.name, ts: Date\.now\(\) \}\);/, "session history stays name-only");
-  assert.match(branch, /const progress = \{ type: "task\.progress", agent, task, tool: b\.name,\s*session: entry\.key \};/);
+  const branch = serverSrc.slice(i, i + 1600);
+  assert.match(branch, /const call = toolDetails\.newId\(\);/);
+  assert.match(branch, /entry\.log\.push\(\{ who: "tool", text: b\.name, ts: Date\.now\(\), id: call \}\);/, "session history keeps the tool name and call id only");
+  assert.match(branch, /toolDetails\.record\(agent, entry, call, devmode\.toolDetail\(b\.name, b\.input\)\);/, "only the redacted, capped summary is saved");
+  assert.ok(!/toolDetails\.record\([^;]*, b\.input\);/.test(branch), "raw b.input is never handed to the detail store");
+  assert.match(branch, /const progress = \{ type: "task\.progress", agent, task, tool: b\.name,\s*session: entry\.key, id: call \};/);
   assert.match(branch, /broadcast\(devmode\.progressEvent\(progress, b\.input, reg\.devMode === true\), progress\);/);
   assert.ok(!/entry\.log\.push\([^)]*b\.input/.test(branch), "b.input never goes into entry.log");
   // broadcast() also accepts a lean event for every persisted output.
@@ -208,9 +212,28 @@ test("server.js: tool_use branch uses devmode.progressEvent gated on reg.devMode
 test("server.js: ghost tool progress has the same Dev Mode enrichment and plain journal payload", () => {
   const i = serverSrc.indexOf('const progress = { type: "subagent.progress"');
   assert.ok(i > 0, "ghost tool progress is defined");
-  const branch = serverSrc.slice(i, i + 400);
-  assert.match(branch, /agent: parentId, sub: subId,\s*tool: b\.name, session: entry\.key \}/);
+  const branch = serverSrc.slice(i, i + 400), before = serverSrc.slice(Math.max(0, i - 700), i);
+  assert.match(before, /entry\.log\.push\(\{ who: "tool", text: b\.name, ts: Date\.now\(\), id: call \}\);/, "ghost history keeps the tool name and call id only");
+  assert.match(before, /toolDetails\.record\("@sub", entry, call, devmode\.toolDetail\(b\.name, b\.input\)\);/, "ghost detail is saved in the @sub bucket");
+  assert.match(branch, /agent: parentId, sub: subId,\s*tool: b\.name, session: entry\.key, id: call \}/);
   assert.match(branch, /broadcast\(devmode\.progressEvent\(progress, b\.input, reg\.devMode === true\), progress\);/);
+});
+
+test("server.js: history joins saved details, one call can be fetched, and deleted/pruned threads drop their details", () => {
+  assert.match(serverSrc, /const toolDetails = createToolDetails\(\{ dir: path\.join\((?:__dirname|STATE_DIR), "tooldetail"\) \}\);/, "the store lives with the daemon's state files");
+  assert.ok(serverSrc.indexOf("toolDetails.sweep(sess)") > serverSrc.indexOf("maintenance.pruneSessions(sess)"), "the boot sweep runs after the thread prune");
+  assert.match(serverSrc, /try \{ sess = JSON\.parse\(fs\.readFileSync\(SESSIONS, "utf8"\)\); sessLoaded = true; \} catch \{\}/);
+  assert.match(serverSrc, /function sweepToolDetails\(\) \{\s*if \(!sessLoaded\) return;/, "an unreadable sessions.json never sweeps the store");
+  const listen = serverSrc.indexOf('server.listen(OEP_PORT, "127.0.0.1", () => {');
+  assert.ok(listen > 0 && /^\s*console\.log\([^\n]*\n\s*sweepToolDetails\(\);/.test(serverSrc.slice(listen + 48, listen + 200)),
+    "only the process that owns the port sweeps (a duplicate launch exits on EADDRINUSE first)");
+  assert.strictEqual(serverSrc.split("sweepToolDetails()").length - 1, 2, "defined once, called once (in the listen callback)");
+  assert.match(serverSrc, /res\.end\(JSON\.stringify\(\{ log: toolDetails\.join\(q\.get\("agent"\), entry\),/, "GET /sessions/log joins saved details");
+  const i = serverSrc.indexOf('req.url.startsWith("/sessions/tool-detail?")');
+  assert.ok(i > 0 && i < serverSrc.indexOf('req.url === "/sessions/all"'), "the tool-detail route is matched before the generic /sessions routes");
+  assert.match(serverSrc.slice(i, i + 700), /toolDetails\.get\(q\.get\("agent"\) \|\| "", q\.get\("key"\) \|\| "", q\.get\("id"\) \|\| ""\)/);
+  const del = serverSrc.indexOf('req.url === "/sessions/delete"');
+  assert.match(serverSrc.slice(del, del + 500), /toolDetails\.remove\(agent, key\);/, "deleting a thread deletes its details");
 });
 
 function bootBroadcast() {
@@ -283,7 +306,7 @@ class FakeEl {
   constructor(tag) {
     this.tagName = String(tag).toUpperCase(); this.children = []; this.parentNode = null;
     this._html = ""; this._text = ""; this.className = ""; this.style = {}; this.scrollTop = 0;
-    this.clicks = 0; this.disabled = false; this.id = ""; this.open = false; this.attributes = {};
+    this.clicks = 0; this.disabled = false; this.id = ""; this.open = false; this.attributes = {}; this.dataset = {};
     const self = this;
     this.classList = {
       contains: (c) => self.className.split(/\s+/).includes(c),
@@ -313,7 +336,7 @@ class FakeEl {
     return this.children.flatMap((c) => [...(matches(c) ? [c] : []), ...c.querySelectorAll(selector)]);
   }
   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
-  set innerHTML(v) { this._html = String(v); this._text = ""; this.children = []; }
+  set innerHTML(v) { this._html = String(v); this._text = ""; for (const c of this.children) c.parentNode = null; this.children = []; }
   get innerHTML() { return this._html + this.children.map((c) => c.outerHTML).join(""); }
   set textContent(v) { this._text = String(v); this._html = ""; this.children = []; }
   get textContent() { return this._text + stripTags(this._html) + this.children.map((c) => c.textContent).join(""); }
@@ -346,6 +369,7 @@ const API = slice(/  async function api\(url, body, checkStatus = false\) \{[\s\
 const ROSTER_SYNC = slice(/    if \(ev.type === "roster.sync"\) \{[\s\S]*?(?=\r?\n    if \(ev.type === "roster.removed"\))/, "roster.sync handler");
 const TARGET_CHROME = slice(/  function refreshTargetChrome\(\) \{[\s\S]*?\r?\n  \}/, "target chrome");
 const ROUTE_SUB = slice(/  function routeSub\(ev, subId\) \{[\s\S]*?\r?\n  \}/, "ghost event handler");
+const PANE_LOAD = slice(/  \/\/ ── Pane loads: one history render at a time[\s\S]*?\r?\n  async function loadThreadLog\(key\) \{[\s\S]*?\r?\n  \}\r?\n/, "pane loads");
 
 for (const [name, src] of [["dev block", DEV_BLOCK], ["addToolRow", ADD_TOOL_ROW]]) {
   for (const fn of name === "dev block" ? ["function esc(", "function redactSecrets(", "function devLogEvent(", "function devLogTool(", "function devLogAgent(", "function devLogPerf(", "function setDevMode(", "function wireDevLogControls("] : [])
@@ -392,6 +416,10 @@ function bootOverlay({ devMode = true, clipboard, secure = true, fetch: fetchImp
     function nameOf(id) { return "N(" + id + ")"; }
     function tr(s) { return s; }
     function addChip(h) { chips.push(String(h)); }
+    function syncOfficeLanguage() { return false; }   // roster.sync language hook (Export / Import)
+    function sessAgent() { return target; }
+    function addMsg(cls, who, text) { const d = document.createElement("div"); d.className = "msg " + cls; d.dataset.text = String(text || "").slice(0, 200); d.textContent = String(text); log.appendChild(d); return d; }
+    ${PANE_LOAD}
     ${DEV_BLOCK}
     ${ADD_TOOL_ROW}
     ${API}
@@ -402,7 +430,7 @@ function bootOverlay({ devMode = true, clipboard, secure = true, fetch: fetchImp
     globalThis.__api = { setDev: setDevMode, syncDevModeUI, wireToggle, routeRoster, routeSub, api,
       state: () => ({ devMode: DEV_MODE, pending: devModePending, groupView, target, historyRefreshes, composerRefreshes }),
       redactSecrets, maskInString, maskSecret, maskKey, esc,
-      devLogEvent, devLogTool, devLogAgent, devLogPerf, addToolRow };
+      devLogEvent, devLogTool, devLogAgent, devLogPerf, addToolRow, loadThreadLog, holdPaneLive, loadToolDetail };
   `;
   vm.runInNewContext(script, sandbox, { filename: "overlay-devmode-block.js" });
   const openSettings = () => {
@@ -814,6 +842,183 @@ test("overlay: ghost progress passes its details to group rows and logs redacted
   off.api.routeSub(ev, ev.sub);
   assert.strictEqual(off.byId.get("log").children[0].tagName, "DIV");
   for (const id of ["devEventLog", "devToolLog"]) assert.strictEqual(off.byId.get(id).children.length, 0, id);
+});
+
+test("overlay: history rows show the saved detail; a captured empty input shows {}", () => {
+  const o = bootOverlay(), log = o.byId.get("log");
+  o.api.addToolRow("Bash", { who: "tool", text: "Bash", id: "c-1", kind: "command", label: "curl x", captured: true,
+    detail: "curl -H 'Authorization: Bearer " + RAW_KEY + "' x", bucket: "lora", session: "s1" });
+  const row = log.children[0];
+  assert.strictEqual(row.tagName, "DETAILS"); assert.strictEqual(row.className, "toolrow dev command");
+  assert.strictEqual(row.children[0].textContent, "⚙ Bash · curl x");
+  assert.ok(row.children[1].textContent.includes(RAW_KEY_MASK) && !row.children[1].textContent.includes(RAW_KEY), "joined detail is masked again client-side");
+  assert.strictEqual(row.ontoggle, undefined, "a row with its detail never fetches");
+  o.api.addToolRow("Read", { who: "tool", text: "Read", id: "c-2", captured: true, detail: "", bucket: "lora", session: "s1" });
+  assert.strictEqual(log.children[1].children[1].textContent, "{}");
+  assert.strictEqual(o.requests.length, 0, "rendering history never fetches");
+});
+
+test("overlay: a row without its detail loads it on expand, once, and falls back when the daemon has none", async () => {
+  const answers = { "c-9": { found: true, kind: "command", label: "echo hi", detail: "echo hi --token " + RAW_KEY } };
+  const o = bootOverlay({ fetch: (url) => {
+    const id = new URL(url, "http://x").searchParams.get("id");
+    return Promise.resolve({ ok: true, status: 200, json: async () => answers[id] || { found: false } });
+  } });
+  const log = o.byId.get("log");
+  // live frame captured while Dev Mode was off: id + thread, no detail
+  o.api.addToolRow("Bash", { type: "task.progress", tool: "Bash", agent: "lora", session: "s1", id: "c-9" });
+  let row = log.children[0];
+  assert.strictEqual(row.children[1].textContent, "…");
+  assert.strictEqual(o.requests.length, 0, "nothing is fetched until the row is expanded");
+  row.open = true; await row.ontoggle(); await tick();
+  assert.deepStrictEqual(o.requests.map((r) => r.url), ["/sessions/tool-detail?agent=lora&key=s1&id=c-9"]);
+  row = log.children[0];
+  assert.strictEqual(row.open, true, "the redrawn row stays open");
+  assert.strictEqual(row.children[0].textContent, "⚙ Bash · echo hi");
+  assert.ok(row.children[1].textContent.startsWith("echo hi --token ") && !row.children[1].textContent.includes(RAW_KEY));
+  assert.strictEqual(row.ontoggle, undefined, "a filled row does not fetch again");
+  // ghost rows ask the @sub bucket; an unknown call shows the fallback and is not asked twice
+  o.api.addToolRow("Read", { type: "subagent.progress", tool: "Read", agent: "main", sub: "main#g1", session: "u1", id: "c-0" });
+  row = log.children[1]; row.open = true; await row.ontoggle(); await tick();
+  assert.strictEqual(o.requests.at(-1).url, "/sessions/tool-detail?agent=%40sub&key=u1&id=c-0");
+  row = log.children[1];
+  assert.strictEqual(row.children[1].textContent, DEV_MODE_KEYS.at(-1));
+  assert.strictEqual(row.ontoggle, undefined);
+  assert.strictEqual(o.requests.length, 2);
+  // Dev Mode off: plain marker, no fetch hook
+  const off = bootOverlay({ devMode: false });
+  off.api.addToolRow("Bash", { type: "task.progress", tool: "Bash", agent: "lora", session: "s1", id: "c-9" });
+  assert.strictEqual(off.byId.get("log").children[0].tagName, "DIV");
+  assert.strictEqual(off.byId.get("log").children[0].ontoggle, undefined);
+});
+
+test("overlay: roster.sync and Dev Mode toggles never fetch tool details", () => {
+  const o = bootOverlay(), log = o.byId.get("log");
+  o.api.addToolRow("Bash", { type: "task.progress", tool: "Bash", agent: "lora", session: "s1", id: "c-1" });
+  for (const devMode of [false, true, false, true]) o.api.routeRoster({ type: "roster.sync", devMode, agents: { main: {} } });
+  assert.strictEqual(log.children[0].children[1].textContent, "…", "still waiting for an expand");
+  assert.ok(!o.requests.some((r) => String(r.url).includes("tool-detail")));
+});
+
+test("overlay: a newer pane load wins, and live rows held during a load are re-added once", async () => {
+  const pending = [];
+  const o = bootOverlay({ fetch: (url) => new Promise((resolve) => pending.push({ url, resolve })) });
+  const log = o.byId.get("log");
+  const reply = (i, rows) => pending[i].resolve({ ok: true, json: async () => ({ log: rows }) });
+  const stale = o.api.loadThreadLog("s-old");
+  const fresh = o.api.loadThreadLog("s-new");
+  assert.deepStrictEqual(pending.map((p) => p.url), ["/sessions/log?agent=main&key=s-old", "/sessions/log?agent=main&key=s-new"]);
+  // live events for the loading thread are held, not drawn over the old view
+  assert.strictEqual(o.api.holdPaneLive({ type: "task.progress", tool: "Read", session: "s-new", id: "c-1" }), true);
+  assert.strictEqual(o.api.holdPaneLive({ type: "task.progress", tool: "Bash", session: "s-new", id: "c-2", kind: "command", detail: "echo live" }), true);
+  assert.strictEqual(o.api.holdPaneLive({ type: "chat.message", agent: "main", session: "s-new", text: "working on it" }), true);
+  assert.strictEqual(o.api.holdPaneLive({ type: "chat.message", agent: "main", session: "s-new", text: "already saved" }), true);
+  assert.strictEqual(o.api.holdPaneLive({ type: "task.progress", tool: "X", session: "other" }), false);
+  assert.strictEqual(log.children.length, 0);
+  reply(1, [{ who: "you", text: "hi" }, { who: "agent", text: "already saved" },
+    { who: "tool", text: "Read", id: "c-1", kind: "file", label: "a.txt", detail: "C:/a.txt", captured: true }]);
+  await fresh;
+  reply(0, [{ who: "you", text: "stale thread" }]);
+  await stale;
+  const texts = log.children.map((r) => r.tagName === "DETAILS" ? r.children[0].textContent + " | " + r.children[1].textContent : r.textContent);
+  assert.deepStrictEqual(texts, ["hi", "already saved", "⚙ Read · a.txt | C:/a.txt", "⚙ Bash | echo live", "working on it"],
+    "stale load dropped; history first; held rows added once, skipping ones the snapshot has");
+  assert.strictEqual(o.api.holdPaneLive({ type: "task.progress", session: "s-new", id: "c-3" }), false, "nothing is held after the load");
+  // two loads of the same thread draw it once
+  const a = o.api.loadThreadLog("s-new"), b = o.api.loadThreadLog("s-new");
+  reply(2, [{ who: "you", text: "one" }]); reply(3, [{ who: "you", text: "one" }]);
+  await a; await b;
+  assert.deepStrictEqual(log.children.map((r) => r.textContent), ["one"]);
+});
+
+test("overlay: a network error while loading a detail can be retried; a toggle during the load still gets the answer", async () => {
+  let fail = true, release;
+  const o = bootOverlay({ fetch: () => fail ? Promise.reject(new Error("daemon restarting"))
+    : new Promise((resolve) => { release = () => resolve({ ok: true, json: async () => ({ found: true, kind: "command", detail: "echo later" }) }); }) });
+  const log = o.byId.get("log");
+  o.api.addToolRow("Bash", { type: "task.progress", tool: "Bash", agent: "lora", session: "s1", id: "c-1" });
+  let row = log.children[0]; row.open = true; await row.ontoggle(); await tick();
+  row = log.children[0];
+  assert.strictEqual(row.children[1].textContent, DEV_MODE_KEYS.at(-1), "shows the fallback after a network error");
+  assert.strictEqual(typeof row.ontoggle, "function", "…but stays retryable");
+  fail = false;
+  row.open = true; const pending = row.ontoggle();
+  // Dev Mode goes off and on while the answer is on its way: the element is replaced twice
+  o.api.setDev(false); o.api.setDev(true);
+  release(); await pending; await tick();
+  row = log.children[0];
+  assert.strictEqual(row.children[1].textContent, "echo later", "the answer lands in the element now on screen");
+  assert.strictEqual(o.requests.length, 2);
+});
+
+test("overlay: a pane load keeps the owner's just-sent bubble, notice chips and the typing row, without duplicates", async () => {
+  const pending = [];
+  const o = bootOverlay({ fetch: (url) => new Promise((resolve) => pending.push({ url, resolve })) });
+  const log = o.byId.get("log"), doc = o.document;
+  const old = doc.createElement("div"); old.className = "msg agent"; old.dataset.text = "old thread"; log.appendChild(old);
+  const load = o.api.loadThreadLog("s1");
+  // drawn while the snapshot is on its way
+  const sent = o.sandbox.addMsg("you", null, "please continue");
+  const saved = o.sandbox.addMsg("you", null, "already in history");
+  const chip = doc.createElement("div"); chip.className = "chip"; chip.textContent = "🧵 notice"; log.appendChild(chip);
+  const typing = doc.createElement("div"); typing.id = "typingRow"; typing.className = "msg agent typing"; log.appendChild(typing);
+  const now = Date.now();
+  pending[0].resolve({ ok: true, json: async () => ({ log: [
+    { who: "agent", text: "please continue", ts: now - 3600e3 },          // same words, an hour ago: not the new bubble
+    { who: "you", text: "already in history", ts: now },
+    { who: "agent", text: "Done.", ts: now },
+  ] }) });
+  await load;
+  const shown = log.children.map((n) => n.id === "typingRow" ? "[typing]" : n.textContent);
+  assert.deepStrictEqual(shown, ["please continue", "already in history", "Done.", "please continue", "🧵 notice", "[typing]"],
+    "old view gone; history; then the unsaved bubble and the chip; the typing row last");
+  assert.ok(!log.children.includes(saved) && log.children.includes(sent) && !log.children.includes(old));
+});
+
+test("overlay: held messages are matched one for one against rows saved during the load", async () => {
+  const pending = [];
+  const o = bootOverlay({ fetch: (url) => new Promise((resolve) => pending.push({ url, resolve })) });
+  const log = o.byId.get("log");
+  const load = o.api.loadThreadLog("s1");
+  for (const text of ["Done.", "Done."]) o.api.holdPaneLive({ type: "chat.message", agent: "main", session: "s1", text });
+  const now = Date.now();
+  pending[0].resolve({ ok: true, json: async () => ({ log: [
+    { who: "agent", text: "Done.", ts: now - 3600e3 },   // an older, identical reply
+    { who: "agent", text: "Done.", ts: now },            // the first held one, already saved
+  ] }) });
+  await load;
+  assert.deepStrictEqual(log.children.map((n) => n.textContent), ["Done.", "Done.", "Done."], "the second new reply is still drawn");
+});
+
+test("overlay: ghost rows and messages for a meeting that is loading are held and drawn once (routeSub)", async () => {
+  const pending = [];
+  const o = bootOverlay({ fetch: (url) => new Promise((resolve) => pending.push({ url, resolve })) });
+  const log = o.byId.get("log");
+  const load = o.api.loadThreadLog("meeting-1");   // the harness sits in group view "meeting-1"
+  const base = { agent: "main", sub: "main#g1", session: "meeting-1" };
+  o.api.routeSub({ ...base, type: "subagent.progress", tool: "Grep", id: "g-1", kind: "search", detail: "TODO" }, base.sub);
+  o.api.routeSub({ ...base, type: "subagent.progress", tool: "Read", id: "g-0" }, base.sub);
+  o.api.routeSub({ ...base, type: "chat.message", text: "ghost says hi" }, base.sub);
+  assert.strictEqual(log.children.length, 0, "nothing is drawn over the old view");
+  pending[0].resolve({ ok: true, json: async () => ({ log: [{ who: "tool", text: "Read", id: "g-0" }] }) });
+  await load;
+  const shown = log.children.map((n) => n.tagName === "DETAILS" ? n.children[0].textContent : n.textContent);
+  assert.deepStrictEqual(shown, ["⚙ Read", "⚙ Grep", "ghost says hi"]);
+});
+
+test("overlay: live events, meetings and background refreshes use the pane-load guards", () => {
+  assert.match(html, /if \(!holdPaneLive\(ev\)\) addToolRow\(ev\.tool \|\| "…", ev\);   \/\/ Dev Mode/, "task.progress holds during a load");
+  assert.match(html, /if \(!holdPaneLive\(ev\)\) addMsg\("agent", ev\.agent, ev\.text, ev\.ts, ev\.model \? "🧠 " \+ ev\.model : ""\);/, "thread chat.message holds during a load");
+  assert.match(html, /if \(holdPaneLive\(ev\)\) \{ \/\* drawn after the meeting's history loads \*\/ \}/, "meeting chat.message holds during a load");
+  const group = html.slice(html.indexOf("async function openGroupLog("), html.indexOf("function renderGroupMsg("));
+  assert.match(group, /const load = beginPaneLoad\(key\);/);
+  assert.match(group, /if \(!finishPaneLoad\(load\)\) return;/, "a superseded meeting load draws nothing");
+  assert.match(group, /replayPaneLive\(load, /);
+  assert.match(group, /if \(groupView !== key \|\| paneLoad\) return;/, "late action items never land on another view");
+  const bar = html.slice(html.indexOf("async function refreshThreadBar("), html.indexOf("async function refreshThreadBar(") + 600);
+  assert.match(bar, /if \(groupView && !force\) return;/, "a background refresh never draws over an open meeting");
+  assert.match(bar, /paneLoad = null;/);
+  assert.match(html, /d\.dataset\.text = String\(text \|\| ""\)\.slice\(0, 200\);/, "messages carry their opening text for the reload match");
 });
 
 test("overlay: a pending request blocks rapid clicks and a newly opened Settings toggle", async () => {

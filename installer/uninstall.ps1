@@ -56,6 +56,7 @@ if ($KeepData -and (Test-Path (Join-Path $APP "daemon"))) {
       "calendar.json","notes.json","layout.json","stats.json","proposals.json","presets.json")) {
     $p = Join-Path $APP "daemon\$f"; if (Test-Path $p) { Copy-Item $p $backup -Force }
   }
+  if (Test-Path (Join-Path $APP "daemon\tooldetail")) { Copy-Item (Join-Path $APP "daemon\tooldetail") (Join-Path $backup "tooldetail") -Recurse -Force }
   if (Test-Path (Join-Path $APP "workspace")) { Copy-Item (Join-Path $APP "workspace") (Join-Path $backup "workspace") -Recurse -Force }
 } else {
   Write-Host "  [5/5] Removing all files..." -ForegroundColor DarkCyan

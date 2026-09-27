@@ -108,6 +108,12 @@ function maskInString(s) {
   return out;
 }
 
+// Mask only what can reach the output, plus a margin longer than any secret:
+// masking a multi-megabyte tool input in full can stall the event loop, and
+// every tool call is summarised now, whatever the Dev Mode setting.
+const MASK_MARGIN = 4096;
+function bounded(s, n) { return s.length > n + MASK_MARGIN ? s.slice(0, n + MASK_MARGIN) : s; }
+
 function truncStr(s) {
   return s.length > MAX_STRING ? s.slice(0, MAX_STRING) + "…<truncated>" : s;
 }
@@ -118,7 +124,7 @@ function truncStr(s) {
 function redactSecrets(obj, depth = 0, ancestors = new Set(), force = false) {
   if (obj === null || obj === undefined) return obj;
   const t = typeof obj;
-  if (t === "string") return force ? mask(obj) : truncStr(maskInString(obj));
+  if (t === "string") return force ? mask(obj) : truncStr(maskInString(bounded(obj, MAX_STRING)));
   if (t === "number" || t === "boolean") return force ? mask(obj) : obj;
   if (t === "bigint") return force ? mask(obj) : obj.toString();
   if (t === "function" || t === "symbol") return "<" + t + ">";
@@ -197,9 +203,9 @@ function toolDetail(name, input) {
     detail = safeJson(redactSecrets(inp), 1);
     if (detail === "{}") detail = "";
   } else {
-    detail = maskInString(detail);
+    detail = maskInString(bounded(detail, MAX_DETAIL));
   }
-  return { kind, label: cap(maskInString(label), MAX_LABEL), detail: cap(detail, MAX_DETAIL) };
+  return { kind, label: cap(maskInString(bounded(label, MAX_LABEL)), MAX_LABEL), detail: cap(detail, MAX_DETAIL) };
 }
 
 // task.progress payload: the tool input (redacted) + detail are attached ONLY
