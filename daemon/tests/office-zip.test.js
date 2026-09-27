@@ -222,7 +222,9 @@ test("office ZIP: bounds archive, entry count, uncompressed sizes, and deflate e
   count.writeUInt16LE(zip.MAX_ENTRIES + 1, endOffset(count) + 10);
   assert.throws(() => zip.decode(count), /too many/);
   const data = Buffer.alloc(zip.MAX_ENTRY_BYTES, 65);
-  assert.throws(() => zip.encode(Array.from({ length: 3 }, (_, n) => ({ name: String(n), data }))), /archive exceeds/);
+  // incompressible data is stored as is, so it still hits the archive cap
+  const noise = require("node:crypto").randomBytes(zip.MAX_ENTRY_BYTES);
+  assert.throws(() => zip.encode(Array.from({ length: 3 }, (_, n) => ({ name: String(n), data: noise }))), /archive exceeds/);
   assert.throws(() => zip.encode(Array.from({ length: 9 }, (_, n) => ({ name: String(n), data }))), /total uncompressed/);
   assert.equal(zip.decode(fixture("at-limit", data))[0].data.length, zip.MAX_ENTRY_BYTES);
   assert.throws(() => zip.decode(fixture("large", Buffer.from("x"), { size: zip.MAX_ENTRY_BYTES + 1 })), /entry exceeds/);
@@ -235,4 +237,32 @@ test("office ZIP: bounds archive, entry count, uncompressed sizes, and deflate e
   assert.throws(() => zip.decode(fixture("bad", Buffer.from("x"), { packed: Buffer.from([0xff, 0xff]) })), /deflate/);
   assert.throws(() => zip.decode(fixture("tail", Buffer.from("x"), { packed: Buffer.concat([deflateRawSync(Buffer.from("x")), Buffer.from("extra")]) })), /trailing compressed/);
   assert.throws(() => zip.decode(fixture("short", Buffer.from("x"), { size: 2 })), /uncompressed size mismatch/);
+});
+
+test("office ZIP: compressible entries are deflated and read back exactly; others are stored", () => {
+  const text = JSON.stringify({ agents: Array.from({ length: 200 }, (_, i) => ({ id: "agent-" + i, prompt: "Work carefully and report back." })) }, null, 2);
+  const noise = require("node:crypto").randomBytes(4096);
+  const archive = zip.encode([{ name: "office.json", data: text }, { name: "blob.bin", data: noise }, { name: "empty.md", data: "" }]);
+  assert.ok(archive.length < text.length / 3 + noise.length + 1000, "JSON is compressed: " + archive.length);
+  const methods = [];
+  for (let p = 0; p + 4 <= archive.length; p++) if (archive.readUInt32LE(p) === 0x02014b50) methods.push(archive.readUInt16LE(p + 10));
+  assert.deepEqual(methods, [8, 0, 0], "deflate only where it saves space");
+  const back = zip.decode(archive);
+  assert.equal(back[0].data.toString(), text);
+  assert.ok(back[1].data.equals(noise));
+  assert.equal(back[2].data.length, 0);
+});
+
+test("office ZIP: entry names are capped in length and depth, and deep names are checked in linear time", () => {
+  assert.throws(() => zip.encode([{ name: "a".repeat(zip.MAX_NAME_LENGTH + 1), data: "x" }]), /too long or too deep/);
+  assert.throws(() => zip.encode([{ name: Array.from({ length: zip.MAX_NAME_DEPTH + 1 }, () => "d").join("/"), data: "x" }]), /too long or too deep/);
+  const deepest = Array.from({ length: zip.MAX_NAME_DEPTH }, (_, i) => "d" + i).join("/");
+  assert.equal(zip.decode(zip.encode([{ name: deepest, data: "x" }]))[0].name, deepest);
+  // a hostile central directory with a very deep name is refused before any costly work
+  const deep = fixture(Array.from({ length: 30000 }, () => "a").join("/").slice(0, 60000));
+  const t0 = Date.now();
+  assert.throws(() => zip.decode(deep), /too long or too deep/);
+  assert.ok(Date.now() - t0 < 500, "refused quickly: " + (Date.now() - t0) + " ms");
+  // file-used-as-parent detection still works with the incremental keys
+  assert.throws(() => zip.encode([{ name: "a/b", data: "x" }, { name: "a/b/c", data: "y" }]), /parent directory/);
 });

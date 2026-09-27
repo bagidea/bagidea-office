@@ -105,9 +105,9 @@ as raw source-machine directories.
 
 ## Archive format and limits
 
-The ZIP uses the `bagidea-office` format, version **1**. Every exported item
-also has its own readable file, so each category shows up as a folder when you
-open the ZIP:
+The ZIP uses the `bagidea-office` format, version **2** (entries are
+compressed). Every exported item also has its own readable file, so each
+category shows up as a folder when you open the ZIP:
 
 | Path | Contents |
 |---|---|
@@ -122,9 +122,11 @@ open the ZIP:
 
 `office.json` is the source of truth. The importer checks that every readable
 copy matches its item in `office.json` exactly and rejects the archive if one
-was edited or has no matching item. Archives exported before the readable
-copies existed still import. Use this feature's export to create a compatible
-archive; an arbitrary folder ZIP is not an office archive.
+was edited or has no matching item. Version 1 archives, exported before the
+readable copies existed, still import; an office that only understands
+version 1 declines a version 2 archive with an "unsupported version" message.
+Use this feature's export to create a compatible archive; an arbitrary folder
+ZIP is not an office archive.
 
 | Limit | Maximum |
 |---|---:|
@@ -132,6 +134,7 @@ archive; an arbitrary folder ZIP is not an office archive.
 | Total unpacked content | 64 MiB |
 | Each unpacked file | 8 MiB |
 | Archive entries | 5,000 |
+| Path of each entry | 1,024 characters, 32 folders deep |
 
 The importer validates the ZIP and its paths before showing the preview. Entries
 cannot escape the supported destination folders. Imported workflow triggers are

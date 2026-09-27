@@ -11,7 +11,12 @@ const { BUILTIN_TOOLS, DEFAULT_SKILLS, SKILL_LIBRARY } = require("./constants");
 const { frontmatter } = require("./skills");
 
 const FORMAT = "bagidea-office";
-const VERSION = 1;
+const VERSION = 1;                 // office.json configuration schema
+// Archive layout: 2 adds the readable per-item copies. Version 1 archives
+// (office.json + skills + workspace only) still import, and builds that only
+// know version 1 refuse version 2 with a clear "unsupported version" message.
+const ARCHIVE_VERSION = 2;
+const ARCHIVE_VERSIONS = [1, 2];
 const CATEGORIES = ["team", "skills", "mcp", "workflows", "settings"];
 const BOOL_SETTINGS = ["sound", "tts", "ecoMode", "autoSkills", "nativeSkills", "verifyDelegated", "channelNotify"];
 const NUMBER_SETTINGS = ["heartbeatMin", "socialMin", "proposalMin"];
@@ -269,7 +274,8 @@ function cleanOffice(value, categories) {
 }
 
 function markdownPath(relative) {
-  if (typeof relative !== "string" || relative.includes("\\") || relative.startsWith("/") || relative.includes(":") || relative.includes("\0") || !/\.md$/i.test(relative)) return false;
+  // ≤ 1000 chars keeps "workspace/" + path inside the ZIP's 1024-char entry names
+  if (typeof relative !== "string" || relative.length > 1000 || relative.includes("\\") || relative.startsWith("/") || relative.includes(":") || relative.includes("\0") || !/\.md$/i.test(relative)) return false;
   const parts = relative.split("/");
   if (parts.some((s) => !s || s === "." || s === ".." || /[. ]$/.test(s) || /[<>"|?*\x00-\x1f]/.test(s) || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(s))) return false;
   if (parts.length === 1) return relative.toLowerCase() !== "notes.md";
@@ -492,7 +498,7 @@ module.exports = function officeTransfer(options) {
     for (const [sid, s] of Object.entries(data.office.skills?.definitions || {})) add("skills/" + sid + "/SKILL.md", "skills", frontmatter(s, sid));
     for (const [name, category, text] of readableCopies(data.office)) add(name, category, text);
     for (const d of data.docs) add("workspace/" + d.path, "settings", d.content);
-    const manifest = { format: FORMAT, version: VERSION, createdAt: new Date().toISOString(), categories,
+    const manifest = { format: FORMAT, version: ARCHIVE_VERSION, createdAt: new Date().toISOString(), categories,
       files: files.map((f) => ({ path: f.name, category: f.category, size: f.data.length, sha256: sha(f.data) })) };
     return zip.encode([{ name: "manifest.json", data: JSON.stringify(manifest, null, 2) }, ...files]);
   }
@@ -500,7 +506,7 @@ module.exports = function officeTransfer(options) {
     const members = zip.decode(buffer), byName = new Map(members.map((f) => [f.name, f.data]));
     if (!byName.has("manifest.json") || !byName.has("office.json")) fail("ZIP must contain manifest.json and office.json");
     const manifest = object(parse(byName.get("manifest.json"), "manifest"), "manifest");
-    if (manifest.format !== FORMAT || manifest.version !== VERSION) fail("unsupported archive format or version");
+    if (manifest.format !== FORMAT || !ARCHIVE_VERSIONS.includes(manifest.version)) fail("unsupported archive format or version");
     const categories = selected(manifest.categories);
     if (!Array.isArray(manifest.files) || manifest.files.length !== members.length - 1) fail("manifest file list does not match the ZIP");
     const seen = new Set();
@@ -514,7 +520,7 @@ module.exports = function officeTransfer(options) {
     const raw = parse(byName.get("office.json"), "office configuration");
     const office = cleanOffice(raw, categories), docs = [];
     // Readable copies are compared with office.json as exported (the raw items).
-    const copies = new Map(readableCopies(raw).map(([name, , text]) => [name, text]));
+    const copies = new Map(manifest.version >= 2 ? readableCopies(raw).map(([name, , text]) => [name, text]) : []);
     for (const [name, bytes] of byName) {
       if (name === "manifest.json" || name === "office.json") continue;
       const skill = /^skills\/([\w-]+)\/SKILL\.md$/.exec(name);
@@ -738,4 +744,5 @@ module.exports = function officeTransfer(options) {
 
 module.exports.FORMAT = FORMAT;
 module.exports.VERSION = VERSION;
+module.exports.ARCHIVE_VERSION = ARCHIVE_VERSION;
 module.exports.CATEGORIES = CATEGORIES;

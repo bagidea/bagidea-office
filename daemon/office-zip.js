@@ -2,7 +2,7 @@
 
 // Small, deliberately strict ZIP reader/writer for portable office bundles. It
 // never extracts files itself: callers choose the destination after validation.
-const { inflateRawSync } = require("node:zlib");
+const { inflateRawSync, deflateRawSync } = require("node:zlib");
 const { TextDecoder } = require("node:util");
 
 const MAX_ARCHIVE_BYTES = 20 * 1024 * 1024;
@@ -11,6 +11,10 @@ const MAX_ENTRY_BYTES = 8 * 1024 * 1024;
 // Room for every item of a full office with its readable copies (≈4,300 at the
 // category maxima); the byte limits below bound the work regardless.
 const MAX_ENTRIES = 5000;
+// Real exports stay far below these (Markdown is at most 17 folders deep); the
+// caps keep the per-entry path checks cheap on a hostile archive.
+const MAX_NAME_LENGTH = 1024;
+const MAX_NAME_DEPTH = 32;
 const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const CP437 = "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
@@ -37,6 +41,7 @@ function safeName(name) {
   const directory = name.endsWith("/");
   const clean = directory ? name.slice(0, -1) : name;
   const parts = clean.split("/");
+  if (name.length > MAX_NAME_LENGTH || parts.length > MAX_NAME_DEPTH) fail("entry path is too long or too deep");
   for (const part of parts) {
     if (!part || part === "." || part === ".." || /[. ]$/.test(part)) fail("unsafe entry path");
     const base = part.split(".")[0].replace(/[. ]+$/, "");
@@ -53,9 +58,13 @@ function checkPaths(entries) {
     entry.directory = p.directory;
   }
   for (const entry of entries) {
-    const parts = entry.name.replace(/\/$/, "").split("/");
-    for (let n = 1; n < parts.length; n++) {
-      if (paths.get(pathKey(parts.slice(0, n).join("/"))) === false) fail("a file is used as a parent directory");
+    // Parent keys are built incrementally from per-segment keys ("/" never
+    // joins a normalisation sequence), so the check is linear in the name.
+    const keys = entry.name.replace(/\/$/, "").split("/").map(pathKey);
+    let parent = "";
+    for (let n = 0; n < keys.length - 1; n++) {
+      parent = n ? parent + "/" + keys[n] : keys[n];
+      if (paths.get(parent) === false) fail("a file is used as a parent directory");
     }
   }
 }
@@ -87,14 +96,17 @@ function encode(entries) {
     if (UTF8.decode(nameBytes) !== entry.name || nameBytes.length > 0xffff) fail("invalid filename");
     const data = Buffer.isBuffer(entry.data) ? entry.data : Buffer.from(entry.data, "utf8");
     if (data.length > MAX_ENTRY_BYTES) fail("entry exceeds size limit");
-    return { name: entry.name, nameBytes, data };
+    // Deflate when it saves space (JSON and Markdown usually shrink several-fold).
+    const packed = data.length ? deflateRawSync(data, { level: 9 }) : data;
+    const method = packed.length < data.length ? 8 : 0;
+    return { name: entry.name, nameBytes, data, stored: method ? packed : data, method };
   });
   checkPaths(files);
   let total = 0, archiveSize = 22;
   for (const file of files) {
     if (file.directory && file.data.length) fail("directory entry has data");
     total += file.data.length;
-    archiveSize += 30 + 46 + file.nameBytes.length * 2 + file.data.length;
+    archiveSize += 30 + 46 + file.nameBytes.length * 2 + file.stored.length;
   }
   if (total > MAX_TOTAL_BYTES) fail("total uncompressed size exceeds limit");
   if (archiveSize > MAX_ARCHIVE_BYTES) fail("archive exceeds size limit");
@@ -106,26 +118,28 @@ function encode(entries) {
     header.writeUInt32LE(0x04034b50, 0);
     header.writeUInt16LE(20, 4);
     header.writeUInt16LE(0x800, 6);
+    header.writeUInt16LE(file.method, 8);
     header.writeUInt16LE(0x21, 12); // 1980-01-01, valid even for strict unzip tools.
     header.writeUInt32LE(crc, 14);
-    header.writeUInt32LE(file.data.length, 18);
+    header.writeUInt32LE(file.stored.length, 18);
     header.writeUInt32LE(file.data.length, 22);
     header.writeUInt16LE(nameLength, 26);
-    local.push(header, file.nameBytes, file.data);
+    local.push(header, file.nameBytes, file.stored);
     const record = Buffer.alloc(46);
     record.writeUInt32LE(0x02014b50, 0);
     record.writeUInt16LE(0x0314, 4); // Unix, ZIP 2.0.
     record.writeUInt16LE(20, 6);
     record.writeUInt16LE(0x800, 8);
+    record.writeUInt16LE(file.method, 10);
     record.writeUInt16LE(0x21, 14);
     record.writeUInt32LE(crc, 16);
-    record.writeUInt32LE(file.data.length, 20);
+    record.writeUInt32LE(file.stored.length, 20);
     record.writeUInt32LE(file.data.length, 24);
     record.writeUInt16LE(nameLength, 28);
     record.writeUInt32LE(((file.directory ? 0x41ed : 0x81a4) * 0x10000 + (file.directory ? 0x10 : 0)) >>> 0, 38);
     record.writeUInt32LE(offset, 42);
     central.push(record, file.nameBytes);
-    offset += header.length + nameLength + file.data.length;
+    offset += header.length + nameLength + file.stored.length;
     centralSize += record.length + nameLength;
   }
   const end = Buffer.alloc(22);
@@ -232,4 +246,4 @@ function decode(buffer) {
   return files;
 }
 
-module.exports = { encode, decode, MAX_ARCHIVE_BYTES, MAX_TOTAL_BYTES, MAX_ENTRY_BYTES, MAX_ENTRIES };
+module.exports = { encode, decode, MAX_ARCHIVE_BYTES, MAX_TOTAL_BYTES, MAX_ENTRY_BYTES, MAX_ENTRIES, MAX_NAME_LENGTH, MAX_NAME_DEPTH };

@@ -397,3 +397,14 @@ test("readable copies must match office.json; archives without copies still impo
   assert.ok(plan.categories.team >= 1 && plan.categories.workflows === 2);
   assert.strictEqual(dst.transfer.importArchive(plan, { conflict: "skip" }).ok, true);
 });
+
+test("new archives are format version 2; version 1 archives (no readable copies) still import", (t) => {
+  const src = source(t), dst = fixture(t), archive = src.transfer.exportArchive();
+  assert.strictEqual(JSON.parse(zip.decode(archive).find((f) => f.name === "manifest.json").data).version, 2);
+  assert.strictEqual(createTransfer.ARCHIVE_VERSION, 2);
+  const v1 = rewriteArchive(withoutCopies(archive), (o, files, manifest) => { manifest.version = 1; });
+  assert.strictEqual(dst.transfer.importArchive(dst.transfer.previewArchive(v1), { conflict: "skip" }).ok, true);
+  const v1WithCopies = rewriteArchive(archive, (o, files, manifest) => { manifest.version = 1; });
+  assert.throws(() => dst.transfer.previewArchive(v1WithCopies), /no matching item/, "version 1 never had readable copies");
+  assert.throws(() => dst.transfer.previewArchive(rewriteArchive(archive, (o, files, manifest) => { manifest.version = 3; })), /unsupported archive format or version/);
+});
