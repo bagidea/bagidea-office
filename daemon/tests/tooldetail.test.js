@@ -123,7 +123,11 @@ test("tooldetail: sweep drops files of deleted/pruned threads and leftovers; rem
   td.record("@sub", ghost, "c-1", { detail: "c" });
   fs.writeFileSync(td.fileOf("main", "s1") + ".tmp", "partial");
   fs.writeFileSync(path.join(dir, "stray.txt"), "not a folder");
-  const r = td.sweep({ main: [keep], "@sub": [ghost] });
+  // A fresh orphan survives the default sweep: another daemon booted from the
+  // same folder may have created that thread after this one read sessions.json.
+  assert.deepStrictEqual(td.sweep({ main: [keep], "@sub": [ghost] }), { removed: 0, compacted: 0 }, "younger than a day: kept");
+  assert.ok(fs.existsSync(td.fileOf("main", "s2")));
+  const r = td.sweep({ main: [keep], "@sub": [ghost] }, { minAgeMs: 0 });
   assert.deepStrictEqual(r, { removed: 2, compacted: 0 });
   assert.ok(fs.existsSync(td.fileOf("main", "s1")) && fs.existsSync(td.fileOf("@sub", "u1")));
   assert.ok(!fs.existsSync(td.fileOf("main", "s2")));

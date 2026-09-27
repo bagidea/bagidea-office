@@ -228,6 +228,27 @@ the installer** (re-running is safe; no data is lost).
 **LINE doesn't fire** — the webhook URL must be public HTTPS and end with
 `/channels/line/webhook`; check that cloudflared is still running
 
+## 🛠 Dev Mode — see inside a run
+
+When an agent does something you didn't expect, switch on **⚙ → TOOLS →
+🛠 DEV MODE**. Then:
+
+- every **tool row** in the chat (▸ `Bash`, ▸ `Read`, ▸ `Skill`…) opens to a
+  short summary of what the tool was called with — the command, the file
+  path, the skill and its arguments;
+- a **debug panel** shows the live event stream, tool calls, agent messages
+  and timings, with 🧹 clear and 📤 export (clipboard or a file).
+
+What you see is **redacted and capped**: API keys, tokens, passwords,
+`KEY=value` secrets, URL credentials, CLI flags like `--password` and PEM
+private keys are replaced with `••••••`, and a summary is at most 2,000
+characters. The raw tool input is never written to the journal,
+`sessions.json` or the daemon's stdout. Summaries are kept per thread in
+`daemon/tooldetail/` whatever the switch says, so a row from yesterday still
+opens after a reload or a restart; a row from a run made while the store did
+not exist says *no detail was captured for this call*. Deleting a thread
+deletes its details.
+
 ## View raw logs
 
 - All events: `daemon/journal.jsonl`

@@ -2105,9 +2105,18 @@
     // Bare user:pass@host (no scheme): contiguous userinfo, user part starts
     // with a letter/underscore (not a clock time), `@` followed by a host char.
     [/(^|[\s"'=,(\[])(?!mailto:)([A-Za-z_][^\s"'\/@:=,(\[]*:[^\s"'\/@]+)@(?=[A-Za-z0-9\[])/g, (m, pre) => pre + SECRET_MASK + "@"],
-    // key=value / key: value pairs inside free text (query strings, env lines, JSON-ish)
-    [/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|private[_-]?key|x-api-key|authorization|token|secret|passw(?:or)?d)\s*[=:]\s*["']?)(?!(?:Bearer|Basic)\b)([^\s"'&;,]{6,})/gi,
-      (m, head, val) => head + maskSecret(val)],
+    // PEM private keys: the whole block goes.
+    [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, () => "-----BEGIN PRIVATE KEY----- " + SECRET_MASK + " -----END PRIVATE KEY-----"],
+    // key=value / key: value pairs inside free text: ANY identifier containing
+    // a secret-ish word (AWS_SECRET_ACCESS_KEY, DB_PASS…), any value length,
+    // quoted values with spaces as a whole. (Mirrors devmode.js.)
+    [/((?:^|[^A-Za-z0-9_-])[A-Za-z0-9_.-]*?(?:api[_-]?key|apikey|x-api-key|access[_-]?token|refresh[_-]?token|client[_-]?secret|private[_-]?key|authorization|token|secret|passw(?:or)?d|pass|pwd|credentials?)(?![A-Za-z0-9])[A-Za-z0-9_.-]*\s*[=:]\s*)(?!(?:Bearer|Basic)\b)(?:"([^"]*)"|'([^']*)'|([^\s"'&;,]+))/gi,
+      maskFlagValue],
+    // Well-known CLIs with a bare secret argument (mirrors devmode.js).
+    [/(\baws\s+configure\s+set\s+\S*(?:secret|token|password)\S*\s+)(\S+)/gi, (m, head, val) => head + maskSecret(val)],
+    [/((?:^|\s)redis-cli\b[^\n]*?\s-a\s+)(?!-)(\S+)/g, (m, head, val) => head + maskSecret(val)],
+    [/(\bvault\s+login\s+)(?!-)(\S+)/g, (m, head, val) => head + maskSecret(val)],
+    [/(\b(?:mysql\w*|mariadb\w*)\b[^\n]*?\s-p)(?=[^\s-])(\S+)/g, (m, head, val) => head + maskSecret(val)],
     // CLI header flags (-H / --header): secret-ish header NAME → the header
     // VALUE is masked as a whole, scheme word included: `-H 'Authorization: ••••••'`.
     [/((?:^|\s)(?:-H|--[Hh]eader)(?:\s+|=))(?:"([^"]*)"|'([^']*)'|(?!-)(\S+))/g, (m, head, dq, sq, uq) => {

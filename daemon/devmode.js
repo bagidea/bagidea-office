@@ -74,9 +74,24 @@ const VALUE_PATTERNS = [
   // cannot match), the user part must start with a letter/underscore (so a
   // clock time `12:30@…` cannot), and `@` must be followed by a host char.
   [/(^|[\s"'=,(\[])(?!mailto:)([A-Za-z_][^\s"'\/@:=,(\[]*:[^\s"'\/@]+)@(?=[A-Za-z0-9\[])/g, (m, pre) => pre + MASK + "@"],
-  // key=value / key: value pairs inside free text (query strings, env lines, JSON-ish)
-  [/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|private[_-]?key|x-api-key|authorization|token|secret|passw(?:or)?d)\s*[=:]\s*["']?)(?!(?:Bearer|Basic)\b)([^\s"'&;,]{6,})/gi,
-    (m, head, val) => head + mask(val)],
+  // PEM private keys (a heredoc into ~/.ssh/id_rsa, a cert tool): the whole
+  // block goes, however it is wrapped or truncated.
+  [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, () => "-----BEGIN PRIVATE KEY----- " + MASK + " -----END PRIVATE KEY-----"],
+  // key=value / key: value pairs inside free text (query strings, env lines,
+  // JSON-ish). The key is ANY identifier that contains a secret-ish word
+  // (AWS_SECRET_ACCESS_KEY, DB_PASS, MYSQL_PWD…), the value may be any
+  // length, and a quoted value with spaces goes as a whole. Over-masking a
+  // `max_tokens=200` is the accepted price.
+  [/((?:^|[^A-Za-z0-9_-])[A-Za-z0-9_.-]*?(?:api[_-]?key|apikey|x-api-key|access[_-]?token|refresh[_-]?token|client[_-]?secret|private[_-]?key|authorization|token|secret|passw(?:or)?d|pass|pwd|credentials?)(?![A-Za-z0-9])[A-Za-z0-9_.-]*\s*[=:]\s*)(?!(?:Bearer|Basic)\b)(?:"([^"]*)"|'([^']*)'|([^\s"'&;,]+))/gi,
+    maskFlagValue],
+  // Well-known CLIs whose secret is a bare positional / short-flag argument:
+  // `aws configure set aws_secret_access_key X`, `redis-cli -a X`,
+  // `vault login X`, and the attached mysql form `mysql -pX` (only after a
+  // mysql/mariadb command word, so `find -print` is untouched).
+  [/(\baws\s+configure\s+set\s+\S*(?:secret|token|password)\S*\s+)(\S+)/gi, (m, head, val) => head + mask(val)],
+  [/((?:^|\s)redis-cli\b[^\n]*?\s-a\s+)(?!-)(\S+)/g, (m, head, val) => head + mask(val)],
+  [/(\bvault\s+login\s+)(?!-)(\S+)/g, (m, head, val) => head + mask(val)],
+  [/(\b(?:mysql\w*|mariadb\w*)\b[^\n]*?\s-p)(?=[^\s-])(\S+)/g, (m, head, val) => head + mask(val)],
   // CLI header flags (-H / --header). When the header NAME is secret-ish
   // (Authorization, X-Api-Key, Cookie, X-Auth-Token…) the header VALUE is
   // masked as a whole, scheme word included: `-H 'Authorization: ••••••'`.

@@ -149,6 +149,32 @@ test("devmode: bearer / sk- / key=value tokens are masked inside innocent string
   assert.strictEqual(devmode.redactSecrets("max_tokens=8000 input_tokens: 12").toString(), "max_tokens=8000 input_tokens: 12");
 });
 
+test("devmode: env-style, attached-flag and PEM secrets are masked (review of #62)", () => {
+  // Every summary is persisted whatever the Dev Mode setting, so these must
+  // never reach disk in the clear.
+  const cases = [
+    ["export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG", "wJalrXUtnFEMI"],
+    ["aws configure set aws_secret_access_key wJalrXUtnFEMI", "wJalrXUtnFEMI"],
+    ["DB_PASS=hunter2 MYSQL_PWD=hunter3 node app.js", "hunter2", "hunter3"],
+    ["mysql -u root -phunter2 -h db", "hunter2"],
+    ["password=abc12 TOKEN='xyz'", "abc12", "xyz"],
+    ['PASSWORD="hunter2 rocks" ./run', "hunter2 rocks", "rocks"],
+    ["cat > ~/.ssh/id_rsa <<EOF\n-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA7\nabcdef\n-----END RSA PRIVATE KEY-----\nEOF", "MIIEowIBAAKCAQEA7", "abcdef"],
+    ["-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXkt", "b3BlbnNzaC1rZXkt"],
+    ["redis-cli -a s3cret ping", "s3cret"],
+    ["vault login hvs.CAESIJ", "hvs.CAESIJ"],
+  ];
+  for (const [input, ...secrets] of cases) {
+    const out = devmode.maskInString(input);
+    for (const s of secrets) assert.ok(!out.includes(s), `leaked "${s}" in: ${out}`);
+    assert.ok(out.includes(RAW_KEY_MASK), "placeholder present: " + out);
+  }
+  // …and the innocent neighbours stay readable
+  assert.strictEqual(devmode.maskInString("find . -print -name x"), "find . -print -name x");
+  assert.strictEqual(devmode.maskInString("mysql --port=3306 -u root"), "mysql --port=3306 -u root");
+  assert.ok(devmode.maskInString("export AWS_SECRET_ACCESS_KEY=x").startsWith("export AWS_SECRET_ACCESS_KEY="), "the key name stays");
+});
+
 test("devmode: toolDetail for Bash / PowerShell / Skill / Read / Grep / Agent / unknown", () => {
   let d = devmode.toolDetail("Bash", { command: "curl -H 'Authorization: Bearer " + RAW_KEY + "' https://x\nsecond line", description: "x" });
   assert.strictEqual(d.kind, "command");
@@ -226,8 +252,9 @@ test("server.js: history joins saved details, one call can be fetched, and delet
   assert.match(serverSrc, /server\.listen\(OEP_PORT, "127\.0\.0\.1", \(\) => \{\s*console\.log\([^\n]*\n\s*sweepToolDetails\(\);/,
     "only the process that owns the port sweeps (a duplicate launch exits on EADDRINUSE first)");
   assert.strictEqual(serverSrc.split("sweepToolDetails()").length - 1, 2, "defined once, called once (in the listen callback)");
-  assert.match(serverSrc, /const ownsStore = String\(OEP_PORT\) === "8787" \|\| !!process\.env\.OEP_STATE_DIR;\s*if \(!sessLoaded \|\| !ownsStore\) return;/,
-    "a test/duplicate daemon on another port never sweeps the office's store");
+  assert.match(serverSrc, /function sweepToolDetails\(\) \{[^}]*?if \(!sessLoaded\) return;/,
+    "never sweep against a sessions.json that failed to load");
+  assert.ok(!/OEP_STATE_DIR/.test(serverSrc), "no phantom state-dir switch: the age gate in tooldetail.sweep is the isolation");
   assert.match(serverSrc, /res\.end\(JSON\.stringify\(\{ log: toolDetails\.join\(q\.get\("agent"\), entry\),/, "GET /sessions/log joins saved details");
   const i = serverSrc.indexOf('req.url.startsWith("/sessions/tool-detail?")');
   assert.ok(i > 0 && i < serverSrc.indexOf('req.url === "/sessions/all"'), "the tool-detail route is matched before the generic /sessions routes");
@@ -462,6 +489,8 @@ test("overlay: the lifted block executes and its redactSecrets matches daemon/de
     "DATABASE_URL=postgres://alice:hunter2@db.local:5432/app mongodb+srv://u:p@c.net/db bare alice:hunter2@db.local https://ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123@github.com/o/r",
     "curl -H 'Authorization: Bearer abc123def456' -H \"x-api-key: abc\" -H 'Content-Type: text/plain' --token xyz789abc -u bob:pw12345 --password 'SuperSecret1Word!' --password=Sup3r -p hunter2 --port 5432 top-p 0.9",
     { command: "mysql -u root -p hunter2 -h db", args: ["--api-key", "k", "--secret=\"s s\""], password: "SuperSecret1Word!" },
+    // the #62 review gaps must agree between client and daemon too
+    "export AWS_SECRET_ACCESS_KEY=wJalr DB_PASS=hunter2 mysql -phunter3 aws configure set aws_secret_access_key X redis-cli -a Y vault login Z PASSWORD=\"a b\" -----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY----- find -print",
   ];
   for (const f of fixtures) {
     assert.strictEqual(JSON.stringify(api.redactSecrets(f)), JSON.stringify(devmode.redactSecrets(f)), "client and daemon redaction agree");
@@ -1193,7 +1222,9 @@ test("i18n: all 13 seed files parse, keep their HEAD format, and carry every Dev
   assert.ok(!fs.existsSync(path.join(SEED_DIR, "add-devmode-translations.js")), "one-shot script must be deleted");
   for (const l of LANGS) {
     const file = path.join(SEED_DIR, l + ".json");
-    const raw = fs.readFileSync(file, "utf8");
+    // A Windows checkout with autocrlf hands back CRLF; the format rule is about
+    // the committed bytes, so normalise before comparing.
+    const raw = fs.readFileSync(file, "utf8").split("\r").join("");
     assert.ok(!raw.startsWith("\uFEFF"), l + ": no BOM");
     const data = JSON.parse(raw);
     const lines = raw.split("\n");

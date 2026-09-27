@@ -4,6 +4,48 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [1.7.0] — 📦🛠 A team you can hand over, and an office you can see inside
+
+**Added**
+- **📦 Export / Import BAGIDEA OFFICE** — move an office's reusable
+  configuration to another installation as one ZIP: agents, skills, MCP
+  tools, workflows + triggers, portable settings and Markdown, chosen by
+  category or item by item (with dependency notes). The import **previews
+  first** — destinations, conflicts, protected items — then applies
+  transactionally with rollback; credentials, sessions, history and project
+  files never travel, imported triggers arrive disabled, and the hand-written
+  ZIP decoder refuses traversal, bombs, links and reserved names. ⚙ → AGENTS →
+  📦 EXPORT / IMPORT. Guide: `docs/guide/export-import.md`; the docs page
+  links it in all 14 languages. Contributed by @f2dac in
+  [#61](https://github.com/bagidea/bagidea-office/pull/61).
+- **🛠 Dev Mode** (⚙ → TOOLS) — see inside a run: every tool call's row in
+  the chat opens to show a **redacted, capped summary** of what it was called
+  with, bounded debug panels for the event stream, tool calls, agent messages
+  and performance, clear/export, and live tool details for main agents and
+  ghosts. Summaries are kept per thread (`daemon/tooldetail/`) whatever the
+  setting, so a history row can show its detail after a reload, a thread
+  switch or a restart; raw tool input is never written to the journal,
+  `sessions.json` or stdout. Chat-pane loads are now race-free: a newer load
+  supersedes an older one and live events for the loading thread are held and
+  re-added once. Contributed by @f2dac in
+  [#60](https://github.com/bagidea/bagidea-office/pull/60) and
+  [#62](https://github.com/bagidea/bagidea-office/pull/62), in 14 languages.
+
+**Fixed** (review follow-ups on both)
+- Export / Import: an install under a symlink or junction (`/home` on NFS,
+  macOS `/var` → `/private/var`, a dev-drive junction) failed every summary and
+  import with "destination contains a symlink or junction" — only links
+  *below* the roots are refused now. Replacing an existing webhook trigger
+  dropped the destination's token and secret; they are kept.
+- Dev Mode redaction: `AWS_SECRET_ACCESS_KEY=…`, `DB_PASS=…`, `MYSQL_PWD=…`,
+  the attached `mysql -phunter2`, short or quoted values, PEM private-key
+  blocks, `aws configure set`, `redis-cli -a` and `vault login` were written to
+  the tool-detail store in the clear; all masked now (client and daemon rules
+  agree, guarded by tests). The boot sweep of that store no longer depends on
+  a state-dir switch that nothing implemented: it skips files younger than a
+  day and never compacts, so a test daemon booted from the same folder cannot
+  delete or truncate the live office's details.
+
 ## [1.6.7] — 🎤 The pitch deck catches up
 
 **Changed**

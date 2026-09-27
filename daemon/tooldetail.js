@@ -146,7 +146,15 @@ module.exports = function createToolDetails({ dir, io = fs, now = Date.now, maxF
   // Boot housekeeping: drop files of threads that no longer exist (pruned or
   // deleted) and compact the rest. Only the daemon that owns the office may
   // call this, with a sessions map it actually loaded.
-  function sweep(sess) {
+  // Drop files that belong to no thread in `sess`. Two things keep this safe
+  // next to ANOTHER daemon booted from the same folder (a test office on a
+  // second port shares this store and sessions.json): a file younger than
+  // minAgeMs (default 24 h) is never touched, because that other daemon may
+  // have created its thread after this process read sessions.json — and the
+  // sweep never compacts, because compaction runs on the write path when a
+  // file doubles, and a rewrite here could race the other daemon's append.
+  function sweep(sess, opts = {}) {
+    const minAge = opts.minAgeMs === undefined ? 24 * 3600 * 1000 : Number(opts.minAgeMs) || 0;
     const valid = new Map();
     for (const [bucket, list] of Object.entries(sess || {})) {
       for (const e of Array.isArray(list) ? list : []) if (e && e.key) valid.set(fileOf(bucket, e.key), [bucket, e]);
@@ -158,9 +166,11 @@ module.exports = function createToolDetails({ dir, io = fs, now = Date.now, maxF
       let files;
       try { files = io.readdirSync(path.join(dir, folder.name)); } catch { continue; }
       for (const name of files) {
-        const file = path.join(dir, folder.name, name), hit = valid.get(file);
-        if (!hit) { try { io.unlinkSync(file); removed++; } catch {} continue; }
-        if (compact(hit[0], hit[1])) compacted++;
+        const file = path.join(dir, folder.name, name);
+        if (valid.has(file)) continue;
+        // (minAge 0 = no gate at all: an mtime can sit a fraction of a ms
+        // AHEAD of Date.now() on NTFS, so `age < 0` must not count as young.)
+        try { if (minAge > 0 && now() - io.statSync(file).mtimeMs < minAge) continue; io.unlinkSync(file); removed++; } catch {}
       }
     }
     return { removed, compacted };
