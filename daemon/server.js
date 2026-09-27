@@ -41,6 +41,8 @@ const projtrust = require("./projecttrust");
 const joborder = require("./joborder");
 const { wireWorkspaceSettings } = require("./wire-hooks-runtime");
 const { killTree } = require("./kill-tree");   // cross-platform child reap (issue #15 review)
+const devmode = require("./devmode");           // 🛠 Dev Mode: redacted tool detail for task.progress
+const createToolDetails = require("./tooldetail");  // 🛠 Dev Mode: per-thread tool details for history rows
 
 // Issue #15 (Bug 1) — main runs need both a hard wall-clock cap and an idle
 // detector, or a stuck CLI retry loop pins a task in "started" until the CLI
@@ -307,7 +309,8 @@ function rosterEvt() {
     proposalMin: Number(reg.proposalMin !== undefined ? reg.proposalMin : 120),
     maxStaff: MAX_STAFF, staffCount: staffCount(),
     lang: reg.lang || "en", daylight: reg.daylight ?? "auto",
-    monitor: reg.monitor || 0, monitors: monitorCount() };
+    monitor: reg.monitor || 0, monitors: monitorCount(),
+    devMode: reg.devMode === true };
 }
 
 // Relaunch the whole stack (shell → daemon → godot) detached, so it survives
@@ -523,7 +526,8 @@ async function maybeLearnSkill(agent, task, prompt, acts, finalText, projId, fai
 
 const SESSIONS = path.join(__dirname, "sessions.json");
 let sess = {};
-try { sess = JSON.parse(fs.readFileSync(SESSIONS, "utf8")); } catch {}
+let sessLoaded = false;   // false: missing/unreadable sessions.json — never sweep tool details against it
+try { sess = JSON.parse(fs.readFileSync(SESSIONS, "utf8")); sessLoaded = true; } catch {}
 function saveSess() { fs.writeFileSync(SESSIONS, JSON.stringify(sess, null, 2)); }
 
 // One-time boot housekeeping (P0): keep journal + sessions from growing forever
@@ -536,6 +540,22 @@ try {
   const p = maintenance.pruneSessions(sess);
   if (p.changed) { sess = p.sess; saveSess(); console.log(`[maint] pruned ${p.dropped} stale session thread(s)`); }
 } catch (e) { console.error("[maint] sessions:", e.message); }
+// 🛠 Dev Mode: every tool call's redacted detail, per thread, so history rows
+// can show it later (see tooldetail.js). Swept with the threads it belongs to —
+// but only once this process owns the office (server.listen below): a second
+// daemon started by mistake exits on EADDRINUSE without touching the store.
+const toolDetails = createToolDetails({ dir: path.join(__dirname, "tooldetail") });
+function sweepToolDetails() {
+  // Only the office itself (default port) or a daemon given its own state
+  // folder sweeps. A test or duplicate daemon booted from this folder on
+  // another port must not delete the running office's details.
+  const ownsStore = String(OEP_PORT) === "8787" || !!process.env.OEP_STATE_DIR;
+  if (!sessLoaded || !ownsStore) return;
+  try {
+    const t = toolDetails.sweep(sess);
+    if (t.removed || t.compacted) console.log(`[maint] tool details: removed ${t.removed}, compacted ${t.compacted}`);
+  } catch (e) { console.error("[maint] tool details:", e.message); }
+}
 function latestSession(agent) {
   const l = sess[agent] || [];
   return l.length ? l.reduce((a, b) => (a.ts > b.ts ? a : b)) : null;
@@ -971,10 +991,14 @@ let onBroadcastHook = null;   // set once triggers exist (event triggers listen 
 function broadcast(evt, journal = true) {
   evt.ts = Date.now();
   const json = JSON.stringify(evt);
-  if (journal) fs.appendFile(JOURNAL, json + "\n", () => {});
+  // journal may be an OBJECT: the leaner event to persist instead of evt
+  // (Dev Mode task.progress ships tool input live, but never to disk).
+  const persistedJson = journal && journal !== true
+    ? JSON.stringify({ ...journal, ts: evt.ts }) : json;
+  if (journal) fs.appendFile(JOURNAL, persistedJson + "\n", () => {});
   const frame = wsFrame(json);
   for (const s of wsClients) s.write(frame);
-  if (evt.type !== "world.pos") console.log("[oep] →", json);
+  if (evt.type !== "world.pos") console.log("[oep] →", persistedJson);
   if (onBroadcastHook) { try { onBroadcastHook(evt); } catch (e) { console.error("[trigger] event hook", e && e.message); } }
 }
 
@@ -2626,12 +2650,19 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
           if (b.type === "tool_use") {
             acts.push(b.name);
             // Tool calls belong to the conversation: a tiny "tool" entry in
-            // the thread history + a session-tagged progress event.
-            entry.log.push({ who: "tool", text: b.name, ts: Date.now() });
+            // the thread history (name + call id) + a session-tagged progress event.
+            const call = toolDetails.newId();
+            entry.log.push({ who: "tool", text: b.name, ts: Date.now(), id: call });
             while (entry.log.length > 200) entry.log.shift();
             saveSess();
-            broadcast({ type: "task.progress", agent, task, tool: b.name,
-              session: entry.key });
+            // 🛠 Dev Mode: the redacted, capped summary (never raw b.input) is
+            // kept per thread whatever the mode, so the row can show it later.
+            toolDetails.record(agent, entry, call, devmode.toolDetail(b.name, b.input));
+            // The live frame carries the (redacted) tool input plus that summary
+            // ONLY while reg.devMode is on. The journal always gets the plain event.
+            const progress = { type: "task.progress", agent, task, tool: b.name,
+              session: entry.key, id: call };
+            broadcast(devmode.progressEvent(progress, b.input, reg.devMode === true), progress);
             watchdog.touch();   // issue #15: a tool call is forward progress
           } else if (b.type === "text" && b.text.trim()) {
             lastText = b.text;
@@ -3446,11 +3477,16 @@ function runSub(parentId, subId, taskText, entry, onDone) {
       if (m.type === "assistant" && m.message && Array.isArray(m.message.content)) {
         for (const b of m.message.content) {
           if (b.type === "tool_use") {
-            entry.log.push({ who: "tool", text: b.name, ts: Date.now() });
+            const call = toolDetails.newId();
+            entry.log.push({ who: "tool", text: b.name, ts: Date.now(), id: call });
             while (entry.log.length > 200) entry.log.shift();
             saveSess();
-            broadcast({ type: "subagent.progress", agent: parentId, sub: subId,
-              tool: b.name, session: entry.key });
+            // Match the main-agent path: the redacted summary is kept per
+            // thread; live Dev Mode details are redacted; the journal stays plain.
+            toolDetails.record("@sub", entry, call, devmode.toolDetail(b.name, b.input));
+            const progress = { type: "subagent.progress", agent: parentId, sub: subId,
+              tool: b.name, session: entry.key, id: call };
+            broadcast(devmode.progressEvent(progress, b.input, reg.devMode === true), progress);
           } else if (b.type === "text" && b.text.trim()) {
             lastText = b.text;
             entry.log.push({ who: "agent", text: b.text.slice(0, 8000), ts: Date.now() });
@@ -4965,8 +5001,17 @@ const server = http.createServer((req, res) => {
     // live=true tells the overlay it may show the speak bar + controls for this
     // meeting (a finished Meeting Log stays read-only). Only group meetings are
     // ever live; @sub logs never are.
-    res.end(JSON.stringify({ log: (entry && entry.log) || [],
+    // Tool rows get their saved Dev Mode detail joined in by call id.
+    res.end(JSON.stringify({ log: toolDetails.join(q.get("agent"), entry),
       live: !!(entry && activeMeetings.has(entry.key)) }));
+
+  } else if (req.method === "GET" && req.url.startsWith("/sessions/tool-detail?")) {
+    // 🛠 Dev Mode: one tool call's saved detail — the overlay asks when a row
+    // that arrived without it (Dev Mode was off at the time) is expanded.
+    const q = new URL(req.url, "http://x").searchParams;
+    const d = toolDetails.get(q.get("agent") || "", q.get("key") || "", q.get("id") || "");
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.end(JSON.stringify(d ? { found: true, kind: d.kind, label: d.label, detail: d.detail } : { found: false }));
 
   } else if (req.method === "GET" && req.url === "/sessions/all") {
     res.writeHead(200, { "content-type": "application/json" });
@@ -4979,6 +5024,7 @@ const server = http.createServer((req, res) => {
         sess[agent] = (sess[agent] || []).filter((s) => s.key !== key);
         if (!sess[agent].length) delete sess[agent];
         saveSess();
+        toolDetails.remove(agent, key);
         res.writeHead(200);
         res.end("ok");
       } catch (e) {
@@ -6964,6 +7010,23 @@ end tell`;
       }
     });
 
+  } else if (req.method === "POST" && req.url === "/registry/devmode") {
+    // 🛠 Dev Mode: show detailed panels, scroll bars, verbose logging for debugging.
+    // Owner-only, opt-in, default off.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      try {
+        reg.devMode = !!JSON.parse(body).enabled;
+        saveReg();
+        pushRoster();
+        res.writeHead(200);
+        res.end("ok");
+      } catch {
+        res.writeHead(400);
+        res.end("bad json");
+      }
+    });
+
   } else if (req.method === "POST" && req.url === "/registry/autoskills") {
     readBody(req, (body) => {
       try {
@@ -8153,6 +8216,7 @@ catch (e) { console.error("[startup] wireWorkspaceSettings failed:", e && e.mess
 ensureOnboarded();
 server.listen(OEP_PORT, "127.0.0.1", () => {
   console.log(`[oep] http+ws listening :${OEP_PORT}`);
+  sweepToolDetails();   // this process owns the office now
   // Fresh boot ⇒ nothing is running (runChildren starts empty). A task.started left
   // dangling in the journal by the previous (killed) run would otherwise REPLAY on the
   // next client connect and pin agents as "working" forever. Journal a reset so it

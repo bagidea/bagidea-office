@@ -387,10 +387,12 @@ if (Test-Path (Join-Path $APP ".git")) {
     $p = Join-Path $APP "daemon\$f"; if (Test-Path $p) { Copy-Item $p (Join-Path $backup $f) -Force }
   }
   if (Test-Path (Join-Path $APP "daemon\i18n")) { Copy-Item (Join-Path $APP "daemon\i18n") (Join-Path $backup "i18n") -Recurse -Force }
+  if (Test-Path (Join-Path $APP "daemon\tooldetail")) { Copy-Item (Join-Path $APP "daemon\tooldetail") (Join-Path $backup "tooldetail") -Recurse -Force }
   Remove-Item -Recurse -Force $APP
   git clone --depth 1 --branch $Branch $Repo $APP
   Get-ChildItem $backup -File | ForEach-Object { Copy-Item $_.FullName (Join-Path $APP ("daemon\" + $_.Name)) -Force }
   if (Test-Path (Join-Path $backup "i18n")) { Copy-Item (Join-Path $backup "i18n") (Join-Path $APP "daemon\i18n") -Recurse -Force }
+  if (Test-Path (Join-Path $backup "tooldetail")) { Copy-Item (Join-Path $backup "tooldetail") (Join-Path $APP "daemon\tooldetail") -Recurse -Force }
   Ok "cloned + restored your previous data"
 } else {
   git clone --depth 1 --branch $Branch $Repo $APP
