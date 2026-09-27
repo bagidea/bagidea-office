@@ -223,7 +223,14 @@ test("devmode: inputs too large to mask quickly are not summarised (fail closed)
   const g = devmode.toolDetail("mcp__web__post", { body: secret + "x".repeat(devmode.MAX_MASK_INPUT) });
   assert.match(g.detail, /^<input too large to summarise/); assert.ok(!JSON.stringify(g).includes(secret));
   const ev = devmode.progressEvent({ type: "task.progress", tool: "mcp__web__post" }, { body: "y".repeat(devmode.MAX_MASK_INPUT + 1) }, true);
-  assert.ok(!("input" in ev), "the live frame carries no input it could not mask quickly");
+  assert.match(ev.input, /^<input too large to summarise: \d+ KB>$/, "the live frame says how large the input was, nothing more");
+  // a long path is summarised in linear time and a path over the limit is not summarised
+  let t0 = Date.now();
+  assert.strictEqual(devmode.toolDetail("Read", { file_path: "a".repeat(devmode.MAX_MASK_INPUT - 10) + "/x.md" }).label, "x.md");
+  assert.match(devmode.toolDetail("Read", { file_path: "a".repeat(devmode.MAX_MASK_INPUT * 8) + "/x.md" }).detail, /too large/);
+  assert.ok(Date.now() - t0 < 200, "long paths are cheap: " + (Date.now() - t0) + " ms");
+  for (const [p, want] of [["C:\\a\\b.md", "b.md"], ["a/b/", "b"], ["/", "/"], ["", ""], ["x", "x"], ["a\\b\\", "b"]])
+    assert.strictEqual(devmode.toolDetail("Read", { file_path: p }).label, want === "" ? "" : want, JSON.stringify(p));
   assert.match(ev.detail, /^<input too large to summarise/);
   // just under the limit: summarised and masked as before
   const ok = devmode.toolDetail("Bash", { command: "curl -H 'Authorization: Bearer " + secret + "' x" });

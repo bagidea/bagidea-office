@@ -956,6 +956,18 @@ test("overlay: a network error while loading a detail can be retried; a toggle d
   assert.strictEqual(o.requests.length, 2);
 });
 
+test("overlay: a Dev Mode redraw landing between a click and its toggle event still loads the detail", async () => {
+  const o = bootOverlay({ fetch: () => Promise.resolve({ ok: true, json: async () => ({ found: true, kind: "command", detail: "echo hi" }) }) });
+  const log = o.byId.get("log");
+  o.api.addToolRow("Bash", { type: "task.progress", tool: "Bash", agent: "lora", session: "s1", id: "c-1" });
+  log.children[0].open = true;                 // the click opened it; its toggle event has not run yet
+  o.api.setDev(false); o.api.setDev(true);     // a roster.sync redraw lands first
+  await tick(); await tick();
+  assert.strictEqual(o.requests.length, 1, "the pending expand is not lost");
+  assert.strictEqual(log.children[0].children[1].textContent, "echo hi");
+  assert.strictEqual(log.children[0].open, true);
+});
+
 test("overlay: a pane load keeps the owner's just-sent bubble, notice chips and the typing row, without duplicates", async () => {
   const pending = [];
   const o = bootOverlay({ fetch: (url) => new Promise((resolve) => pending.push({ url, resolve })) });
@@ -966,6 +978,8 @@ test("overlay: a pane load keeps the owner's just-sent bubble, notice chips and 
   const sent = o.sandbox.addMsg("you", null, "please continue");
   const saved = o.sandbox.addMsg("you", null, "already in history");
   const withFile = o.sandbox.addMsg("you", null, "look at this"); withFile.dataset.text = "look at this\n\n[ไฟล์แนบ]:\n- a.png";
+  const shortYes = o.sandbox.addMsg("you", null, "yes");               // an earlier message merely contains it
+  const ceoOrder = o.sandbox.addMsg("you", null, "ship it");           // saved from the CEO pane with a prefix
   const chip = doc.createElement("div"); chip.className = "chip"; chip.textContent = "🧵 notice"; log.appendChild(chip);
   const perm = doc.createElement("div"); perm.className = "msg agent permcard"; perm.textContent = "[perm card]"; log.appendChild(perm);
   const typing = doc.createElement("div"); typing.id = "typingRow"; typing.className = "msg agent typing"; log.appendChild(typing);
@@ -975,14 +989,17 @@ test("overlay: a pane load keeps the owner's just-sent bubble, notice chips and 
     { who: "agent", text: "please continue", ts: now - 3600e3 },          // same words, an hour ago: not the new bubble
     { who: "you", text: "already in history", ts: now },
     { who: "you", text: "look at this\n\n[ไฟล์แนบ]:\n- a.png", ts: now }, // saved with its attachment list
+    { who: "you", text: "yes please go ahead", ts: now - 5000 },
+    { who: "you", text: "👑 (CEO) ship it", ts: now },
     { who: "agent", text: "Done.", ts: now },
   ] }) });
   await load;
   const shown = log.children.map((n) => n.id === "typingRow" ? "[typing]" : n.textContent);
-  assert.deepStrictEqual(shown, ["please continue", "already in history", "look at this\n\n[ไฟล์แนบ]:\n- a.png", "Done.",
-    "please continue", "🧵 notice", "[perm card]", "[typing]"],
-    "old view gone; history; then the unsaved bubble, the chip and the permission card; the typing row last");
+  assert.deepStrictEqual(shown, ["please continue", "already in history", "look at this\n\n[ไฟล์แนบ]:\n- a.png", "yes please go ahead",
+    "👑 (CEO) ship it", "Done.", "please continue", "yes", "🧵 notice", "[perm card]", "[typing]"],
+    "old view gone; history; then the unsaved bubbles, the chip and the permission card; the typing row last");
   assert.ok(!log.children.includes(saved) && !log.children.includes(withFile) && log.children.includes(sent) && !log.children.includes(old));
+  assert.ok(log.children.includes(shortYes) && !log.children.includes(ceoOrder), "exact match only: 'yes' is not 'yes please go ahead'; the CEO prefix is ignored");
   assert.ok(!log.children.includes(other), "a live row of another thread is not carried into this one");
 });
 
@@ -1029,9 +1046,13 @@ test("overlay: live events, meetings and background refreshes use the pane-load 
   const bar = html.slice(html.indexOf("async function refreshThreadBar("), html.indexOf("async function refreshThreadBar(") + 600);
   assert.match(bar, /if \(groupView && !force\) return;/, "a background refresh never draws over an open meeting");
   assert.match(bar, /paneLoad = null;/);
-  const barFull = html.slice(html.indexOf("async function refreshThreadBar("), html.indexOf("async function refreshThreadBar(") + 1400);
-  assert.match(barFull, /await fetch\(`\/sessions\?agent=[\s\S]*?\.then\(\(x\) => x\.json\(\)\);\s*\r?\n\s*if \(groupView && !force\) return;/, "…nor one that started before the meeting opened");
-  assert.match(html, /function setTarget\(id\) \{\s*groupView = null;[^\n]*\r?\n\s*hideTyping\(\);/, "switching agents drops the old typing row");
+  const barFull = html.slice(html.indexOf("async function refreshThreadBar("), html.indexOf("async function refreshThreadBar(") + 1600);
+  assert.match(barFull, /const startedIn = groupView;/);
+  assert.match(barFull, /await fetch\(`\/sessions\?agent=[\s\S]*?\.then\(\(x\) => x\.json\(\)\);\s*\r?\n\s*if \(groupView !== startedIn\) return;/,
+    "…nor any refresh (forced or not) whose view changed while it waited for the list");
+  assert.match(html, /function setTarget\(id\) \{[\s\S]{0,200}?if \(id !== target \|\| groupView\) hideTyping\(\);\s*\r?\n\s*groupView = null;/,
+    "switching agents (or leaving a meeting) drops the old typing row; the same agent keeps it");
+  assert.match(html, /o\.onclick = \(\) => \{ hideTyping\(\); onpick\(\);/, "picking another thread drops the old view's typing row");
   assert.match(html, /async function openGroupLog\([^)]*\) \{\s*groupView = key;\s*hideTyping\(\);/, "opening a meeting drops a thread's typing row");
   assert.match(html, /d\.dataset\.text = prompt\.slice\(0, 200\);/, "a sent bubble is matched as the history saves it (attachments included)");
   assert.match(html, /d\.dataset\.text = String\(text \|\| ""\)\.slice\(0, 200\);/, "messages carry their opening text for the reload match");

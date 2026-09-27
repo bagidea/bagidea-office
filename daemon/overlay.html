@@ -1760,8 +1760,10 @@
   _miniMQ.addEventListener("change", () => setComposerHint());
 
   function setTarget(id) {
+    // Another agent's (or a meeting's) "working…" row does not follow to this
+    // pane; the same agent's own row is kept through the reload.
+    if (id !== target || groupView) hideTyping();
     groupView = null;  // leaving a meeting log view
-    hideTyping();      // the previous agent's "working…" row does not follow to the next pane
     if (typeof hideSpeakBar === "function") hideSpeakBar();
     target = id;
     refreshTargetChrome();
@@ -1998,8 +2000,12 @@
     for (const row of log.querySelectorAll(".toolrow")) {
       const data = devToolRows.get(row);
       if (!data) continue;
+      // A click can open a row just before this redraw, ahead of its "toggle"
+      // event; the redrawn row would never see that expand, so load it here.
+      const expanded = row.tagName === "DETAILS" && row.open && !data.open;
       if (row.tagName === "DETAILS") data.open = row.open;
       row.replaceWith(renderDevToolRow(data));
+      if (expanded && canFetchDetail(data)) loadToolDetail(data);
     }
     log.scrollTop = scrollTop;
   }
@@ -6524,13 +6530,13 @@
     const ids = new Set(snapshot.filter((m) => m && m.who === "tool" && m.id).map((m) => m.id));
     // Messages match by opening text, one for one, and only against rows saved
     // since the load began — an older reply with the same words is not this one.
-    // The owner's own bubble may be saved with more around it (an attachment
-    // list, a voice prefix), so it matches any recent "you" row containing it.
+    // The owner's orders from the CEO pane are saved with a "👑 (CEO) " prefix.
+    const opening = (text) => String(text || "").replace(/^👑 \(CEO\) /, "").slice(0, 200);
     const recent = snapshot.filter((m) => m && m.who !== "tool" && m.text && !(m.ts && m.ts < load.t0 - 10000))
-      .map((m) => ({ mine: m.who === "you" || m.who === "ceo", text: String(m.text).slice(0, 4000), used: false }));
+      .map((m) => ({ mine: m.who === "you" || m.who === "ceo", text: opening(m.text), used: false }));
     const inSnapshot = (text, mine) => {
-      const t = String(text || "").slice(0, 200);
-      const hit = recent.find((r) => !r.used && r.mine === mine && (mine && t ? r.text.includes(t) : r.text.slice(0, 200) === t));
+      const t = opening(text);
+      const hit = recent.find((r) => !r.used && r.mine === mine && r.text === t);
       if (hit) hit.used = true;
       return !!hit;
     };
@@ -6581,8 +6587,10 @@
   // shared, so "same thread as before" never means "still on screen".
   async function refreshThreadBar(force = false) {
     // An open meeting / ghost log owns the pane until the owner leaves it
-    // (seat click, thread pick): a background refresh must not draw over it.
+    // (seat click, thread pick): a background refresh must not draw over it,
+    // nor may any refresh whose view changed while it waited for the list.
     if (groupView && !force) return;
+    const startedIn = groupView;
     if (SESS[target] === "new") {
       CUR[target] = null;
       paneLoad = null;   // a pending history load must not draw over the fresh thread
@@ -6592,7 +6600,7 @@
     }
     try {
       const r = await fetch(`/sessions?agent=${encodeURIComponent(sessAgent())}`).then((x) => x.json());
-      if (groupView && !force) return;   // a meeting opened while the list was loading
+      if (groupView !== startedIn) return;   // a meeting opened (or was left) while the list was loading
       const list = r.sessions || [];
       let cur = SESS[target] ? list.find((s) => s.key === SESS[target]) : null;
       if (!cur) cur = list[0];
@@ -6621,7 +6629,7 @@
       const o = document.createElement("div");
       o.className = "opt" + (active ? " active" : "");
       o.innerHTML = label + (sub ? `<small>${sub}</small>` : "");
-      o.onclick = () => { onpick(); m.classList.remove("open"); refreshThreadBar(); };
+      o.onclick = () => { hideTyping(); onpick(); m.classList.remove("open"); refreshThreadBar(); };   // the old view's "working…" row stays behind
       m.appendChild(o);
     };
     mk("🆕 เริ่ม thread ใหม่", "ความจำใหม่ ไม่ต่อจากของเดิม", "new",

@@ -167,7 +167,14 @@ function inputSize(v) { try { return JSON.stringify(v === undefined ? null : v).
 function tooLarge(n) { return "<input too large to summarise: " + (Number.isFinite(n) ? Math.ceil(n / 1024) + " KB" : "unreadable") + ">"; }
 function cap(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 function firstLine(s) { return String(s).split(/\r?\n/)[0].trim(); }
-function baseName(p) { const s = String(p); const m = s.match(/([^\\\/]+)[\\\/]*$/); return m ? m[1] : s; }
+// Linear on purpose: a trailing-separator regex backtracks quadratically on long paths.
+function baseName(p) {
+  const s = String(p);
+  let end = s.length;
+  while (end > 0 && (s[end - 1] === "/" || s[end - 1] === "\\")) end--;
+  const t = s.slice(0, end), i = Math.max(t.lastIndexOf("/"), t.lastIndexOf("\\"));
+  return i >= 0 ? t.slice(i + 1) : (t || s);
+}
 
 // Human-readable description of one tool call. `detail` is ALWAYS redacted
 // and capped at MAX_DETAIL; `label` is a ≤ 60 char one-line preview for the
@@ -175,30 +182,32 @@ function baseName(p) { const s = String(p); const m = s.match(/([^\\\/]+)[\\\/]*
 function toolDetail(name, input) {
   const tool = String(name || "");
   const inp = input && typeof input === "object" && !Array.isArray(input) ? input : {};
-  let kind = "tool", detail = "", label = "";
+  // labelOf runs only after the size guard below: label work on a huge input costs too.
+  let kind = "tool", detail = "", labelOf = () => "";
   if (/^(bash|powershell|shell|sh|cmd|terminal)$/i.test(tool)) {
     kind = "command";
     detail = str(inp.command !== undefined ? inp.command : (inp.cmd !== undefined ? inp.cmd : inp.script));
-    label = firstLine(detail);
+    labelOf = (raw) => firstLine(raw);
   } else if (/^skill$/i.test(tool)) {
     kind = "skill";
     const sk = str(inp.skill !== undefined ? inp.skill : inp.name);
     const args = str(inp.args);
     detail = [sk, args].filter(Boolean).join(" ");
-    label = sk;
+    labelOf = () => sk;
   } else if (/^(read|write|edit|multiedit|notebookedit|notebookread)$/i.test(tool)) {
     kind = "file";
     detail = str(inp.file_path !== undefined ? inp.file_path : (inp.path !== undefined ? inp.path : inp.notebook_path));
-    label = baseName(detail);
+    labelOf = (raw) => baseName(raw);
   } else if (/^(glob|grep)$/i.test(tool)) {
     kind = "search";
     detail = str(inp.pattern);
     if (inp.path) detail += "  in " + str(inp.path);
-    label = firstLine(str(inp.pattern));
+    labelOf = () => firstLine(str(inp.pattern));
   } else if (/^(agent|task)$/i.test(tool)) {
     detail = str(inp.description !== undefined ? inp.description : inp.prompt);
-    label = firstLine(detail);
+    labelOf = (raw) => firstLine(raw);
   }
+  let label = "";
   if (!detail) {
     const size = inputSize(inp);
     if (size > MAX_MASK_INPUT) return { kind, label: "", detail: tooLarge(size) };
@@ -206,6 +215,7 @@ function toolDetail(name, input) {
     if (detail === "{}") detail = "";
   } else {
     if (detail.length > MAX_MASK_INPUT) return { kind, label: "", detail: tooLarge(detail.length) };
+    label = labelOf(detail);   // from the raw text, masked below — as before
     detail = maskInString(detail);
   }
   return { kind, label: cap(maskInString(label), MAX_LABEL), detail: cap(detail, MAX_DETAIL) };
@@ -216,7 +226,10 @@ function toolDetail(name, input) {
 function progressEvent(base, input, devMode) {
   const ev = Object.assign({}, base);
   if (devMode !== true) return ev;
-  if (input && typeof input === "object" && inputSize(input) <= MAX_MASK_INPUT) ev.input = redactSecrets(input);
+  if (input && typeof input === "object") {
+    const size = inputSize(input);
+    ev.input = size <= MAX_MASK_INPUT ? redactSecrets(input) : tooLarge(size);   // too large to mask quickly: size only
+  }
   const d = toolDetail(base && base.tool, input);
   ev.kind = d.kind;
   if (d.label) ev.label = d.label;
