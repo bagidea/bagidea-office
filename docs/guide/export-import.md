@@ -131,7 +131,7 @@ archive; an arbitrary folder ZIP is not an office archive.
 | ZIP file size | 20 MiB |
 | Total unpacked content | 64 MiB |
 | Each unpacked file | 8 MiB |
-| Archive entries | 2,000 |
+| Archive entries | 5,000 |
 
 The importer validates the ZIP and its paths before showing the preview. Entries
 cannot escape the supported destination folders. Imported workflow triggers are

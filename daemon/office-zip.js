@@ -8,7 +8,9 @@ const { TextDecoder } = require("node:util");
 const MAX_ARCHIVE_BYTES = 20 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 64 * 1024 * 1024;
 const MAX_ENTRY_BYTES = 8 * 1024 * 1024;
-const MAX_ENTRIES = 2000;
+// Room for every item of a full office with its readable copies (≈4,300 at the
+// category maxima); the byte limits below bound the work regardless.
+const MAX_ENTRIES = 5000;
 const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const CP437 = "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
