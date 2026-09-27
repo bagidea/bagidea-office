@@ -9,6 +9,10 @@ const MAX_BREADTH = 100;
 const MAX_STRING = 1024;
 const MAX_DETAIL = 2000;
 const MAX_LABEL = 60;
+// Inputs larger than this are not masked or summarised at all (fail closed):
+// masking cost grows faster than the text, and every tool call is summarised
+// for the saved history now, whatever the Dev Mode setting.
+const MAX_MASK_INPUT = 16 * 1024;
 
 // Key-name patterns that mark a value as a secret. Keys are normalised
 // (camelCase → snake_case, lower-cased) before matching, and the match must
@@ -108,12 +112,6 @@ function maskInString(s) {
   return out;
 }
 
-// Mask only what can reach the output, plus a margin longer than any secret:
-// masking a multi-megabyte tool input in full can stall the event loop, and
-// every tool call is summarised now, whatever the Dev Mode setting.
-const MASK_MARGIN = 4096;
-function bounded(s, n) { return s.length > n + MASK_MARGIN ? s.slice(0, n + MASK_MARGIN) : s; }
-
 function truncStr(s) {
   return s.length > MAX_STRING ? s.slice(0, MAX_STRING) + "…<truncated>" : s;
 }
@@ -124,7 +122,7 @@ function truncStr(s) {
 function redactSecrets(obj, depth = 0, ancestors = new Set(), force = false) {
   if (obj === null || obj === undefined) return obj;
   const t = typeof obj;
-  if (t === "string") return force ? mask(obj) : truncStr(maskInString(bounded(obj, MAX_STRING)));
+  if (t === "string") return force ? mask(obj) : truncStr(maskInString(obj));
   if (t === "number" || t === "boolean") return force ? mask(obj) : obj;
   if (t === "bigint") return force ? mask(obj) : obj.toString();
   if (t === "function" || t === "symbol") return "<" + t + ">";
@@ -165,6 +163,8 @@ function str(v) {
   if (v === undefined || v === null) return "";
   return typeof v === "string" ? v : safeJson(v);
 }
+function inputSize(v) { try { return JSON.stringify(v === undefined ? null : v).length; } catch { return Infinity; } }
+function tooLarge(n) { return "<input too large to summarise: " + (Number.isFinite(n) ? Math.ceil(n / 1024) + " KB" : "unreadable") + ">"; }
 function cap(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 function firstLine(s) { return String(s).split(/\r?\n/)[0].trim(); }
 function baseName(p) { const s = String(p); const m = s.match(/([^\\\/]+)[\\\/]*$/); return m ? m[1] : s; }
@@ -200,12 +200,15 @@ function toolDetail(name, input) {
     label = firstLine(detail);
   }
   if (!detail) {
+    const size = inputSize(inp);
+    if (size > MAX_MASK_INPUT) return { kind, label: "", detail: tooLarge(size) };
     detail = safeJson(redactSecrets(inp), 1);
     if (detail === "{}") detail = "";
   } else {
-    detail = maskInString(bounded(detail, MAX_DETAIL));
+    if (detail.length > MAX_MASK_INPUT) return { kind, label: "", detail: tooLarge(detail.length) };
+    detail = maskInString(detail);
   }
-  return { kind, label: cap(maskInString(bounded(label, MAX_LABEL)), MAX_LABEL), detail: cap(detail, MAX_DETAIL) };
+  return { kind, label: cap(maskInString(label), MAX_LABEL), detail: cap(detail, MAX_DETAIL) };
 }
 
 // task.progress payload: the tool input (redacted) + detail are attached ONLY
@@ -213,7 +216,7 @@ function toolDetail(name, input) {
 function progressEvent(base, input, devMode) {
   const ev = Object.assign({}, base);
   if (devMode !== true) return ev;
-  if (input && typeof input === "object") ev.input = redactSecrets(input);
+  if (input && typeof input === "object" && inputSize(input) <= MAX_MASK_INPUT) ev.input = redactSecrets(input);
   const d = toolDetail(base && base.tool, input);
   ev.kind = d.kind;
   if (d.label) ev.label = d.label;
@@ -223,5 +226,5 @@ function progressEvent(base, input, devMode) {
 
 module.exports = {
   redactSecrets, toolDetail, progressEvent, mask, maskInString, isSecretKey,
-  MAX_DEPTH, MAX_BREADTH, MAX_STRING, MAX_DETAIL, MAX_LABEL,
+  MAX_DEPTH, MAX_BREADTH, MAX_STRING, MAX_DETAIL, MAX_LABEL, MAX_MASK_INPUT,
 };

@@ -546,7 +546,11 @@ try {
 // daemon started by mistake exits on EADDRINUSE without touching the store.
 const toolDetails = createToolDetails({ dir: path.join(__dirname, "tooldetail") });
 function sweepToolDetails() {
-  if (!sessLoaded) return;
+  // Only the office itself (default port) or a daemon given its own state
+  // folder sweeps. A test or duplicate daemon booted from this folder on
+  // another port must not delete the running office's details.
+  const ownsStore = String(OEP_PORT) === "8787" || !!process.env.OEP_STATE_DIR;
+  if (!sessLoaded || !ownsStore) return;
   try {
     const t = toolDetails.sweep(sess);
     if (t.removed || t.compacted) console.log(`[maint] tool details: removed ${t.removed}, compacted ${t.compacted}`);

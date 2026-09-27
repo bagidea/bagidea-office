@@ -1761,6 +1761,7 @@
 
   function setTarget(id) {
     groupView = null;  // leaving a meeting log view
+    hideTyping();      // the previous agent's "working…" row does not follow to the next pane
     if (typeof hideSpeakBar === "function") hideSpeakBar();
     target = id;
     refreshTargetChrome();
@@ -1940,8 +1941,13 @@
       pre.textContent = data.body || (canFetchDetail(data) && !data.failed ? "…" : tr("ไม่มีรายละเอียดที่บันทึกไว้สำหรับการเรียกนี้"));
       row.appendChild(summary);
       row.appendChild(pre);
-      // Fetch on expand only — rendering (history, toggles, roster.sync) never fetches.
-      if (canFetchDetail(data)) row.ontoggle = () => { data.open = row.open; return row.open ? loadToolDetail(data) : undefined; };
+      // Fetch on a real expand only. Browsers also fire "toggle" when a row is
+      // redrawn already open — that must not fetch again (or loop on a failure).
+      if (canFetchDetail(data)) row.ontoggle = () => {
+        if (row.open === data.open) return;
+        data.open = row.open;
+        return row.open ? loadToolDetail(data) : undefined;
+      };
     } else row.textContent = "⚙ " + data.name;
     devToolRows.set(row, data);
     data.el = row;   // the element currently showing this call (toggles replace it)
@@ -2090,8 +2096,7 @@
     const t = typeof obj;
     if (t === "string") {
       if (force) return maskSecret(obj);
-      // mask BEFORE truncating — only what can reach the output, plus a 4096-char margin (as devmode.js)
-      const s = maskInString(obj.length > MAX_REDACT_STRING + 4096 ? obj.slice(0, MAX_REDACT_STRING + 4096) : obj);
+      const s = maskInString(obj);   // mask BEFORE truncating
       return s.length > MAX_REDACT_STRING ? s.slice(0, MAX_REDACT_STRING) + "…<truncated>" : s;
     }
     if (t === "number" || t === "boolean") return force ? maskSecret(obj) : obj;
@@ -6397,6 +6402,7 @@
   // one read-only in the chat pane; live messages keep streaming in.
   async function openGroupLog(key, title, bucket = "@group", faceId = null) {
     groupView = key;
+    hideTyping();   // a thread's "working…" row does not belong in the meeting view
     setThreadLabel((bucket === "@sub" ? "👻 " : "🗣 ") + title);
     document.getElementById("inp").placeholder = bucket === "@sub"
       ? "งานของ sub-agent (อ่านอย่างเดียว) — คลิก agent ใน rail เพื่อกลับไปคุย"
@@ -6501,8 +6507,10 @@
     if (paneLoad !== load) return false;
     paneLoad = null;
     // What was drawn during the load and no history carries — the owner's
-    // just-sent bubble, a notice chip, the typing row — is put back afterwards.
-    load.extra = Array.from(log.children).filter((n) => !load.before.has(n));
+    // just-sent bubble, a notice chip, a permission or proposal card — is put
+    // back afterwards, and so is a typing row still showing (the views that
+    // switch to another agent or a meeting hide it first).
+    load.extra = Array.from(log.children).filter((n) => !load.before.has(n) || n.id === "typingRow");
     log.innerHTML = "";
     return true;
   }
@@ -6516,27 +6524,28 @@
     const ids = new Set(snapshot.filter((m) => m && m.who === "tool" && m.id).map((m) => m.id));
     // Messages match by opening text, one for one, and only against rows saved
     // since the load began — an older reply with the same words is not this one.
-    const recent = new Map();
-    for (const m of snapshot) {
-      if (!m || m.who === "tool" || !m.text || (m.ts && m.ts < load.t0 - 10000)) continue;
-      const t = String(m.text).slice(0, 200);
-      recent.set(t, (recent.get(t) || 0) + 1);
-    }
-    const inSnapshot = (text) => {
-      const t = String(text || "").slice(0, 200), n = recent.get(t) || 0;
-      if (n) recent.set(t, n - 1);
-      return n > 0;
+    // The owner's own bubble may be saved with more around it (an attachment
+    // list, a voice prefix), so it matches any recent "you" row containing it.
+    const recent = snapshot.filter((m) => m && m.who !== "tool" && m.text && !(m.ts && m.ts < load.t0 - 10000))
+      .map((m) => ({ mine: m.who === "you" || m.who === "ceo", text: String(m.text).slice(0, 4000), used: false }));
+    const inSnapshot = (text, mine) => {
+      const t = String(text || "").slice(0, 200);
+      const hit = recent.find((r) => !r.used && r.mine === mine && (mine && t ? r.text.includes(t) : r.text.slice(0, 200) === t));
+      if (hit) hit.used = true;
+      return !!hit;
     };
     for (const ev of load.live) {
       const isTool = ev.type === "task.progress" || ev.type === "subagent.progress";
-      if (isTool ? (!ev.id || ids.has(ev.id)) : inSnapshot(ev.text)) continue;
+      if (isTool ? (!ev.id || ids.has(ev.id)) : inSnapshot(ev.text, ev.agent === "ceo")) continue;
       draw(ev);
     }
     let typing = null;
     for (const node of load.extra || []) {
       if (node.id === "typingRow") typing = node;
-      else if (node.classList.contains("chip")) log.appendChild(node);
-      else if (node.dataset && node.dataset.text !== undefined && !inSnapshot(node.dataset.text)) log.appendChild(node);
+      else if (node.classList.contains("toolrow")) continue;   // another thread's live row: not this view's
+      else if (node.dataset && node.dataset.text !== undefined) {
+        if (!inSnapshot(node.dataset.text, node.classList.contains("you"))) log.appendChild(node);
+      } else log.appendChild(node);   // chips, permission and proposal cards
     }
     if (typing) log.appendChild(typing);   // the agent is still working: keep saying so, last
     log.scrollTop = log.scrollHeight;
@@ -6583,6 +6592,7 @@
     }
     try {
       const r = await fetch(`/sessions?agent=${encodeURIComponent(sessAgent())}`).then((x) => x.json());
+      if (groupView && !force) return;   // a meeting opened while the list was loading
       const list = r.sessions || [];
       let cur = SESS[target] ? list.find((s) => s.key === SESS[target]) : null;
       if (!cur) cur = list[0];
@@ -7534,6 +7544,7 @@
       prompt += "\n\n[ไฟล์แนบจากผู้ใช้ — เปิดดูได้ด้วย Read]:\n" +
         files.map((f) => "- " + f.path).join("\n");
     }
+    d.dataset.text = prompt.slice(0, 200);   // as the thread history will save it
     const session = SESS[target];
     if (session === "new") SESS[target] = undefined;  // next sends continue it
     await fetch("/chat", {

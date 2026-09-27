@@ -223,11 +223,12 @@ test("server.js: history joins saved details, one call can be fetched, and delet
   assert.match(serverSrc, /const toolDetails = createToolDetails\(\{ dir: path\.join\((?:__dirname|STATE_DIR), "tooldetail"\) \}\);/, "the store lives with the daemon's state files");
   assert.ok(serverSrc.indexOf("toolDetails.sweep(sess)") > serverSrc.indexOf("maintenance.pruneSessions(sess)"), "the boot sweep runs after the thread prune");
   assert.match(serverSrc, /try \{ sess = JSON\.parse\(fs\.readFileSync\(SESSIONS, "utf8"\)\); sessLoaded = true; \} catch \{\}/);
-  assert.match(serverSrc, /function sweepToolDetails\(\) \{\s*if \(!sessLoaded\) return;/, "an unreadable sessions.json never sweeps the store");
   const listen = serverSrc.indexOf('server.listen(OEP_PORT, "127.0.0.1", () => {');
   assert.ok(listen > 0 && /^\s*console\.log\([^\n]*\n\s*sweepToolDetails\(\);/.test(serverSrc.slice(listen + 48, listen + 200)),
     "only the process that owns the port sweeps (a duplicate launch exits on EADDRINUSE first)");
   assert.strictEqual(serverSrc.split("sweepToolDetails()").length - 1, 2, "defined once, called once (in the listen callback)");
+  assert.match(serverSrc, /const ownsStore = String\(OEP_PORT\) === "8787" \|\| !!process\.env\.OEP_STATE_DIR;\s*if \(!sessLoaded \|\| !ownsStore\) return;/,
+    "a test/duplicate daemon on another port never sweeps the office's store");
   assert.match(serverSrc, /res\.end\(JSON\.stringify\(\{ log: toolDetails\.join\(q\.get\("agent"\), entry\),/, "GET /sessions/log joins saved details");
   const i = serverSrc.indexOf('req.url.startsWith("/sessions/tool-detail?")');
   assert.ok(i > 0 && i < serverSrc.indexOf('req.url === "/sessions/all"'), "the tool-detail route is matched before the generic /sessions routes");
@@ -941,8 +942,12 @@ test("overlay: a network error while loading a detail can be retried; a toggle d
   row = log.children[0];
   assert.strictEqual(row.children[1].textContent, DEV_MODE_KEYS.at(-1), "shows the fallback after a network error");
   assert.strictEqual(typeof row.ontoggle, "function", "…but stays retryable");
+  // browsers fire "toggle" when a row is redrawn already open: that is not an expand
+  await row.ontoggle(); await tick();
+  assert.strictEqual(o.requests.length, 1, "a redraw never refetches (no retry loop)");
   fail = false;
-  row.open = true; const pending = row.ontoggle();
+  row.open = false; row.ontoggle();                          // the owner collapses…
+  row.open = true; const pending = row.ontoggle();           // …and expands again: retry
   // Dev Mode goes off and on while the answer is on its way: the element is replaced twice
   o.api.setDev(false); o.api.setDev(true);
   release(); await pending; await tick();
@@ -960,19 +965,25 @@ test("overlay: a pane load keeps the owner's just-sent bubble, notice chips and 
   // drawn while the snapshot is on its way
   const sent = o.sandbox.addMsg("you", null, "please continue");
   const saved = o.sandbox.addMsg("you", null, "already in history");
+  const withFile = o.sandbox.addMsg("you", null, "look at this"); withFile.dataset.text = "look at this\n\n[ไฟล์แนบ]:\n- a.png";
   const chip = doc.createElement("div"); chip.className = "chip"; chip.textContent = "🧵 notice"; log.appendChild(chip);
+  const perm = doc.createElement("div"); perm.className = "msg agent permcard"; perm.textContent = "[perm card]"; log.appendChild(perm);
   const typing = doc.createElement("div"); typing.id = "typingRow"; typing.className = "msg agent typing"; log.appendChild(typing);
+  const other = doc.createElement("details"); other.className = "toolrow dev"; other.textContent = "another thread's row"; log.appendChild(other);
   const now = Date.now();
   pending[0].resolve({ ok: true, json: async () => ({ log: [
     { who: "agent", text: "please continue", ts: now - 3600e3 },          // same words, an hour ago: not the new bubble
     { who: "you", text: "already in history", ts: now },
+    { who: "you", text: "look at this\n\n[ไฟล์แนบ]:\n- a.png", ts: now }, // saved with its attachment list
     { who: "agent", text: "Done.", ts: now },
   ] }) });
   await load;
   const shown = log.children.map((n) => n.id === "typingRow" ? "[typing]" : n.textContent);
-  assert.deepStrictEqual(shown, ["please continue", "already in history", "Done.", "please continue", "🧵 notice", "[typing]"],
-    "old view gone; history; then the unsaved bubble and the chip; the typing row last");
-  assert.ok(!log.children.includes(saved) && log.children.includes(sent) && !log.children.includes(old));
+  assert.deepStrictEqual(shown, ["please continue", "already in history", "look at this\n\n[ไฟล์แนบ]:\n- a.png", "Done.",
+    "please continue", "🧵 notice", "[perm card]", "[typing]"],
+    "old view gone; history; then the unsaved bubble, the chip and the permission card; the typing row last");
+  assert.ok(!log.children.includes(saved) && !log.children.includes(withFile) && log.children.includes(sent) && !log.children.includes(old));
+  assert.ok(!log.children.includes(other), "a live row of another thread is not carried into this one");
 });
 
 test("overlay: held messages are matched one for one against rows saved during the load", async () => {
@@ -1018,6 +1029,11 @@ test("overlay: live events, meetings and background refreshes use the pane-load 
   const bar = html.slice(html.indexOf("async function refreshThreadBar("), html.indexOf("async function refreshThreadBar(") + 600);
   assert.match(bar, /if \(groupView && !force\) return;/, "a background refresh never draws over an open meeting");
   assert.match(bar, /paneLoad = null;/);
+  const barFull = html.slice(html.indexOf("async function refreshThreadBar("), html.indexOf("async function refreshThreadBar(") + 1400);
+  assert.match(barFull, /await fetch\(`\/sessions\?agent=[\s\S]*?\.then\(\(x\) => x\.json\(\)\);\s*\r?\n\s*if \(groupView && !force\) return;/, "…nor one that started before the meeting opened");
+  assert.match(html, /function setTarget\(id\) \{\s*groupView = null;[^\n]*\r?\n\s*hideTyping\(\);/, "switching agents drops the old typing row");
+  assert.match(html, /async function openGroupLog\([^)]*\) \{\s*groupView = key;\s*hideTyping\(\);/, "opening a meeting drops a thread's typing row");
+  assert.match(html, /d\.dataset\.text = prompt\.slice\(0, 200\);/, "a sent bubble is matched as the history saves it (attachments included)");
   assert.match(html, /d\.dataset\.text = String\(text \|\| ""\)\.slice\(0, 200\);/, "messages carry their opening text for the reload match");
 });
 

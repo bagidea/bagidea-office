@@ -197,3 +197,37 @@ test("tooldetail: a deleted thread stays deleted even if a run still records int
   assert.strictEqual(fs.existsSync(td.fileOf("main", "s1")), false);
   assert.strictEqual(td.get("main", "s1", "c-2"), null);
 });
+
+test("tooldetail: a compaction that fails (file held open elsewhere) backs off instead of retrying on every call", (t) => {
+  let renames = 0;
+  const { dir } = store(t);
+  const io = { ...fs, renameSync() { renames++; const e = new Error("EPERM"); e.code = "EPERM"; throw e; } };
+  const td = createToolDetails({ dir, io, maxFileBytes: 2000 });
+  const e = thread("s1", []);
+  for (let i = 0; i < 80; i++) {
+    const id = "c-" + i;
+    e.log.push({ who: "tool", text: "Bash", id });
+    while (e.log.length > 3) e.log.shift();
+    assert.strictEqual(td.record("main", e, id, { detail: "d".repeat(200) }), true, "recording keeps working");
+  }
+  assert.ok(renames > 0 && renames <= 5, "rename attempts: " + renames);
+  assert.strictEqual(fs.existsSync(td.fileOf("main", "s1") + ".tmp"), false, "no temp file is left behind");
+});
+
+test("devmode: inputs too large to mask quickly are not summarised (fail closed)", () => {
+  const secret = "sk-" + "Z9y8X7w6V5u4T3s2R1q0P9o8";
+  const big = { command: "echo " + secret + " " + "a.".repeat(devmode.MAX_MASK_INPUT) };
+  const d = devmode.toolDetail("Bash", big);
+  assert.deepStrictEqual(d, { kind: "command", label: "", detail: d.detail });
+  assert.match(d.detail, /^<input too large to summarise: \d+ KB>$/);
+  const g = devmode.toolDetail("mcp__web__post", { body: secret + "x".repeat(devmode.MAX_MASK_INPUT) });
+  assert.match(g.detail, /^<input too large to summarise/); assert.ok(!JSON.stringify(g).includes(secret));
+  const ev = devmode.progressEvent({ type: "task.progress", tool: "mcp__web__post" }, { body: "y".repeat(devmode.MAX_MASK_INPUT + 1) }, true);
+  assert.ok(!("input" in ev), "the live frame carries no input it could not mask quickly");
+  assert.match(ev.detail, /^<input too large to summarise/);
+  // just under the limit: summarised and masked as before
+  const ok = devmode.toolDetail("Bash", { command: "curl -H 'Authorization: Bearer " + secret + "' x" });
+  assert.ok(ok.detail.includes("••••••") && !ok.detail.includes(secret));
+  // file tools only read the path, so a large Write is still summarised
+  assert.strictEqual(devmode.toolDetail("Write", { file_path: "C:/a/b.txt", content: "z".repeat(1e6) }).detail, "C:/a/b.txt");
+});

@@ -64,8 +64,8 @@ module.exports = function createToolDetails({ dir, io = fs, now = Date.now, maxF
   // (entry.log is capped at 200 rows, so older calls have scrolled out).
   // Returns true when the file changed.
   function compact(bucket, entry) {
+    const file = fileOf(bucket, entry.key);
     try {
-      const file = fileOf(bucket, entry.key);
       const keep = new Set((entry.log || []).filter((m) => m && m.who === "tool" && m.id).map((m) => m.id));
       const all = read(bucket, entry.key);
       const kept = [...all.values()].filter((r) => keep.has(r.id));
@@ -81,7 +81,13 @@ module.exports = function createToolDetails({ dir, io = fs, now = Date.now, maxF
       compactedAt.set(file, Buffer.byteLength(body));
       dirty.delete(file);
       return true;
-    } catch { return false; }
+    } catch {
+      // e.g. EPERM while another program holds the file open: wait until it has
+      // doubled again instead of re-reading and rewriting it on every call.
+      try { compactedAt.set(file, io.statSync(file).size); } catch {}
+      try { io.unlinkSync(file + ".tmp"); } catch {}
+      return false;
+    }
   }
 
   // d = devmode.toolDetail(name, input): { kind, label, detail }, already redacted.
