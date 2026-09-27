@@ -40,8 +40,19 @@ function rewriteArchive(buffer, change) {
   const files = zip.decode(buffer), by = new Map(files.map((f) => [f.name, f]));
   const manifest = JSON.parse(by.get("manifest.json").data);
   const office = JSON.parse(by.get("office.json").data);
+  const before = new Map(files.map((f) => [f.name, f.data]));
   change(office, files, manifest);
   by.get("office.json").data = Buffer.from(JSON.stringify(office));
+  // Keep the readable copies in step with an edited office.json, unless the
+  // test changed a copy on purpose.
+  for (const f of files) {
+    if (f.data !== before.get(f.name)) continue;
+    const m = /^(?:team\/agents\/(.+)|team\/(roles)|mcp\/(.+)|workflows\/triggers\/(.+)|workflows\/(.+)|settings\/(preferences))\.json$/.exec(f.name);
+    if (!m) continue;
+    const v = m[1] ? office.team?.agents?.[m[1]] : m[2] ? office.team?.roles : m[3] ? office.mcp?.servers?.[m[3]]
+      : m[4] ? (office.workflows?.triggers || []).find((t) => t.id === m[4]) : m[5] ? office.workflows?.definitions?.[m[5]] : office.settings?.preferences;
+    if (v !== undefined) f.data = Buffer.from(JSON.stringify(v, null, 2) + "\n");
+  }
   for (const f of files) {
     if (f.name === "manifest.json") continue;
     let desc = manifest.files.find((x) => x.path === f.name);
@@ -77,7 +88,8 @@ test("exports credentials and machine/runtime exclusions without leaking them in
   const src = source(t), files = zip.decode(src.transfer.exportArchive()), text = files.map((f) => f.data.toString()).join("\n");
   for (const secret of ["secret-command-value", "secret-arg-value", "secret-env-value", "secret-registry-value", "provider-secret-value", "secret-trust", "region-value", "my-machine", "private note", "private memory", "private project", "derived private skill", "never export"]) assert.ok(!text.includes(secret), secret);
   assert.ok(files.some((f) => f.name === "skills/research/SKILL.md"));
-  assert.ok(!files.some((f) => /notes|memory|agents|settings\.json/.test(f.name)));
+  // no notes, memory, generated agent folders or Claude settings (team/agents/*.json are the readable agent copies)
+  assert.ok(!files.some((f) => !f.name.startsWith("team/agents/") && /notes|memory|agents|settings\.json/.test(f.name)));
 });
 
 test("selective import applies only chosen categories and skip never overwrites conflicts", (t) => {
@@ -323,4 +335,65 @@ test("a Markdown file with a long path can be picked by its summary ID", (t) => 
   assert.ok(target && target.id.length > 600);
   const files = zip.decode(src.transfer.exportArchive(["settings"], { settings: [target.id] }));
   assert.deepEqual(files.filter((f) => f.name.startsWith("workspace/")).map((f) => f.name), ["workspace/" + rel]);
+});
+
+// Readable copies: every category is visible as folders when the ZIP is opened.
+function names(buffer) { return zip.decode(buffer).map((f) => f.name).sort(); }
+function withoutCopies(buffer) {
+  const files = zip.decode(buffer).filter((f) => !/^(?:team|mcp|workflows|settings)\//.test(f.name));
+  const by = new Map(files.map((f) => [f.name, f]));
+  const manifest = JSON.parse(by.get("manifest.json").data);
+  manifest.files = manifest.files.filter((f) => by.has(f.path));
+  by.get("manifest.json").data = Buffer.from(JSON.stringify(manifest));
+  return zip.encode(files);
+}
+
+test("export writes one readable file per agent, MCP server, workflow, trigger and the office preferences", (t) => {
+  const src = source(t), archive = src.transfer.exportArchive();
+  const files = zip.decode(archive), by = new Map(files.map((f) => [f.name, f.data.toString()]));
+  const office = JSON.parse(by.get("office.json"));
+  for (const name of ["team/agents/alice.json", "team/agents/main.json", "team/roles.json", "mcp/search.json",
+    "workflows/research_flow.json", "workflows/triggers/weekly.json", "settings/preferences.json"]) assert.ok(by.has(name), name);
+  assert.deepStrictEqual(JSON.parse(by.get("team/agents/alice.json")), office.team.agents.alice);
+  assert.deepStrictEqual(JSON.parse(by.get("team/roles.json")), office.team.roles);
+  assert.deepStrictEqual(JSON.parse(by.get("mcp/search.json")), office.mcp.servers.search);
+  assert.deepStrictEqual(JSON.parse(by.get("workflows/research_flow.json")), office.workflows.definitions.research_flow);
+  assert.deepStrictEqual(JSON.parse(by.get("workflows/triggers/weekly.json")), office.workflows.triggers[0]);
+  assert.deepStrictEqual(JSON.parse(by.get("settings/preferences.json")), office.settings.preferences);
+  const manifest = JSON.parse(by.get("manifest.json"));
+  const cat = (p) => manifest.files.find((f) => f.path === p).category;
+  assert.deepStrictEqual(["team/roles.json", "mcp/search.json", "workflows/triggers/weekly.json", "settings/preferences.json"].map(cat), ["team", "mcp", "workflows", "settings"]);
+  const text = files.map((f) => f.data.toString()).join("\n");
+  for (const secret of ["secret-command-value", "secret-arg-value", "secret-env-value", "secret-registry-value"]) assert.ok(!text.includes(secret), secret);
+  // and it still imports
+  const dst = fixture(t), out = dst.transfer.importArchive(dst.transfer.previewArchive(archive), { conflict: "skip" });
+  assert.ok(out.imported.team >= 1 && out.imported.mcp === 1 && out.imported.workflows === 2);
+});
+
+test("a partial export writes copies only for the chosen items", (t) => {
+  const src = source(t);
+  const archive = src.transfer.exportArchive(["team", "workflows", "settings"], { team: ["alice"], workflows: ["research_flow"], settings: ["markdown:OFFICE.md"] });
+  const copies = names(archive).filter((n) => /^(?:team|mcp|workflows|settings)\//.test(n));
+  assert.deepStrictEqual(copies, ["team/agents/alice.json", "workflows/research_flow.json"]);
+});
+
+test("readable copies must match office.json; archives without copies still import", (t) => {
+  const src = source(t), dst = fixture(t), archive = src.transfer.exportArchive();
+  const tampered = rewriteArchive(archive, (o, files) => {
+    const f = files.find((x) => x.name === "team/agents/alice.json");
+    f.data = Buffer.from(f.data.toString().replace("Alice", "Mallory"));
+  });
+  assert.throws(() => dst.transfer.previewArchive(tampered), /readable copy does not match office\.json: team\/agents\/alice\.json/);
+  const orphan = rewriteArchive(archive, (o, files, manifest) => {
+    files.push({ name: "mcp/ghost.json", data: Buffer.from("{}\n") });
+    manifest.files.push({ path: "mcp/ghost.json", category: "mcp" });
+  });
+  assert.throws(() => dst.transfer.previewArchive(orphan), /no matching item in office\.json: mcp\/ghost\.json/);
+  const miscategorised = rewriteArchive(archive, (o, files, manifest) => { manifest.files.find((f) => f.path === "mcp/search.json").category = "settings"; });
+  assert.throws(() => dst.transfer.previewArchive(miscategorised), /category mismatch/);
+  const old = withoutCopies(archive);
+  assert.ok(!names(old).some((n) => n.startsWith("team/")), "older layout: office.json + skills + workspace only");
+  const plan = dst.transfer.previewArchive(old);
+  assert.ok(plan.categories.team >= 1 && plan.categories.workflows === 2);
+  assert.strictEqual(dst.transfer.importArchive(plan, { conflict: "skip" }).ok, true);
 });

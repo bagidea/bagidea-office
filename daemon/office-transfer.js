@@ -466,11 +466,31 @@ module.exports = function officeTransfer(options) {
     for (const { category, ...item } of catalog(data.office, data.docs)) items[category].push(item);
     return { categories: counts(entries), items, workspace, limits: { maxArchiveBytes: zip.MAX_ARCHIVE_BYTES }, warnings: ["Credentials, channel connections, machine paths, permission approvals and runtime history are excluded."] };
   }
+  // One readable file per item next to office.json, so every category shows up
+  // as a folder when the ZIP is opened (skills already have SKILL.md).
+  // office.json stays the source of truth: on import a copy must match its
+  // item exactly, and archives made before these copies existed stay valid.
+  function readableCopies(office) {
+    const out = [], json = (v) => JSON.stringify(v, null, 2) + "\n";
+    for (const [aid, a] of Object.entries(office.team?.agents || {})) out.push(["team/agents/" + aid + ".json", "team", json(a)]);
+    if (office.team?.roles?.length) out.push(["team/roles.json", "team", json(office.team.roles)]);
+    for (const [mid, m] of Object.entries(office.mcp?.servers || {})) out.push(["mcp/" + mid + ".json", "mcp", json(m)]);
+    for (const [wid, w] of Object.entries(office.workflows?.definitions || {})) out.push(["workflows/" + wid + ".json", "workflows", json(w)]);
+    for (const t of office.workflows?.triggers || []) out.push(["workflows/triggers/" + t.id + ".json", "workflows", json(t)]);
+    if (office.settings && Object.keys(office.settings.preferences || {}).length) out.push(["settings/preferences.json", "settings", json(office.settings.preferences)]);
+    return out;
+  }
+  function fileCategory(name) {
+    if (name === "office.json") return "configuration";
+    const top = name.split("/")[0];
+    return top === "skills" || top === "team" || top === "mcp" || top === "workflows" ? top : "settings";
+  }
   function exportArchive(categoriesArray, itemSelection) {
     const categories = selected(categoriesArray), data = source(categories, pickedItems(itemSelection, categories)), files = [];
     const add = (name, category, value) => files.push({ name, category, data: Buffer.from(value) });
     add("office.json", "configuration", JSON.stringify(data.office, null, 2));
     for (const [sid, s] of Object.entries(data.office.skills?.definitions || {})) add("skills/" + sid + "/SKILL.md", "skills", frontmatter(s, sid));
+    for (const [name, category, text] of readableCopies(data.office)) add(name, category, text);
     for (const d of data.docs) add("workspace/" + d.path, "settings", d.content);
     const manifest = { format: FORMAT, version: VERSION, createdAt: new Date().toISOString(), categories,
       files: files.map((f) => ({ path: f.name, category: f.category, size: f.data.length, sha256: sha(f.data) })) };
@@ -489,10 +509,12 @@ module.exports = function officeTransfer(options) {
       if (typeof f.path !== "string" || f.path === "manifest.json" || seen.has(f.path) || !byName.has(f.path)) fail("invalid manifest file entry");
       const bytes = byName.get(f.path); seen.add(f.path);
       if (f.size !== bytes.length || f.sha256 !== sha(bytes)) fail("archive file checksum mismatch: " + f.path);
-      const expected = f.path === "office.json" ? "configuration" : f.path.startsWith("skills/") ? "skills" : "settings";
-      if (f.category !== expected) fail("manifest file category mismatch");
+      if (f.category !== fileCategory(f.path)) fail("manifest file category mismatch");
     }
-    const office = cleanOffice(parse(byName.get("office.json"), "office configuration"), categories), docs = [];
+    const raw = parse(byName.get("office.json"), "office configuration");
+    const office = cleanOffice(raw, categories), docs = [];
+    // Readable copies are compared with office.json as exported (the raw items).
+    const copies = new Map(readableCopies(raw).map(([name, , text]) => [name, text]));
     for (const [name, bytes] of byName) {
       if (name === "manifest.json" || name === "office.json") continue;
       const skill = /^skills\/([\w-]+)\/SKILL\.md$/.exec(name);
@@ -501,6 +523,12 @@ module.exports = function officeTransfer(options) {
         if (!s || UTF8.decode(bytes) !== frontmatter(s, skill[1])) fail("skill Markdown does not match its definition");
         continue;
       }
+      if (copies.has(name)) {
+        let text; try { text = UTF8.decode(bytes); } catch { fail("readable copy is not UTF-8: " + name); }
+        if (text !== copies.get(name)) fail("readable copy does not match office.json: " + name);
+        continue;
+      }
+      if (/^(?:team|mcp|workflows|settings)\//.test(name)) fail("readable copy has no matching item in office.json: " + name);
       if (!categories.includes("settings") || !name.startsWith("workspace/") || !markdownPath(name.slice(10))) fail("archive contains an unsupported file: " + name);
       let content; try { content = UTF8.decode(bytes); } catch { fail("Markdown must be UTF-8"); }
       docs.push({ path: name.slice(10), content: redactText(content) });

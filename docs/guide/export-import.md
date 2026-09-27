@@ -105,11 +105,26 @@ as raw source-machine directories.
 
 ## Archive format and limits
 
-The ZIP uses the `bagidea-office` format, version **1**. It contains
-`manifest.json` for the archive format and contents, `office.json` for portable
-configuration, and the selected Markdown and skill `SKILL.md` files. Use this
-feature's export to create a compatible archive; an arbitrary folder ZIP is not
-an office archive.
+The ZIP uses the `bagidea-office` format, version **1**. Every exported item
+also has its own readable file, so each category shows up as a folder when you
+open the ZIP:
+
+| Path | Contents |
+|---|---|
+| `manifest.json` | Archive format, categories, and every file's size and checksum |
+| `office.json` | The portable configuration for everything selected — the file the importer applies |
+| `team/agents/<id>.json`, `team/roles.json` | Each agent's portable definition and the team roles |
+| `skills/<id>/SKILL.md` | Each skill |
+| `mcp/<id>.json` | Each MCP server definition (credentials removed) |
+| `workflows/<id>.json`, `workflows/triggers/<id>.json` | Each workflow and trigger |
+| `settings/preferences.json` | The portable office preferences |
+| `workspace/…` | The selected Markdown files, at their working-folder paths |
+
+`office.json` is the source of truth. The importer checks that every readable
+copy matches its item in `office.json` exactly and rejects the archive if one
+was edited or has no matching item. Archives exported before the readable
+copies existed still import. Use this feature's export to create a compatible
+archive; an arbitrary folder ZIP is not an office archive.
 
 | Limit | Maximum |
 |---|---:|
