@@ -15,7 +15,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const LOG = path.join(__dirname, "proxy.log");
+// BAGIDEA_PROXY_LOG: tests redirect the log so they never write into the live proxy.log.
+const LOG = process.env.BAGIDEA_PROXY_LOG || path.join(__dirname, "proxy.log");
 // Lightweight per-call log (auto-truncated) so provider failures are diagnosable.
 function plog(line) {
   try {
@@ -57,7 +58,38 @@ function upstreamFor(provider, reg) {
   // "key not set" guards pass without the user pasting anything.
   const key = pc.token || (up.key && (reg.apiKeys || {})[up.key]) || (up.local ? "local" : "");
   const models = chat ? chat.replace(/\/chat\/completions$/, "/models") : "";
-  return { chat, models, key, fallbackModel: pc.model || up.fallbackModel || "" };
+  // local: built-in local provider OR any chat URL on this machine (a Custom
+  // provider pointed at LM Studio/llama.cpp on a non-default port counts too).
+  const local = !!up.local || isLocalUrl(chat);
+  return { chat, models, key, fallbackModel: pc.model || up.fallbackModel || "", local };
+}
+
+function isLocalUrl(u) {
+  try {
+    const h = new URL(u).hostname.toLowerCase();
+    return h === "127.0.0.1" || h === "localhost" || h === "[::1]" || h === "::1";
+  } catch { return false; }
+}
+
+// --- Upstream timeout per provider (pure, testable) ---------------------------
+// Remote APIs keep the 120 s hard cap (issue #15, Bug 2). Local servers get far
+// longer: body.stream=false means LM Studio sends headers only when the whole
+// completion is done, and a ~60k-token prompt with slot contention routinely
+// passes 120 s. Claude CLI 2.1.283 (native Bun build) closes a request that has sent
+// no headers at ~360 s via Bun's HTTP-client idle timeout, independent of
+// API_TIMEOUT_MS (SDK default 600 s), so a local spawn must raise its client limits
+// above this cap (server.js → localclient.js).
+// Order: reg.providerConfig[p].timeoutMs → (local) env BAGIDEA_PROXY_LOCAL_TIMEOUT_MS
+// → default. Non-finite / 0 / negative values fall through.
+const REMOTE_TIMEOUT_MS = 120000;
+const LOCAL_TIMEOUT_MS = 540000;
+function upstreamTimeoutMs(provider, reg, local, env) {
+  const pos = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0; };
+  const pc = ((reg && reg.providerConfig) || {})[provider] || {};
+  const own = pos(pc.timeoutMs);
+  if (own) return own;
+  if (local) return pos((env || {}).BAGIDEA_PROXY_LOCAL_TIMEOUT_MS) || LOCAL_TIMEOUT_MS;
+  return REMOTE_TIMEOUT_MS;
 }
 
 const STOP = { stop: "end_turn", length: "max_tokens", tool_calls: "tool_use", content_filter: "end_turn" };
@@ -195,16 +227,40 @@ function toOpenAI(a, model, opts) {
   return out;
 }
 
+// --- Reply text: content, else reasoning when that is ALL the model sent (pure) --
+// Some local servers (LM Studio + Gemma/Qwen thinking builds) answer 200 with
+// content "" and the whole reply in reasoning_content (alias: reasoning). With no
+// usable content and no tool_calls, surface the reasoning as the reply text rather
+// than an empty turn. Content present or tool_calls present → unchanged behaviour.
+function pickText(msg) {
+  const m = msg || {};
+  const c = m.content;
+  const usable = typeof c === "string" ? c.trim() !== "" : !!c;
+  const hasTools = Array.isArray(m.tool_calls) && m.tool_calls.length > 0;
+  if (!usable && !hasTools) {
+    for (const k of ["reasoning_content", "reasoning"]) {
+      const r = typeof m[k] === "string" ? m[k].trim() : "";
+      if (r) return { text: r, fromReasoning: true };
+    }
+  }
+  return { text: c || "", fromReasoning: false };
+}
+
 // --- OpenAI non-streaming response → Anthropic message (pure, testable) ------
 // opts.sigs: signature cache override (tests) — defaults to the module cache.
 function toAnthropic(o, model, opts) {
   const choice = (o.choices || [])[0] || {};
   const msg = choice.message || {};
   const content = [];
-  if (msg.content) content.push({ type: "text", text: msg.content });
+  const { text, fromReasoning } = pickText(msg);
+  // Reasoning cut off at the token cap (finish=length) is never a usable answer:
+  // surface no text, stop_reason max_tokens (SHINO R1, 2026-09-27). finish=stop keeps c0d6c2d.
+  if (text && !(fromReasoning && choice.finish_reason === "length")) content.push({ type: "text", text });
   for (const tc of msg.tool_calls || []) {
     let input = {};
-    try { input = JSON.parse((tc.function && tc.function.arguments) || "{}"); } catch {}
+    const args = (tc.function && tc.function.arguments) || "{}";
+    try { input = JSON.parse(args); }
+    catch { plog(`  BAD-ARGS ${tc.function && tc.function.name} (sent {}): ${String(args).slice(0, 300)}`); }
     // Gemini thinking models sign each tool call; remember the signature so the
     // history echo (toOpenAI) can re-attach it — required, or next turn 400s.
     const sig = tc.extra_content && tc.extra_content.google &&
@@ -277,7 +333,7 @@ async function handle(req, res, provider, reg, raw) {
       res.end(JSON.stringify({ type: "error", error: { type, message } }));
     } catch {}
   };
-  const { chat, key, fallbackModel } = upstreamFor(provider, reg);
+  const { chat, key, fallbackModel, local } = upstreamFor(provider, reg);
   if (!chat) return errOut(404, "not_found_error", `no endpoint configured for provider "${provider}"`);
   if (!key) return errOut(400, "authentication_error", `key not set for "${provider}" — add it in ⚙ CONNECT`);
   let a;
@@ -302,25 +358,37 @@ async function handle(req, res, provider, reg, raw) {
   // Claude Code sends Anthropic-sized max_tokens (often 32k); most OpenAI-compat
   // chat models cap completion at 16k → pre-clamp to avoid a guaranteed 400.
   if (body.max_tokens && body.max_tokens > 16384) body.max_tokens = 16384;
-  plog(`[${new Date().toISOString().slice(11, 19)}] ${provider} model=${model} stream=${!!a.stream} msgs=${(body.messages || []).length} tools=${(body.tools || []).length} max=${body.max_tokens || "-"} → ${chat}`);
+  // Hard upstream cap (issue #15, Bug 2): without it a hung upstream is held open
+  // forever and the CLI's ~60s retry loop turns one bad turn into a storm.
+  // Per provider: remote 120 s, local 540 s (see upstreamTimeoutMs).
+  const timeoutMs = upstreamTimeoutMs(provider, reg, local, process.env);
+  const tmoS = timeoutMs % 1000 ? (timeoutMs / 1000).toFixed(1) : String(timeoutMs / 1000);
+  plog(`[${new Date().toISOString().slice(11, 19)}] ${provider} model=${model} stream=${!!a.stream} msgs=${(body.messages || []).length} tools=${(body.tools || []).length} max=${body.max_tokens || "-"} → ${chat} timeout=${tmoS}s`);
 
   // Cancel the upstream only if claude drops before we finish (real task cancel).
   const ac = new AbortController();
-  res.on("close", () => { if (!res.writableEnded) { try { ac.abort(); } catch {} } });
+  const t0 = Date.now();
+  res.on("close", () => { if (!res.writableEnded) {
+    plog(`  CLIENT-ABORT after ${Math.round((Date.now() - t0) / 1000)}s (client closed before reply)`);
+    try { ac.abort(); } catch {} } });
 
-  // Hard upstream cap (issue #15, Bug 2): without it a hung upstream is held open
-  // forever and the CLI's ~60s retry loop turns one bad turn into a storm.
-  const PROXY_TIMEOUT_MS = 120000;
   const doFetch = () => fetchWithTimeout(chat, { method: "POST", signal: ac.signal,
     headers: { "content-type": "application/json", authorization: "Bearer " + key,
       "HTTP-Referer": "https://github.com/bagidea/bagidea-office", "X-Title": "BagIdea Office" },
-    body: JSON.stringify(body) }, PROXY_TIMEOUT_MS);
+    body: JSON.stringify(body) }, timeoutMs);
+  // Our own timer fired (client still connected) → say so plainly instead of the
+  // generic "This operation was aborted". Other fetch errors keep the old text.
+  // A bare "fetch failed" hides undici's reason → append cause.code when present.
+  const fetchFailMsg = (e) => (e && e.name === "AbortError")
+    ? `upstream timed out after ${tmoS}s (proxy cap; provider=${provider})`
+    : "upstream fetch failed: " + (e && e.message) +
+      (e && e.cause && e.cause.code ? ` (cause: ${e.cause.code})` : "");
 
   let r;
   try { r = await doFetch(); }
   catch (e) {
     if (ac.signal.aborted) return;   // cancelled — nothing to send
-    return errOut(502, "api_error", "upstream fetch failed: " + (e && e.message));
+    return errOut(502, "api_error", fetchFailMsg(e));
   }
 
   // One-shot self-heal for the param rejections OpenAI-compat providers throw most
@@ -341,7 +409,7 @@ async function handle(req, res, provider, reg, raw) {
     try { r = await doFetch(); }
     catch (e) {
       if (ac.signal.aborted) return;
-      return errOut(502, "api_error", "upstream fetch failed: " + (e && e.message));
+      return errOut(502, "api_error", fetchFailMsg(e));
     }
   }
   if (!r.ok) {
@@ -375,7 +443,12 @@ async function handle(req, res, provider, reg, raw) {
   const finish = (j.choices && j.choices[0] && j.choices[0].finish_reason) || "?";
   const msg = toAnthropic(j, model);
   plog(`  ok status=${r.status} finish=${finish} blocks=${msg.content.length}`);
-  if (!msg.content.length) {
+  const picked = pickText(j.choices && j.choices[0] && j.choices[0].message);
+  const cutReasoning = picked.fromReasoning && finish === "length";
+  if (cutReasoning) plog(`  REASONING-ONLY at length: NOT surfaced (${picked.text.length} chars dropped)`);
+  else if (picked.fromReasoning) plog(`  REASONING-ONLY reply surfaced as text (${picked.text.length} chars)`);
+  // A dropped reasoning cut stays an empty max_tokens turn — no notice text either.
+  if (!msg.content.length && !cutReasoning) {
     // Empty/odd reply → surface it (and log the raw body) instead of going silent.
     plog(`  EMPTY body=${JSON.stringify(j).slice(0, 700)}`);
     msg.content.push({ type: "text",
@@ -404,11 +477,48 @@ async function fetchWithTimeout(url, opts, timeoutMs) {
   }
   try {
     const { signal: _drop, ...rest } = opts || {};
-    return await fetch(url, { ...rest, signal: ctrl.signal });
+    const dispatcher = upstreamDispatcher(timeoutMs);
+    return await fetch(url, { ...rest, signal: ctrl.signal, ...(dispatcher ? { dispatcher } : {}) });
   } finally {
     clearTimeout(timer);
     if (external) external.removeEventListener("abort", onAbort);
   }
 }
 
-module.exports = { handle, streamAnthropic, toOpenAI, toAnthropic, pickModel, cleanModels, upstreamFor, UPSTREAM, fetchWithTimeout, SIG_DUMMY };
+// Node's global fetch (bundled undici) gives up after 300 s with no response
+// headers (headersTimeout) or 300 s of body silence (bodyTimeout). With
+// body.stream=false a local model sends no headers until it is done, so a
+// 540 s cap died at ~300 s as a bare "fetch failed" (UND_ERR_HEADERS_TIMEOUT).
+// Give the upstream fetch a dispatcher whose limits sit just above timeoutMs so
+// our AbortController stays the only effective cap.
+// Zero-dep: the Agent class comes from Node's own global dispatcher (same
+// undici build as fetch; `require("undici")` is not available without npm).
+// If it cannot be found, fall back to the default dispatcher (old behaviour).
+const DISPATCHER_MARGIN_MS = 5000;
+const dispatchers = new Map();   // one per timeout value, reused across requests
+let AgentClass;                  // undefined = not looked up yet, null = unavailable
+function upstreamAgentClass() {
+  if (AgentClass !== undefined) return AgentClass;
+  AgentClass = null;
+  try { AgentClass = require("undici").Agent; } catch {}
+  if (!AgentClass) {
+    try {
+      void globalThis.Response;   // makes Node load its bundled undici + global dispatcher
+      const d = globalThis[Symbol.for("undici.globalDispatcher.1")];
+      if (d && d.constructor && d.constructor.name === "Agent") AgentClass = d.constructor;
+    } catch {}
+  }
+  return AgentClass;
+}
+function upstreamDispatcher(timeoutMs) {
+  if (!(timeoutMs > 0) || !Number.isFinite(timeoutMs)) return undefined;
+  if (dispatchers.has(timeoutMs)) return dispatchers.get(timeoutMs);
+  const A = upstreamAgentClass();
+  let d;
+  try { d = A ? new A({ headersTimeout: timeoutMs + DISPATCHER_MARGIN_MS, bodyTimeout: timeoutMs + DISPATCHER_MARGIN_MS }) : undefined; }
+  catch { d = undefined; }
+  dispatchers.set(timeoutMs, d);
+  return d;
+}
+
+module.exports = { handle, streamAnthropic, toOpenAI, toAnthropic, pickText, pickModel, cleanModels, upstreamFor, upstreamTimeoutMs, UPSTREAM, fetchWithTimeout, upstreamDispatcher, SIG_DUMMY };

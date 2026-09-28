@@ -6436,7 +6436,8 @@
         const rec = t.recurrence ? (t.recurrence.every) : "";
         ed.innerHTML = `<div class="field" style="margin-bottom:8px">
             <input id="ce_title" maxlength="200" style="width:100%;margin-bottom:6px">
-            <textarea id="ce_detail" style="width:100%;min-height:48px;margin-bottom:6px" placeholder="${tr("รายละเอียด…")}"></textarea>
+            <textarea id="ce_detail" maxlength="4000" style="width:100%;min-height:48px;margin-bottom:2px" placeholder="${tr("รายละเอียด…")}"></textarea>
+            <div id="ce_count" style="font-size:10px;color:var(--dim);text-align:right;margin-bottom:6px">0/4000</div>
             <div class="assistrow" style="flex-wrap:wrap">
               <select id="ce_owner" style="flex:1 1 120px">${sel.innerHTML}</select>
               <input id="ce_due" type="datetime-local" style="flex:1 1 150px" value="${toLocal(t.due)}">
@@ -6452,16 +6453,28 @@
               <button class="sparkle" id="ce_done">✅ เสร็จแล้ว</button>
               <button class="winbtn" id="ce_del" title="ลบ">✕</button>
               <button class="winbtn" id="ce_x" title="ยกเลิก">↩</button>
-            </div></div>`;
+            </div>
+            <div id="ce_err" style="display:none;margin-top:6px;font-size:12px;color:#ff6b6b"></div></div>`;
         ed.querySelector("#ce_title").value = t.title; ed.querySelector("#ce_detail").value = t.detail || "";
+        const ceCount = () => { ed.querySelector("#ce_count").textContent = ed.querySelector("#ce_detail").value.length + "/4000"; };
+        ed.querySelector("#ce_detail").oninput = ceCount; ceCount();
         ed.querySelector("#ce_owner").value = t.owner; ed.querySelector("#ce_pri").value = String(t.priority); ed.querySelector("#ce_rec").value = rec;
         ed.querySelector("#ce_x").onclick = () => { ed.innerHTML = ""; };
-        ed.querySelector("#ce_save").onclick = () => {
+        ed.querySelector("#ce_save").onclick = async () => {
           const dv = ed.querySelector("#ce_due").value;
-          uiPost("/tasks/update", { id: t.id, title: ed.querySelector("#ce_title").value, detail: ed.querySelector("#ce_detail").value,
+          const err = ed.querySelector("#ce_err"); err.style.display = "none";
+          // A refused save keeps the editor open, so what was typed is not lost.
+          const r = await uiPost("/tasks/update", { id: t.id, title: ed.querySelector("#ce_title").value, detail: ed.querySelector("#ce_detail").value,
             owner: ed.querySelector("#ce_owner").value, due: dv ? new Date(dv).getTime() : 0, priority: Number(ed.querySelector("#ce_pri").value),
             recurrence: ed.querySelector("#ce_rec").value ? { every: ed.querySelector("#ce_rec").value } : null,
-            dependsOn: [...ed.querySelector("#ce_dep").selectedOptions].map((o) => o.value) }).then(refresh);
+            dependsOn: [...ed.querySelector("#ce_dep").selectedOptions].map((o) => o.value) }).catch(() => null);
+          if (r && r.ok) return refresh();
+          const body = r ? await r.text().catch(() => "") : "";
+          let j = null; try { j = JSON.parse(body); } catch {}
+          err.textContent = "⚠️ " + (j && j.error === "detail_too_long"
+            ? `${tr("รายละเอียดยาวเกินไป")} (${j.length}/${j.limit}) — ${tr("ยังไม่ได้บันทึก")}`
+            : `${tr("บันทึกไม่สำเร็จ")}${body ? ": " + body : ""}`);
+          err.style.display = "block";
         };
         ed.querySelector("#ce_done").onclick = () => uiPost("/tasks/move", { id: t.id, status: "done" }).then(refresh);
         ed.querySelector("#ce_del").onclick = () => askConfirm(tr("ลบการ์ดนี้?")).then((ok) => ok && uiPost("/tasks/delete", { id: t.id }).then(refresh));
@@ -6477,8 +6490,9 @@
           const c = document.createElement("div");
           c.className = "card p" + t.priority + (t.overdue ? " over" : "") + (t.blocked ? " blocked" : ""); c.draggable = true;
           c.ondragstart = (e) => e.dataTransfer.setData("text/plain", t.id);
-          const meta = [who(t.owner), t.project ? "📁 " + t.project : "", t.due ? "⏰ " + new Date(t.due).toLocaleDateString() : "", t.blocked ? "🔒" : "", t.recurrence ? "🔁" : ""].filter(Boolean).join(" · ");
+          const meta = [who(t.owner), t.project ? "📁 " + t.project : "", t.due ? "⏰ " + new Date(t.due).toLocaleDateString() : "", t.blocked ? "🔒" : "", t.recurrence ? "🔁" : "", t.detailTruncated ? "✂️" : ""].filter(Boolean).join(" · ");
           c.innerHTML = `<div>${KIND[t.kind] ? KIND[t.kind] + " " : ""}${esc(t.title)}</div><div class="m">${esc(meta)}</div>`;
+          if (t.detailTruncated) c.title = `✂️ ${tr("ถูกตัดจาก")} ${t.detailTruncated.from} ${tr("ตัวอักษร")}`;
           c.onclick = () => editCard(t);
           col.appendChild(c);
         }

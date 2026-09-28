@@ -55,4 +55,31 @@ class RunWatchdog {
   }
 }
 
-module.exports = { RunWatchdog };
+// Idle window for a run whose brain sits behind the in-process proxy. The proxy
+// calls upstream with stream=false, so the CLI emits nothing while one request is
+// in flight; the idle window must outlast the proxy's own upstream cap or a
+// legitimately slow local turn is reaped first. Returns max(base, cap + margin)
+// for a positive finite cap, else base. Pure; bad inputs fall back safely.
+function runIdleMsFor({ baseIdleMs, proxyTimeoutMs, marginMs = 60000 } = {}) {
+  const pos = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : 0; };
+  const base = pos(baseIdleMs);
+  const cap = pos(proxyTimeoutMs);
+  if (!cap) return base;
+  const margin = Number.isFinite(Number(marginMs)) && Number(marginMs) >= 0 ? Number(marginMs) : 60000;
+  return Math.max(base, cap + margin);
+}
+
+// Total wall-clock cap for a run. A LOCAL brain behind the proxy answers one
+// request in up to its proxy cap, so a long local run needs more than the remote
+// 30-min cap (SHINO D1, 2026-09-27: 60 min for local runs only). Returns
+// max(base, localTotal) for a local run with a positive finite localTotal, else
+// base. Pure; bad inputs fall back to base.
+function runTotalMsFor({ baseTotalMs, local, localTotalMs } = {}) {
+  const pos = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : 0; };
+  const base = pos(baseTotalMs);
+  const loc = pos(localTotalMs);
+  if (!local || !loc) return base;
+  return Math.max(base, loc);
+}
+
+module.exports = { RunWatchdog, runIdleMsFor, runTotalMsFor };

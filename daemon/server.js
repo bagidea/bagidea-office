@@ -31,11 +31,14 @@ const retrieval = require("./retrieval");
 const skillsSync = require("./skills");
 const providers = require("./providers");
 const execBackend = require("./exec-backend");
+const textonly = require("./textonly");
+const maxout = require("./maxout");             // opt-in per-run output cap (POST /chat maxOutputTokens)
+const localclient = require("./localclient");
 const worktree = require("./worktree");
 const semantic = require("./semantic");
 const media = require("./media");
 const proxy = require("./proxy");
-const { RunWatchdog } = require("./watchdog");
+const { RunWatchdog, runIdleMsFor, runTotalMsFor } = require("./watchdog");
 const { stripStatus, verdict: autoVerdict, readStatus } = require("./autopilot");
 const projtrust = require("./projecttrust");
 const joborder = require("./joborder");
@@ -43,20 +46,28 @@ const { wireWorkspaceSettings } = require("./wire-hooks-runtime");
 const { killTree } = require("./kill-tree");   // cross-platform child reap (issue #15 review)
 const devmode = require("./devmode");           // 🛠 Dev Mode: redacted tool detail for task.progress
 const createToolDetails = require("./tooldetail");  // 🛠 Dev Mode: per-thread tool details for history rows
+const localslots = require("./localslots");     // 🧠 cap on concurrent LM Studio spawns (KV-cache decode errors)
 
 // Issue #15 (Bug 1) — main runs need both a hard wall-clock cap and an idle
 // detector, or a stuck CLI retry loop pins a task in "started" until the CLI
 // gives up on its own (observed: 14 min). Sub-agents already have a 6-min
 // watchdog; these apply to the main runClaude() path.
 const RUN_TOTAL_MS = Number(process.env.OFFICE_RUN_TOTAL_MS) || 30 * 60000;  // 30 min hard cap
+const LOCAL_RUN_TOTAL_MS = Number(process.env.OFFICE_LOCAL_RUN_TOTAL_MS) || 60 * 60000;  // 60 min cap for local-proxy brains (SHINO D1)
 const RUN_IDLE_MS = Number(process.env.OFFICE_RUN_IDLE_MS) || 5 * 60000;     // 5 min no-progress
 
 
-const WORKSPACE = path.join(__dirname, "..", "workspace");
+// OEP_WORKSPACE / OEP_STATE_DIR let a test boot this daemon against a throwaway
+// workspace + state dir (card wmuhc2fwa3j). Unset = the real install, unchanged.
+// STATE_DIR holds every file the daemon writes; bundled assets stay on __dirname.
+const WORKSPACE = process.env.OEP_WORKSPACE || path.join(__dirname, "..", "workspace");
+const STATE_DIR = process.env.OEP_STATE_DIR || __dirname;
+if (process.env.OEP_WORKSPACE || process.env.OEP_STATE_DIR)
+  console.log(`[oep] isolated state: workspace=${WORKSPACE} state=${STATE_DIR}`);
 // Server-local paths (the refactor moved REPLAY_COUNT to constants.js but these
 // two are used right here — broadcast() journals to JOURNAL, GET / serves OVERLAY).
 const OVERLAY = path.join(__dirname, "overlay.html");
-const JOURNAL = path.join(__dirname, "journal.jsonl");
+const JOURNAL = path.join(STATE_DIR, "journal.jsonl");
 
 const wsClients = new Set();
 const pendingPerms = new Map(); // id -> {res, timer, agent, tool}
@@ -66,7 +77,7 @@ let taskCounter = 0;
 // Persistent staff roster + roles (skills/tools libraries ride along).
 // main = Claude, the undeletable Director; ceo = the human owner's avatar.
 
-const REGISTRY = path.join(__dirname, "registry.json");
+const REGISTRY = path.join(STATE_DIR, "registry.json");
 let reg;
 
 // An MCP server is either a local program to launch (command + args) or a hosted
@@ -287,7 +298,7 @@ function featuresMap() {
 // lists exactly this many — no more guessing "3" when there's one screen.
 function monitorCount() {
   try {
-    const n = parseInt(fs.readFileSync(path.join(__dirname, "monitors.txt"), "utf8").trim(), 10);
+    const n = parseInt(fs.readFileSync(path.join(STATE_DIR, "monitors.txt"), "utf8").trim(), 10);
     return n >= 1 ? n : 1;
   } catch { return 1; }
 }
@@ -524,7 +535,7 @@ async function maybeLearnSkill(agent, task, prompt, acts, finalText, projId, fai
 // the agent's latest session (continuous memory); "new" starts a thread;
 // an explicit key resumes that thread and makes it the latest again.
 
-const SESSIONS = path.join(__dirname, "sessions.json");
+const SESSIONS = path.join(STATE_DIR, "sessions.json");
 let sess = {};
 let sessLoaded = false;   // false: missing/unreadable sessions.json — never sweep tool details against it
 try { sess = JSON.parse(fs.readFileSync(SESSIONS, "utf8")); sessLoaded = true; } catch {}
@@ -544,13 +555,13 @@ try {
 // can show it later (see tooldetail.js). Swept with the threads it belongs to —
 // but only once this process owns the office (server.listen below): a second
 // daemon started by mistake exits on EADDRINUSE without touching the store.
-const toolDetails = createToolDetails({ dir: path.join(__dirname, "tooldetail") });
+const toolDetails = createToolDetails({ dir: path.join(STATE_DIR, "tooldetail") });
 function sweepToolDetails() {
-  // Never against a sessions.json that failed to load (everything would look
-  // orphaned). Safe next to a test daemon booted from this folder on another
-  // port: the sweep skips files younger than a day and never compacts, so a
-  // thread that other daemon created after we read sessions.json survives.
-  if (!sessLoaded) return;
+  // Only the office itself (default port) or a daemon given its own state
+  // folder sweeps. A test or duplicate daemon booted from this folder on
+  // another port must not delete the running office's details.
+  const ownsStore = String(OEP_PORT) === "8787" || !!process.env.OEP_STATE_DIR;
+  if (!sessLoaded || !ownsStore) return;
   try {
     const t = toolDetails.sweep(sess);
     if (t.removed || t.compacted) console.log(`[maint] tool details: removed ${t.removed}, compacted ${t.compacted}`);
@@ -1006,9 +1017,9 @@ function broadcast(evt, journal = true) {
 // Standing work orders (jobs), the shared note board, and the calendar —
 // plus the Director's heartbeat. One 30-second scheduler ticks everything.
 
-const JOBS = path.join(__dirname, "jobs.json");
-const NOTES = path.join(__dirname, "notes.json");
-const CAL = path.join(__dirname, "calendar.json");
+const JOBS = path.join(STATE_DIR, "jobs.json");
+const NOTES = path.join(STATE_DIR, "notes.json");
+const CAL = path.join(STATE_DIR, "calendar.json");
 const NOTES_MD = path.join(WORKSPACE, "notes.md");
 
 function loadJson(file, fallback) {
@@ -1101,7 +1112,7 @@ try {
 (function seedI18n() {
   try {
     const seedDir = path.join(__dirname, "i18n-seed");
-    const runDir = path.join(__dirname, "i18n");
+    const runDir = path.join(STATE_DIR, "i18n");
     if (!fs.existsSync(seedDir)) return;
     fs.mkdirSync(runDir, { recursive: true });
     for (const f of fs.readdirSync(seedDir)) {
@@ -1295,7 +1306,7 @@ function memoryNote(agent, taskText, projId, qvec) {
 }
 
 // ---- 📊 office stats: per-day run counts + spend, for the dashboard.
-const STATS = path.join(__dirname, "stats.json");
+const STATS = path.join(STATE_DIR, "stats.json");
 let stats = loadJson(STATS, {});
 function statBump(field, agent, cost) {
   const day = new Date().toISOString().slice(0, 10);
@@ -1447,7 +1458,7 @@ fs.watchFile(NOTES_MD, { interval: 3000 }, () => {
 // daemon detects whether that window is still open via a marker the
 // launcher bakes into the process command line.
 
-const PROJECTS_FILE = path.join(__dirname, "projects.json");
+const PROJECTS_FILE = path.join(STATE_DIR, "projects.json");
 let projects = loadJson(PROJECTS_FILE, []);  // {id, name, dir, ts, created}
 // Migration: entries from before the `created` flag all came from the
 // create flow (browse-registering didn't exist yet) — they're ours.
@@ -1461,6 +1472,12 @@ const projAgents = {};      // project id -> {agentId: run count} (who's working
 const projChildren = {};    // project id -> Set<ChildProcess> (so the owner can stop the work and take over)
 const runChildren = new Map();  // task id -> { child, agent } — cancel a running task mid-flight
 function agentRunning(agent) { for (const v of runChildren.values()) if (v.agent === agent) return true; return false; }
+// 🧠 Local-model slot gate: at most N concurrent spawns on LM Studio (default 4;
+// reg.providerConfig.lmstudio.maxConcurrent or LMSTUDIO_MAX_CONCURRENT). Eight
+// delegates each opening with a ~60k-token prompt overran the shared KV cache on
+// 25 Sep (36× "failed to decode, ret = 1") — the daemon only throttled scheduled
+// jobs. Extra runs queue, say so in their session log, and start as slots free.
+const localSlots = localslots.createSlots({ getReg: () => reg });
 
 // ⏸ Paused work — tasks interrupted by a TEMPORARY limit (rate/usage/overload) or by a
 // daemon restart, kept so the office RESUMES them instead of silently dropping the work.
@@ -1468,7 +1485,7 @@ function agentRunning(agent) { for (const v of runChildren.values()) if (v.agent
 // can pick up where it left off. Entry: { agent, prompt, project, key, ts, tries, state }
 // state: "active" = running right now (so a restart knows it was mid-task) · "paused" =
 // waiting for the cooldown to elapse, then auto-resumed on its own --resume thread.
-const PAUSED_FILE = path.join(__dirname, "paused.json");
+const PAUSED_FILE = path.join(STATE_DIR, "paused.json");
 let pausedWork = loadJson(PAUSED_FILE, []);
 let _pausedTimer = null;
 function savePaused() {
@@ -2183,13 +2200,30 @@ function failedChild(message) {
   return ch;
 }
 function runClaude(agent, prompt, opts = {}) {
-  const task = "t" + ++taskCounter;
+  // Queue admission continues the task already returned to /chat, so the same
+  // id still cancels its child after the slot opens.
+  const task = (opts._slot && opts._slotTask) || "t" + ++taskCounter;
+
+  // 🧠 Re-entry from the local-model slot queue: the first pass resolved the thread,
+  // logged the prompt and parked; this pass HOLDS a slot and must reuse that same
+  // thread (a fresh resolution would fork it and lose the persona preamble). The
+  // private fields are stripped so the recover/failover/compaction re-runs that
+  // spread `opts` never inherit a slot they don't own.
+  const optsIn = opts;   // exactly what the caller passed (the trust replay re-uses it)
+  const slot = opts._slot ? { release: opts._slot, entry: opts._slotEntry, isNew: !!opts._slotNew,
+    queuedAt: opts._slotQueuedAt || 0, provider: opts._slotProvider || "" } : null;
+  if (slot) {
+    opts = { ...opts };
+    for (const k of ["_slot", "_slotTask", "_slotEntry", "_slotNew", "_slotQueuedAt", "_slotProvider"]) delete opts[k];
+  }
 
   // Session resolution: explicit key > latest > fresh. Fresh threads are
   // created up-front so their history records from the very first message.
   let entry = null;
   let isNew = false;
-  if (opts.session && opts.session !== "new")
+  if (slot && slot.entry && (sess[agent] || []).includes(slot.entry)) {
+    entry = slot.entry; isNew = slot.isNew;   // the thread this run queued on
+  } else if (opts.session && opts.session !== "new")
     entry = (sess[agent] || []).find((e) => e.key === opts.session);
   else if (!opts.session) entry = latestSession(agent);
   if (!entry) {
@@ -2207,7 +2241,7 @@ function runClaude(agent, prompt, opts = {}) {
   // Mentioning a DIFFERENT project than this thread's home forks a fresh
   // thread there — the work must genuinely run inside the named project
   // (same rule delegates already follow), never cross-write from afar.
-  if (!isNew && opts.project && projectDir(opts.project) &&
+  if (!slot && !isNew && opts.project && projectDir(opts.project) &&
       entry.proj && entry.proj !== opts.project) {
     entry = { key: "s" + Date.now(), sid: null, ts: Date.now(),
       title: String(opts.logPrompt || prompt).replace(/\s+/g, " ").slice(0, 48), log: [] };
@@ -2232,7 +2266,7 @@ function runClaude(agent, prompt, opts = {}) {
           text: `🛡 ไม่อนุมัติ hook ของโปรเจค “${name}” — งานนี้ยกเลิก (โปรเจคยังไม่ถูกเปิดใช้)` });
         return;
       }
-      runClaude(agent, prompt, opts);
+      runClaude(agent, prompt, optsIn);
     });
     return task;
   }
@@ -2247,6 +2281,7 @@ function runClaude(agent, prompt, opts = {}) {
         text: `💸 Budget reached for ${lbl}: $${gate.spent.toFixed(2)}${gate.estimated ? " (est.)" : ""} of $${gate.cap.toFixed(2)} ${gate.unit}. ` +
               `This turn was not started. Raise the cap in ⚙ → 💸 BUDGET, or wait for ${gate.unit === "today" ? "tomorrow" : "a higher cap"}.` });
       broadcast({ type: "budget.refused", agent, scope: gate.scope, id: gate.id, spent: gate.spent, cap: gate.cap }, false);
+      if (slot) slot.release();   // a refused turn must not keep its local-model slot
       if (opts.onDone) try { opts.onDone(`(budget reached for ${lbl} — turn not started)`, false); } catch {}
       return task;
     }
@@ -2267,30 +2302,23 @@ function runClaude(agent, prompt, opts = {}) {
   // Reactive recovery (maybeRecover) still backstops rate/TPM limits the size
   // estimate can't see. Guarded so a just-compacted run never re-triggers.
   if (!opts._compacted && !opts._recovered && entry.sid && !isNew && overBudget(agent, entry, cwd)) {
+    if (slot) slot.release();   // the compaction re-run takes its own slot
     compactThenRun(agent, prompt, opts, entry);
     return task;
   }
-  if (projId) {
-    projRuns[projId] = (projRuns[projId] || 0) + 1;
-    projAgents[projId] = projAgents[projId] || {};
-    projAgents[projId][agent] = (projAgents[projId][agent] || 0) + 1;
-    broadcast({ type: "projects.changed" }, false);
-  }
   entry.log = entry.log || [];
-  // A compaction/recovery run carries a heads-up that belongs at the top of the
-  // NEW thread (where the user is sent) — not the old one they were looking at.
-  if (isNew && opts._notice) entry.log.push({ who: "agent", text: opts._notice, ts: Date.now() });
-  entry.log.push({ who: "you", text: String(opts.logPrompt || prompt).slice(0, 4000), ts: Date.now() });
-  while (entry.log.length > 200) entry.log.shift();
-  saveSess();
-  if (opts.onEntry) try { opts.onEntry(entry.key); } catch {}
-
-  broadcast({ type: "task.started", agent, task, session: entry.key,
-    // The overlay's NOW-WORKING strip needs to SAY what the work is.
-    title: String(opts.logPrompt || prompt).replace(/\s+/g, " ").slice(0, 90) });
-  statBump("runs", agent);
-  // Track resumable work as ACTIVE so a restart (or a limit) can continue it later.
-  if (opts.resumable) pauseActive(agent, opts.resumePrompt || prompt, projId, entry.key, opts._tries);
+  // The prompt is logged ONCE — on the first pass. A run re-entering from the
+  // slot queue already has its line; it adds a "starting now" line instead
+  // (unless its thread vanished while it waited and a fresh one was made).
+  if (!slot || entry !== slot.entry) {
+    // A compaction/recovery run carries a heads-up that belongs at the top of the
+    // NEW thread (where the user is sent) — not the old one they were looking at.
+    if (isNew && opts._notice) entry.log.push({ who: "agent", text: opts._notice, ts: Date.now() });
+    entry.log.push({ who: "you", text: String(opts.logPrompt || prompt).slice(0, 4000), ts: Date.now() });
+    while (entry.log.length > 200) entry.log.shift();
+    saveSess();
+    if (opts.onEntry) try { opts.onEntry(entry.key); } catch {}
+  }
 
   // Persona + assigned skills ride in a stdin preamble (robust across
   // Windows shell quoting); resumed sessions already carry it in context.
@@ -2300,6 +2328,68 @@ function runClaude(agent, prompt, opts = {}) {
   // on the agent's own brain was sustainedly overloaded) wins over the agent's provider.
   const ov = opts._brainOverride;
   const effProvider = (ov && ov.provider) || (a && a.provider) || reg.defaultProvider || "claude";
+
+  // 🧠 Local-model slot gate. LM Studio serves a fixed number of KV-cache slots; more
+  // concurrent long prompts than fit → "failed to decode" and every run dies. So a run
+  // whose EFFECTIVE brain is a gated local provider takes a slot here — before any
+  // project counter, task row or child exists — or parks in a FIFO and says so in its
+  // own session log. The queued closure re-enters runClaude holding the slot.
+  let releaseSlot = () => {};
+  if (slot) {
+    releaseSlot = slot.release;
+    if (slot.queuedAt) {
+      entry.log.push({ who: "agent", text: localslots.startLine(slot.provider, Date.now() - slot.queuedAt), ts: Date.now() });
+      while (entry.log.length > 200) entry.log.shift();
+      saveSess();
+    }
+  } else {
+    const lane = localSlots.laneFor(effProvider);
+    if (lane && brainRoute(agent, ov).ok) {
+      let parked = null;   // set below once we know this pass was queued
+      const res = lane.enter({ agent, task, key: entry.key, kind: opts.resumable ? "delegate" : "turn",
+        onCancel: (why) => {
+          if (opts.resumable) pauseClear(entry.key);
+          try { entry.log.push({ who: "agent", text: "⏹ " + why, ts: Date.now() }); saveSess(); } catch {}
+          broadcast({ type: "chat.message", agent, session: entry.key, text: "⏹ " + why });
+          if (opts.onDone) try { opts.onDone("(" + why + ")", false); } catch (e) { console.error("[onDone]", e); }
+        } },
+        (release) => {
+          if (!parked) { releaseSlot = release; return; }   // a slot was free: carry on inline
+          // Started later from the queue: re-enter with the slot in hand.
+          runClaude(agent, prompt, { ...opts, _slot: release, _slotTask: task, _slotEntry: entry, _slotNew: isNew,
+            _slotQueuedAt: parked.at, _slotProvider: effProvider });
+        });
+      if (res.queued) {
+        parked = { at: Date.now() };
+        const line = localslots.waitLine(effProvider, res);
+        entry.log.push({ who: "agent", text: line, ts: Date.now(), queued: true });
+        while (entry.log.length > 200) entry.log.shift();
+        saveSess();
+        console.log(`[localslots] ${agent}/${task} queued on ${effProvider} (${res.running}/${res.limit} running, #${res.position} in line)`);
+        broadcast({ type: "chat.message", agent, session: entry.key, text: line, model: modelTag(agent) });
+        broadcast({ type: "task.queued", agent, task, session: entry.key, provider: effProvider,
+          running: res.running, limit: res.limit, position: res.position }, false);
+        // A queued delegate is still ACTIVE work: a restart must resume it, not lose it.
+        if (opts.resumable) pauseActive(agent, opts.resumePrompt || prompt, projId, entry.key, opts._tries);
+        return task;
+      }
+    }
+  }
+
+  if (projId) {
+    projRuns[projId] = (projRuns[projId] || 0) + 1;
+    projAgents[projId] = projAgents[projId] || {};
+    projAgents[projId][agent] = (projAgents[projId][agent] || 0) + 1;
+    broadcast({ type: "projects.changed" }, false);
+  }
+
+  broadcast({ type: "task.started", agent, task, session: entry.key,
+    // The overlay's NOW-WORKING strip needs to SAY what the work is.
+    title: String(opts.logPrompt || prompt).replace(/\s+/g, " ").slice(0, 90) });
+  statBump("runs", agent);
+  // Track resumable work as ACTIVE so a restart (or a limit) can continue it later.
+  if (opts.resumable) pauseActive(agent, opts.resumePrompt || prompt, projId, entry.key, opts._tries);
+
   const mtag = ov   // brain tag stamped on this run's messages + usage
     ? (ov.model ? ov.provider + "/" + ov.model : ov.provider)
     : modelTag(agent);
@@ -2321,7 +2411,7 @@ function runClaude(agent, prompt, opts = {}) {
     for (const n of mcpNames) {
       conf.mcpServers[n] = mcpEntry(reg.mcpServers[n]);
     }
-    mcpConfig = path.join(__dirname, `mcp_${agent.replace(/[^\w-]/g, "_")}.json`);
+    mcpConfig = path.join(STATE_DIR, `mcp_${agent.replace(/[^\w-]/g, "_")}.json`);
     fs.writeFileSync(mcpConfig, JSON.stringify(conf));
     tools += (tools ? "," : "") + mcpNames.map((n) => `mcp__${n}`).join(",");
   }
@@ -2380,9 +2470,31 @@ function runClaude(agent, prompt, opts = {}) {
   // An opt-in failover override reroutes THIS run to the fallback brain instead.
   const route = brainRoute(agent, ov);
   if (route.modelArgs.length) args.push(...route.modelArgs);
+  // Text-only run (POST /chat textOnly:true): no built-in tools, no MCP, no skills dir.
+  if (opts.textOnly === true) {
+    const kind = execBackend.pick(reg, agent).spec.kind;
+    args.splice(0, args.length, ...textonly.applyTextOnly(args, { backendKind: kind }));
+    console.log(`[claude] text-only run: ${agent}/${task} (--tools "" --strict-mcp-config)`);
+  }
+  if (opts.maxOutputTokens !== undefined) console.log(`[claude] maxOutputTokens=${opts.maxOutputTokens}: ${agent}/${task}`);
+  // Local brain behind the in-process proxy → its proxy cap (else 0). Shared by the
+  // spawn env (localclient) and the watchdog idle window below.
+  let localCapMs = 0;
+  try {
+    if (effProvider !== "claude" && route.ok &&
+        String((route.env || {}).ANTHROPIC_BASE_URL || "").includes("/proxy/" + effProvider)) {
+      const up = proxy.upstreamFor(effProvider, reg);
+      if (up && up.local) localCapMs = proxy.upstreamTimeoutMs(effProvider, reg, up.local, process.env);
+    }
+  } catch (e) { localCapMs = 0; }
+  let childEnv = maxout.applyMaxOutputTokens({ ...process.env, ...(reg.apiKeys || {}), ...route.env, OFFICE_ADAPTER: "1", OFFICE_AGENT: agent, OFFICE_TASK: task }, opts.maxOutputTokens);
+  if (localCapMs) {
+    childEnv = localclient.localClientEnv(childEnv, localCapMs);
+    console.log(`[claude] local client env: ${agent}/${task} API_TIMEOUT_MS=${childEnv.API_TIMEOUT_MS} BUN_CONFIG_HTTP_IDLE_TIMEOUT=${childEnv.BUN_CONFIG_HTTP_IDLE_TIMEOUT}s auto-memory off`);
+  }
   const child = spawnAgent(agent, args, {
     cwd,
-    env: { ...process.env, ...(reg.apiKeys || {}), ...route.env, OFFICE_ADAPTER: "1", OFFICE_AGENT: agent, OFFICE_TASK: task },
+    env: childEnv,
   });
   // Track the run per project so the owner can stop it and take the project over.
   if (projId) {
@@ -2397,8 +2509,20 @@ function runClaude(agent, prompt, opts = {}) {
   // Issue #15 (Bug 1): reap stuck runs. The watchdog fires onKill if either
   // the total wall-clock cap or the idle window (no progress event) elapses.
   // It calls back into the same cleanup path the CLI's own exit would.
+  // A LOCAL brain behind the in-process proxy (stream=false upstream) is silent for
+  // up to its proxy cap (540 s default) per request, so its idle window is widened to
+  // cap + 60 s; remote and direct brains keep RUN_IDLE_MS. Failover re-enters
+  // runClaude, so the fallback brain gets its own window.
+  // A local brain also gets the longer total cap LOCAL_RUN_TOTAL_MS (60 min default).
+  let runIdleMs = RUN_IDLE_MS;
+  const runTotalMs = runTotalMsFor({ baseTotalMs: RUN_TOTAL_MS, local: !!localCapMs, localTotalMs: LOCAL_RUN_TOTAL_MS });
+  if (localCapMs) {
+    runIdleMs = runIdleMsFor({ baseIdleMs: RUN_IDLE_MS, proxyTimeoutMs: localCapMs });
+    if (runIdleMs !== RUN_IDLE_MS || runTotalMs !== RUN_TOTAL_MS)
+      console.log(`[claude] watchdog idle=${Math.round(runIdleMs / 1000)}s total=${Math.round(runTotalMs / 1000)}s (local provider ${effProvider}, proxy cap ${Math.round(localCapMs / 1000)}s)`);
+  }
   const watchdog = new RunWatchdog({
-    totalMs: RUN_TOTAL_MS, idleMs: RUN_IDLE_MS,
+    totalMs: runTotalMs, idleMs: runIdleMs,
     onKill: (reason) => {
       console.error(`[claude] watchdog: ${agent}/${task} killed — ${reason}`);
       killTree(child);   // issue #15 review: shell:true on win32 → must taskkill /T, not plain kill
@@ -2536,6 +2660,7 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     watchdog.clear();     // issue #15: run resolved normally — disarm the watchdog
     runChildren.delete(task);
     releaseProj();
+    releaseSlot();        // 🧠 hand the local-model slot on; the next queued run starts now
     // Resume bookkeeping (delegated work + direct user tasks only): done OK → clear; hit
     // a temporary limit → keep PAUSED for the resume tick; any other failure → clear (a
     // genuine error shouldn't loop forever).
@@ -2560,6 +2685,7 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     recovering = true; doneFired = true;
     runChildren.delete(task);
     releaseProj();
+    releaseSlot();   // the fresh-thread re-run takes its own slot
     ended = true;
     broadcast({ type: "task.completed", agent, task, session: entry.key }); // clear the old row
     autoRecoverOverflow(agent, prompt, opts, entry);
@@ -2585,6 +2711,7 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
     watchdog.clear();
     runChildren.delete(task);
     releaseProj();
+    releaseSlot();   // the fallback brain's run is gated on its own provider
     try { killTree(child); } catch (e) { /* best-effort */ }
     ended = true;
     broadcast({ type: "task.completed", agent, task, session: entry.key }); // clear the stalled row
@@ -2643,6 +2770,13 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
           }
         }
         continue;   // system events carry no assistant/result content
+      }
+
+      // A finished tool (stream-json "user" event carrying a tool_result) is progress:
+      // the idle window then spans one upstream request, not tool run + request.
+      if (m.type === "user" && m.message && Array.isArray(m.message.content) &&
+          m.message.content.some((b) => b && b.type === "tool_result")) {
+        watchdog.touch();
       }
 
       if (m.type === "assistant" && m.message && Array.isArray(m.message.content)) {
@@ -2755,6 +2889,7 @@ model "${mtag}". If the owner asks which AI/model/LLM you are, answer truthfully
         if (!m.is_error && subTasks.length) {
           doneFired = true;  // the synthesis run inherits the callback
           releaseProj();
+          releaseSlot();     // the ghosts + synthesis each take their own slot
           runSubAgents(agent, entry, subTasks.slice(0, 4), opts.onDone);
         } else {
           fireDone(lastText, !m.is_error);
@@ -3215,7 +3350,8 @@ function makeDelegateFilter(depth, session, onHit) {
             session: proj ? ((!te || te.proj !== proj) ? "new" : undefined) : "new",
             resumable: true, resumePrompt: dinst,   // delegated work auto-resumes after a limit/restart
             onDone: (out, ok) => {
-              if (card) { try { tasks.move(card.id, ok ? "done" : "waiting"); } catch {} }
+              // Never overwrite a waiting/todo the agent set on purpose (reports owed).
+              if (card) { try { tasks.settleDelegation(card.id, ok); } catch {} }
               verifyThenReport(t, inst, out, ok, depth, sessionNow(), proj);
             },
           });
@@ -3368,7 +3504,36 @@ function runSubAgents(parentId, parentEntry, tasks, onDone) {
 
 // One ghost: a lean twin of runClaude. Pre-created "@sub" entry, parent's
 // tools, no skills preamble, no resume, and never splits further.
+// 🧠 Ghosts run on the parent's brain, so a SUB: split on an LM Studio agent is
+// the same fan-out that overran the KV cache — they take a local-model slot too.
 function runSub(parentId, subId, taskText, entry, onDone) {
+  const pa = reg.agents[parentId] || {};
+  const prov = pa.provider || reg.defaultProvider || "claude";
+  const lane = localSlots.laneFor(prov);
+  if (!lane || !brainRoute(parentId).ok) return runSubNow(parentId, subId, taskText, entry, onDone, () => {});
+  let parked = null;
+  const res = lane.enter({ agent: parentId, sub: subId, key: entry.key, kind: "ghost",
+    onCancel: (why) => {
+      try { entry.log.push({ who: "agent", text: "⏹ " + why, ts: Date.now() }); saveSess(); } catch {}
+      onDone("(" + why + ")", false);
+    } },
+    (release) => {
+      if (parked) {
+        entry.log.push({ who: "agent", text: localslots.startLine(prov, Date.now() - parked.at), ts: Date.now() });
+        saveSess();
+      }
+      runSubNow(parentId, subId, taskText, entry, onDone, release);
+    });
+  if (res.queued) {
+    parked = { at: Date.now() };
+    const line = localslots.waitLine(prov, res);
+    entry.log.push({ who: "agent", text: line, ts: Date.now(), queued: true });
+    saveSess();
+    console.log(`[localslots] ghost ${subId} queued on ${prov} (${res.running}/${res.limit} running, #${res.position} in line)`);
+    broadcast({ type: "chat.message", agent: parentId, sub: subId, text: line, session: entry.key });
+  }
+}
+function runSubNow(parentId, subId, taskText, entry, onDone, releaseSlot) {
   const a = reg.agents[parentId] || { name: parentId, role: "Staff" };
   const picked = a.tools && a.tools.length ? a.tools
     : ["Read", "Glob", "Grep", "WebSearch", "WebFetch"];
@@ -3381,7 +3546,7 @@ function runSub(parentId, subId, taskText, entry, onDone) {
     for (const n of mcpNames) {
       conf.mcpServers[n] = mcpEntry(reg.mcpServers[n]);
     }
-    mcpConfig = path.join(__dirname, `mcp_${parentId.replace(/[^\w-]/g, "_")}_sub.json`);
+    mcpConfig = path.join(STATE_DIR, `mcp_${parentId.replace(/[^\w-]/g, "_")}_sub.json`);
     fs.writeFileSync(mcpConfig, JSON.stringify(conf));
     tools += (tools ? "," : "") + mcpNames.map((n) => `mcp__${n}`).join(",");
   }
@@ -3450,6 +3615,7 @@ function runSub(parentId, subId, taskText, entry, onDone) {
     if (finished) return;
     finished = true;
     clearTimeout(watchdog);
+    try { releaseSlot(); } catch {}   // 🧠 free the local-model slot before the parent synthesizes
     // Settle the worktree even when the run FAILED: a ghost that was killed
     // half way through still wrote real files, and throwing them away is worse
     // than leaving a branch nobody merges.
@@ -4056,13 +4222,13 @@ channels.restart();
 // everything that waits on a person (daemon/approvals.js). Both are indexes and
 // plumbing; each kind's real resolver stays where it always was.
 const notify = require("./notify")({
-  file: path.join(__dirname, "notifications.json"),
+  file: path.join(STATE_DIR, "notifications.json"),
   reg, saveReg, broadcast,
   relay: (text, item) => channels.relay(text, item),
   log: (s) => console.log(s),
 });
 const approvals = require("./approvals")({
-  file: path.join(__dirname, "approvals.json"),
+  file: path.join(STATE_DIR, "approvals.json"),
   broadcast, notify: (spec) => notify.send(spec),
   log: (s) => console.log(s),
 });
@@ -4083,6 +4249,14 @@ const tasks = require("./tasks")({
   file: path.join(WORKSPACE, "tasks.json"), broadcast, log: (m) => console.log(m),
   notify: (n) => notify.send(n), agentName: (id) => (reg.agents[id] || {}).name || id,
 });
+// A task route's error: detail over the limit is JSON the caller can act on;
+// every other error stays plain text, as callers already expect.
+function taskError(res, e) {
+  if (e && e.code === "DETAIL_TOO_LONG") {
+    res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ error: "detail_too_long", field: "detail", limit: e.limit, length: e.length, message: e.message }));
+  } else { res.writeHead(400); res.end(String(e.message)); }
+}
 // 🧪 Skill regression (v1.6, design J): cases per skill; a self-correction that
 // breaks one is refused. Judged by the same headless turn the reflection uses.
 const skillTests = require("./skilltests")({ reg, saveReg, log: (m) => console.log(m),
@@ -4251,7 +4425,9 @@ approvals.on("blocked", (item, d) => {
 
 // ---------------------------------------------------------------- plugins
 const plugins = require("./plugins")({
-  broadcast, reg, saveReg, workspace: WORKSPACE, daemonDir: __dirname,
+  broadcast, reg, saveReg, workspace: WORKSPACE, daemonDir: STATE_DIR,
+  // Isolated daemon runs must never initialize plugins from the live install.
+  pluginsDir: process.env.OEP_STATE_DIR ? path.join(STATE_DIR, "plugins") : undefined,
   // run a real Claude Code turn as an agent (same engine the office uses).
   runClaude: (agent, prompt, opts) => runClaude(agent || "main", prompt, opts || {}),
   // post a visible line to the office feed (shows in the overlay stream).
@@ -4272,7 +4448,7 @@ const plugins = require("./plugins")({
 // token-free canned banter scene in the meeting corner, sometimes a real
 // AI-to-AI chat (which may even end in a project PROPOSAL the owner can
 // approve). Cadence: reg.socialMin minutes (0 = off).
-const PROPOSALS = path.join(__dirname, "proposals.json");
+const PROPOSALS = path.join(STATE_DIR, "proposals.json");
 let proposals = loadJson(PROPOSALS, []);
 const saveProposals = () => fs.writeFileSync(PROPOSALS, JSON.stringify(proposals, null, 2));
 
@@ -4718,10 +4894,10 @@ function readBodyRaw(req, cb) {
   req.on("end", () => cb(Buffer.concat(chunks)));
 }
 
-const MAPBG = path.join(__dirname, "map_bg.png");
-const LAYOUT_FILE = path.join(__dirname, "layout.json");   // Office Editor
-const PRESETS_FILE = path.join(__dirname, "presets.json"); // saved layouts
-const ASSETS_FILE = path.join(__dirname, "assets.json");   // imported models/images
+const MAPBG = path.join(STATE_DIR, "map_bg.png");
+const LAYOUT_FILE = path.join(STATE_DIR, "layout.json");   // Office Editor
+const PRESETS_FILE = path.join(STATE_DIR, "presets.json"); // saved layouts
+const ASSETS_FILE = path.join(STATE_DIR, "assets.json");   // imported models/images
 
 // Media file server for chat rendering (images / video / audio only).
 const MEDIA_MIME = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
@@ -4760,7 +4936,7 @@ function serveMedia(res, full, req) {
 
 // Portable definitions only: sessions, secrets and machine-specific execution
 // settings stay local. The transfer service owns the transactional disk commit.
-const officeTransfer = require("./office-transfer")({ workspace: WORKSPACE, daemonDir: __dirname, reg, maxStaff: MAX_STAFF });
+const officeTransfer = require("./office-transfer")({ workspace: WORKSPACE, daemonDir: STATE_DIR, reg, maxStaff: MAX_STAFF });
 const handleOfficeTransfer = require("./office-transfer-http")({
   transfer: officeTransfer,
   onImported: () => {
@@ -4922,8 +5098,14 @@ const server = http.createServer((req, res) => {
   } else if (req.method === "POST" && req.url === "/chat") {
     readBody(req, async (body) => {
       try {
-        let { agent = "main", prompt, session, wait, voice, files } = JSON.parse(body);
+        const parsed = JSON.parse(body);
+        let { agent = "main", prompt, session, wait, voice, files } = parsed;
         if (!prompt) throw new Error("no prompt");
+        // Opt-in text-only turn (only boolean true). Director flows delegate and need tools.
+        const textOnly = textonly.isTextOnly(parsed);
+        if (textOnly && (agent === "main" || agent === "ceo")) throw new Error("textOnly is not allowed for agent " + agent);
+        // Opt-in output cap for THIS run only (256..16384; anything else → 400).
+        const maxOutputTokens = maxout.parseMaxOutputTokens(parsed);
         // Attached images → inline a text transcription so ANY brain can read them
         // (DeepSeek/GLM are text-only). The original paths still ride in the prompt for
         // multimodal brains to Read natively. Keep origPrompt for the chat LOG so the
@@ -4973,13 +5155,22 @@ const server = http.createServer((req, res) => {
             ? (() => {
                 const df = makeDelegateFilter(0, () => keyRef.key, () => { dele.hit = true; });
                 return runClaude("main", prompt + directorNote() + autoNote(),
-                  { session, project, logPrompt: origPrompt, qvec,
+                  { session, project, logPrompt: origPrompt, qvec, maxOutputTokens,
                     filterText: (t) => stripStatus(df(t)),
                     onEntry: (k) => { keyRef.key = k; autoRounds.delete(k); },
                     onDone: autoContinue("main", project, keyRef, reply, true, dele) });
               })()
-            : runClaude(agent, prompt + autoNote(), { session, project, logPrompt: origPrompt, qvec,
+            : textOnly
+              // One-shot prose turn: no auto-continue and not resumable (both would
+              // re-run WITHOUT textOnly, i.e. with the full tool set).
+              ? runClaude(agent, prompt + autoNote(), { session, project, logPrompt: origPrompt, qvec,
+                  textOnly: true, maxOutputTokens,
+                  filterText: (t) => stripStatus(t),
+                  onEntry: (k) => { keyRef.key = k; autoRounds.delete(k); },
+                  onDone: reply })
+              : runClaude(agent, prompt + autoNote(), { session, project, logPrompt: origPrompt, qvec,
                 resumable: true, resumePrompt: origPrompt,  // a member's direct task auto-resumes
+                maxOutputTokens,
                 filterText: (t) => stripStatus(t),
                 onEntry: (k) => { keyRef.key = k; autoRounds.delete(k); },
                 onDone: autoContinue(agent, project, keyRef, reply, false) });
@@ -5720,6 +5911,13 @@ end tell`;
         };
         if (task) kill(runChildren.get(task), task);
         if (agent) { for (const [t, rec] of [...runChildren]) if (rec.agent === agent) kill(rec, t); }
+        // 🧠 Runs still WAITING for a local-model slot have no child yet — drop them
+        // from the queue too, or a stopped agent would spring back to life later.
+        for (const p of Object.keys(localslots.GATED)) {
+          const lane = localSlots.laneFor(p);
+          const gone = lane ? lane.cancel((m) => (task && m.task === task) || (agent && m.agent === agent)) : [];
+          for (const j of gone) { try { j.meta.onCancel && j.meta.onCancel("stopped by the owner while waiting for a local-model slot"); } catch {} }
+        }
         res.writeHead(200); res.end("ok");
       } catch (e) { res.writeHead(400); res.end(String(e.message)); }
     });
@@ -5981,9 +6179,9 @@ end tell`;
       try {
         const p = JSON.parse(body);
         if (p.owner && p.owner !== "you" && !reg.agents[p.owner]) throw new Error("unknown owner: " + p.owner);
-        const t = tasks.create(p, req.headers["x-bagidea-ui"] ? "you" : (p.by || "agent"));
+        const t = tasks.create(p, req.headers["x-bagidea-ui"] ? "you" : (p.by || "agent"), { strict: true });
         res.writeHead(200, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(t));
-      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+      } catch (e) { taskError(res, e); }
     });
 
   } else if (req.method === "POST" && req.url === "/tasks/update") {
@@ -5991,9 +6189,9 @@ end tell`;
       try {
         const p = JSON.parse(body);
         if (p.owner && p.owner !== "you" && !reg.agents[p.owner]) throw new Error("unknown owner: " + p.owner);
-        const t = tasks.update(p.id, p, req.headers["x-bagidea-ui"] ? "you" : "agent");
+        const t = tasks.update(p.id, p, req.headers["x-bagidea-ui"] ? "you" : "agent", { strict: true });
         res.writeHead(200, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(t));
-      } catch (e) { res.writeHead(400); res.end(String(e.message)); }
+      } catch (e) { taskError(res, e); }
     });
 
   } else if (req.method === "POST" && req.url === "/tasks/move") {
@@ -7138,7 +7336,7 @@ end tell`;
         const idx = Math.max(0, parseInt(p.index, 10) || 0);
         reg.monitor = idx;
         saveReg();
-        fs.writeFileSync(path.join(__dirname, "monitor.txt"), String(idx));
+        fs.writeFileSync(path.join(STATE_DIR, "monitor.txt"), String(idx));
         broadcast({ type: "ui.monitor", index: idx }, false);
         res.writeHead(200); res.end("ok");
         // Give the response a beat to flush, then relaunch the stack.
@@ -7158,7 +7356,7 @@ end tell`;
     readBody(req, (body) => {
       try {
         const n = Math.max(1, parseInt(JSON.parse(body || "{}").count, 10) || 1);
-        fs.writeFileSync(path.join(__dirname, "monitors.txt"), String(n));
+        fs.writeFileSync(path.join(STATE_DIR, "monitors.txt"), String(n));
         broadcast({ type: "ui.monitors", count: n }, false);
         res.writeHead(200); res.end("ok");
       } catch { res.writeHead(400); res.end("bad json"); }
@@ -7731,7 +7929,7 @@ end tell`;
     const L = String((req.url.split("?")[1] || "").replace(/^lang=/, "")).toLowerCase();
     let map = {};
     if (L && L !== "th" && /^[a-z]{2}$/.test(L)) {
-      try { map = JSON.parse(fs.readFileSync(path.join(__dirname, "i18n", L + ".json"), "utf8")); } catch {}
+      try { map = JSON.parse(fs.readFileSync(path.join(STATE_DIR, "i18n", L + ".json"), "utf8")); } catch {}
     }
     res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ map }));
@@ -7746,7 +7944,7 @@ end tell`;
         const { lang, strings } = JSON.parse(body);
         const L = String(lang || "").toLowerCase();
         if (!L || L === "th" || !Array.isArray(strings)) { res.writeHead(400); return res.end("bad"); }
-        const dir = path.join(__dirname, "i18n");
+        const dir = path.join(STATE_DIR, "i18n");
         fs.mkdirSync(dir, { recursive: true });
         const file = path.join(dir, L + ".json");
         let cache = {};

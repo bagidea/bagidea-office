@@ -4,7 +4,7 @@
   "private": true,
   "description": "BagIdea Office — a living office of AI agents. Daemon + overlay + Godot shell.",
   "scripts": {
-    "test": "node --test 'daemon/tests/**/*.test.js'",
+    "test": "node --test \"daemon/tests/**/*.test.js\"",
     "test:meetings": "node --test daemon/tests/meetings.test.js"
   },
   "license": "SEE LICENSE IN LICENSE"

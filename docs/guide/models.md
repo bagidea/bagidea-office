@@ -108,6 +108,14 @@ Run models locally through an OpenAI-compatible server — **no API key to paste
 
 > Non-default port → use a **Custom provider** and set the Base URL yourself (OpenAI-compatible)
 
+> **LM Studio concurrency cap.** A local model serves a fixed number of KV-cache slots; when the
+> Director fans out more long first prompts than fit, llama.cpp logs `failed to decode` and every run
+> dies. The office therefore runs **at most 4 LM Studio agents at once** (delegates, ghost clones and
+> plain turns alike). Extra runs wait in line — their thread shows *"⏳ waiting for a local-model slot"* —
+> and start by themselves as soon as a slot frees. Tune it with `providerConfig.lmstudio.maxConcurrent`
+> in the registry or the `LMSTUDIO_MAX_CONCURRENT` environment variable (`0` = no cap). The registry
+> value is read live, so no restart is needed after changing it.
+
 > The daemon takes a request from claude (in Anthropic format) → translates it to OpenAI → sends it on with the key from CONNECT
 > (the real key never enters the sandbox) · no key → it falls back to Claude (never hangs)
 

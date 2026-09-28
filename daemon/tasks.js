@@ -26,6 +26,7 @@ const path = require("path");
 const STATUSES = ["todo", "doing", "waiting", "done"];
 const KINDS = ["task", "delegation", "job", "action", "workflow"];
 const EVERY = { day: 86400000, week: 7 * 86400000 };
+const DETAIL_MAX = 4000;                              // UTF-16 code units, as before
 
 module.exports = function initTasks(ctx) {
   const FILE = ctx.file;
@@ -70,13 +71,30 @@ module.exports = function initTasks(ctx) {
   function blocked(t) {
     return (t.dependsOn || []).some((dep) => { const d = get(dep); return d && d.status !== "done"; });
   }
+  // A detail over the limit: strict callers (HTTP) get an error they can act on;
+  // internal callers keep the first DETAIL_MAX units (never half a surrogate
+  // pair) and the card is flagged, so nothing is cut silently.
+  function fitDetail(value, strict) {
+    const s = String(value || "");
+    if (s.length <= DETAIL_MAX) return { text: s, from: 0 };
+    if (strict) {
+      const e = new Error(`detail is ${s.length} characters; the limit is ${DETAIL_MAX}`);
+      e.code = "DETAIL_TOO_LONG"; e.limit = DETAIL_MAX; e.length = s.length;
+      throw e;
+    }
+    let end = DETAIL_MAX;
+    const c = s.charCodeAt(end - 1);
+    if (c >= 0xD800 && c <= 0xDBFF) end--;
+    return { text: s.slice(0, end), from: s.length };
+  }
 
-  function create(spec, by) {
+  function create(spec, by, opts = { strict: false }) {
     const title = String(spec.title || "").trim().slice(0, 200);
     if (!title) throw new Error("a work item needs a title");
+    const fit = fitDetail(spec.detail, opts && opts.strict);
     const t = {
       id: newId(), title,
-      detail: String(spec.detail || "").slice(0, 4000),
+      detail: fit.text,
       kind: KINDS.includes(spec.kind) ? spec.kind : "task",
       owner: String(spec.owner || "you").slice(0, 40),
       project: String(spec.project || "").slice(0, 80),
@@ -92,16 +110,28 @@ module.exports = function initTasks(ctx) {
     };
     if (STATUSES.includes(spec.status) && spec.status !== "done") t.status = spec.status;
     if (blocked(t)) { t.status = "waiting"; t.autoWaiting = true; }
+    if (fit.from) {
+      t.detailTruncated = { from: fit.from, at: now() };
+      log(`[tasks] detail truncated ${t.id} ${fit.from}→${fit.text.length} (${t.source ? t.source.kind : "direct"})`);
+    }
     items.push(t); save();
     emit("work.created", t);
     return pub(t);
   }
 
-  function update(id, patch, by) {
+  function update(id, patch, by, opts = { strict: false }) {
     const t = get(id); if (!t) throw new Error("no such work item: " + id);
     const p = patch || {};
+    // Checked before any field changes, so a rejected update leaves the card whole.
+    const fit = p.detail !== undefined ? fitDetail(p.detail, opts && opts.strict) : null;
     if (p.title !== undefined) { const s = String(p.title).trim().slice(0, 200); if (s) t.title = s; }
-    if (p.detail !== undefined) t.detail = String(p.detail || "").slice(0, 4000);
+    if (fit) {
+      t.detail = fit.text;
+      if (fit.from) {
+        t.detailTruncated = { from: fit.from, at: now() };
+        log(`[tasks] detail truncated ${t.id} ${fit.from}→${fit.text.length} (${t.source ? t.source.kind : "direct"})`);
+      } else delete t.detailTruncated;
+    }
     if (p.owner !== undefined) t.owner = String(p.owner || "you").slice(0, 40);
     if (p.project !== undefined) t.project = String(p.project || "").slice(0, 80);
     if (p.due !== undefined) { t.due = toMs(p.due); t.reminded = {}; }
@@ -145,6 +175,17 @@ module.exports = function initTasks(ctx) {
     save();
     emit(status === "done" ? "work.done" : "work.updated", t, { from: was, by });
     return pub(t);
+  }
+
+  // A delegated session ended. A failure parks the card as "waiting" (a human
+  // must look). A success closes it ONLY if it is still in the "doing" the
+  // daemon set at dispatch — an agent that moved its own card to waiting/todo
+  // (reports still owed) or done keeps that status.
+  function settleDelegation(id, ok) {
+    const t = get(id); if (!t) return null;
+    if (!ok) return move(id, "waiting", "daemon");
+    if (t.status !== "doing") return pub(t);
+    return move(id, "done", "daemon");
   }
 
   function remove(id) {
@@ -221,13 +262,13 @@ The office keeps a task board (📋 TASKS). Use it instead of describing work in
 ${mine.length ? `Your open cards:\n${lines.join("\n")}\n` : "You have no open cards.\n"}API (via Bash; JSON body):
   create:  curl -s -X POST http://127.0.0.1:8787/tasks -H "content-type: application/json" -d '{"title":"…","owner":"${agentId}","due":"2026-01-31","priority":2,"project":"<name>","dependsOn":["<id>"]}'
   move:    curl -s -X POST http://127.0.0.1:8787/tasks/move -H "content-type: application/json" -d '{"id":"<id>","status":"doing|done|waiting|todo"}'
-  edit:    curl -s -X POST http://127.0.0.1:8787/tasks/update -H "content-type: application/json" -d '{"id":"<id>","detail":"…","due":"…"}'
+  edit:    curl -s -X POST http://127.0.0.1:8787/tasks/update -H "content-type: application/json" -d '{"id":"<id>","detail":"…","due":"…"}' — detail max 4000 chars — longer is rejected (400 detail_too_long); put long briefs in a file and reference its path.
   list:    curl -s "http://127.0.0.1:8787/tasks?owner=${agentId}&open=1"
 Calendar: curl -s -X POST http://127.0.0.1:8787/calendar -H "content-type: application/json" -d '{"title":"…","at":"2026-01-31T10:00","remindMin":30,"recurrence":{"freq":"weekly","byDay":["MO"]},"agent":"${agentId}"}' books an event (the owner is reminded through their rules).
 When you start a card, move it to doing; when you finish, move it to done. Non-ASCII text: write the JSON to a file and send it with --data-binary @file.
 </office-tasks>`;
   }
 
-  return { create, update, move, remove, get: (id) => { const t = get(id); return t ? pub(t) : null; }, list, board, bySource, summary, tick, agentNote,
+  return { create, update, move, settleDelegation, remove, get: (id) => { const t = get(id); return t ? pub(t) : null; }, list, board, bySource, summary, tick, agentNote,
            STATUSES, KINDS, _toMs: toMs };
 };
