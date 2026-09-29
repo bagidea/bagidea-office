@@ -4,6 +4,45 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [1.8.0] — 🧠 Local models that don't fall over
+
+**Added**
+- **A queue for LM Studio.** A local model serves a fixed number of KV-cache
+  slots; when the Director fanned out more long prompts than fit, llama.cpp
+  logged `failed to decode` and every run died. The office now runs **at most
+  4 LM Studio agents at once** (delegates, ghost clones and plain turns alike);
+  extra runs wait in line — the thread says *"⏳ waiting for a local-model
+  slot"* — and start by themselves as a slot frees. A queued task keeps the id
+  `/chat` returned, so ⏹ works before and after admission. Tune with
+  `providerConfig.lmstudio.maxConcurrent` (read live) or
+  `LMSTUDIO_MAX_CONCURRENT` (`0` = no cap).
+- **Timeouts that agree.** A slow local answer used to be cut early by
+  whichever of the proxy, the client or the watchdog gave up first; the
+  request, the client and the watchdog now share one local cap (custom
+  providers on 127.0.0.1 / localhost included), and a reasoning-only or
+  empty upstream reply no longer stalls the turn.
+- **Per-chat knobs** on `POST /chat`: `textOnly: true` runs one turn with no
+  tools, no MCP and no skills dir (not for the Director or the CEO), and
+  `maxOutputTokens` (256–16384) caps that run's output — neither changes the
+  agent's saved settings.
+- **Task details have a limit.** A detail over 4,000 characters is refused
+  before anything is written (the editor shows the count and keeps your text);
+  details the office writes itself are trimmed and marked ✂️.
+- **Isolated daemons.** `OEP_STATE_DIR` / `OEP_WORKSPACE` boot a daemon
+  against a throwaway state folder and workspace — every file the daemon
+  writes moves with it, plugins included — so tests and a second office never
+  touch the real one; `npm test` works on Windows.
+  Contributed by @f2dac in [#63](https://github.com/bagidea/bagidea-office/pull/63).
+
+**Fixed** (review follow-ups)
+- The tool-detail boot sweep was skipped on any port but 8787, so an office
+  moved to `OEP_PORT=8790` never pruned again; every port sweeps (the one-day
+  age gate is the isolation).
+- A throw in the spawn setup after a local-model slot was taken (an EACCES on
+  the mcp config, say) stranded the slot until restart — four such failures
+  and every LM Studio run parked forever. The slot is handed back before the
+  error propagates. Regression test on the real `runClaude`.
+
 ## [1.7.0] — 📦🛠 A team you can hand over, and an office you can see inside
 
 **Added**

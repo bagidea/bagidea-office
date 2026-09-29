@@ -94,6 +94,26 @@ test("a queued task keeps its returned ID and can be stopped by that ID after ad
   h.stop(next);
 });
 
+test("a throw in the spawn setup after admission hands the slot back (no stranded lane)", () => {
+  // Review of #63: the mcp-config write sits after admission; if it threw, the
+  // lane's running count stayed incremented until restart.
+  const h = harness();
+  h.ctx.reg.agents.worker.tools = ["Read", "mcp:x"];
+  h.ctx.reg.mcpServers = { x: { command: "x" } };
+  h.ctx.STATE_DIR = "unused";
+  h.ctx.mcpEntry = (s) => s;
+  h.ctx.fs = { ...fs, writeFileSync() { throw new Error("EACCES: injected"); } };
+  assert.throws(() => h.ctx.runClaude("worker", "first", { session: "new" }), /EACCES: injected/);
+  assert.equal(h.slots.laneFor("lmstudio").state().running, 0, "the slot was released by the guard");
+  assert.equal(h.children.length, 0);
+  // …and the lane is usable: the next run is admitted, not queued.
+  h.ctx.fs = fs; h.ctx.reg.agents.worker.tools = ["Read"];
+  const next = h.ctx.runClaude("worker", "next", { session: "new" });
+  assert.equal(h.children.length, 1, "admitted inline");
+  assert.ok(!h.events.some((e) => e.type === "task.queued"));
+  h.stop(next);
+});
+
 test("stopping a queued task by its returned ID prevents it from launching", () => {
   const h = harness();
   h.ctx.runClaude("worker", "first", { session: "new" });

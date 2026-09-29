@@ -191,6 +191,21 @@ Tool-use accuracy matters for "money wasted on failed/redone work" — choose by
 
 > Cheap models suit assistant/chat work (someone's watching, can fix it on the spot) more than long autonomous loops
 
+## Per-run knobs (any brain)
+
+Two options on `POST /chat` change **one run only** — the agent's saved settings
+stay as they are:
+
+| option | what it does |
+|---|---|
+| `textOnly: true` | no built-in tools, no MCP servers, no skills directory — a plain answer. Refused for the Director (`main`) and the CEO. |
+| `maxOutputTokens: n` | caps that run's output (256–16384). Handy on a small local model that otherwise rambles past its context. |
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/chat -H 'content-type: application/json' \
+  -d '{"agent":"alice","prompt":"Summarize this in three lines","textOnly":true,"maxOutputTokens":512}'
+```
+
 ## Model identity
 
 A model swapped in reads Claude Code's system prompt and may claim to be Claude —

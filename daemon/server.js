@@ -557,11 +557,12 @@ try {
 // daemon started by mistake exits on EADDRINUSE without touching the store.
 const toolDetails = createToolDetails({ dir: path.join(STATE_DIR, "tooldetail") });
 function sweepToolDetails() {
-  // Only the office itself (default port) or a daemon given its own state
-  // folder sweeps. A test or duplicate daemon booted from this folder on
-  // another port must not delete the running office's details.
-  const ownsStore = String(OEP_PORT) === "8787" || !!process.env.OEP_STATE_DIR;
-  if (!sessLoaded || !ownsStore) return;
+  // Never against a sessions.json that failed to load (everything would look
+  // orphaned). Every port sweeps — an office moved to OEP_PORT=8790 must still
+  // prune — and a test daemon booted from this folder without its own
+  // OEP_STATE_DIR is covered by tooldetail.sweep itself: files younger than a
+  // day are never touched and the sweep never compacts.
+  if (!sessLoaded) return;
   try {
     const t = toolDetails.sweep(sess);
     if (t.removed || t.compacted) console.log(`[maint] tool details: removed ${t.removed}, compacted ${t.compacted}`);
@@ -2376,6 +2377,12 @@ function runClaude(agent, prompt, opts = {}) {
     }
   }
 
+  // 🧠 From here to the child's exit handler the slot is held by THIS run. A throw
+  // in the spawn setup (an EACCES on the mcp config, say) would strand it — four
+  // such failures and every local-model run parks forever — so the sync writes
+  // below run under this guard, which hands the slot on before re-throwing.
+  const slotGuard = (fn) => { try { return fn(); } catch (e) { releaseSlot(); throw e; } };
+
   if (projId) {
     projRuns[projId] = (projRuns[projId] || 0) + 1;
     projAgents[projId] = projAgents[projId] || {};
@@ -2412,7 +2419,7 @@ function runClaude(agent, prompt, opts = {}) {
       conf.mcpServers[n] = mcpEntry(reg.mcpServers[n]);
     }
     mcpConfig = path.join(STATE_DIR, `mcp_${agent.replace(/[^\w-]/g, "_")}.json`);
-    fs.writeFileSync(mcpConfig, JSON.stringify(conf));
+    slotGuard(() => fs.writeFileSync(mcpConfig, JSON.stringify(conf)));
     tools += (tools ? "," : "") + mcpNames.map((n) => `mcp__${n}`).join(",");
   }
   // Native skills (P3): deliver skills as real Claude Code Skill files disclosed

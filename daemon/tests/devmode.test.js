@@ -252,8 +252,10 @@ test("server.js: history joins saved details, one call can be fetched, and delet
   assert.match(serverSrc, /server\.listen\(OEP_PORT, "127\.0\.0\.1", \(\) => \{\s*console\.log\([^\n]*\n\s*sweepToolDetails\(\);/,
     "only the process that owns the port sweeps (a duplicate launch exits on EADDRINUSE first)");
   assert.strictEqual(serverSrc.split("sweepToolDetails()").length - 1, 2, "defined once, called once (in the listen callback)");
-  assert.match(serverSrc, /const ownsStore = String\(OEP_PORT\) === "8787" \|\| !!process\.env\.OEP_STATE_DIR;\s*if \(!sessLoaded \|\| !ownsStore\) return;/,
-    "only a daemon owning its configured state store may sweep loaded sessions");
+  assert.match(serverSrc, /function sweepToolDetails\(\) \{[^}]*?if \(!sessLoaded\) return;/,
+    "never sweep against a sessions.json that failed to load — and on EVERY port (the age gate in tooldetail.sweep is the isolation)");
+  assert.ok(!/ownsStore/.test(serverSrc), "no port/state-dir switch on the sweep: an office on a custom OEP_PORT must still prune");
+  assert.match(serverSrc, /const STATE_DIR = process\.env\.OEP_STATE_DIR \|\| __dirname;/, "an isolated daemon gets its own state folder");
   assert.match(serverSrc, /res\.end\(JSON\.stringify\(\{ log: toolDetails\.join\(q\.get\("agent"\), entry\),/, "GET /sessions/log joins saved details");
   const i = serverSrc.indexOf('req.url.startsWith("/sessions/tool-detail?")');
   assert.ok(i > 0 && i < serverSrc.indexOf('req.url === "/sessions/all"'), "the tool-detail route is matched before the generic /sessions routes");
