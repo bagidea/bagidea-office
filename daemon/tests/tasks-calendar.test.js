@@ -105,6 +105,75 @@ test("tasks: persisted, ordered by priority then due, summarised, and told to ag
   assert.strictEqual(tasks.bySource("job", "j1").id, j.id);
 });
 
+// ---- detail limit: HTTP callers are refused, internal callers are flagged -------
+test("tasks U1: strict create with a 4000-char detail succeeds, unflagged", () => {
+  const { tasks } = mkTasks();
+  const a = tasks.create({ title: "Fits", detail: "x".repeat(4000) }, "agent", { strict: true });
+  assert.strictEqual(a.detail.length, 4000);
+  assert.strictEqual(a.detailTruncated, undefined);
+});
+
+test("tasks U2: strict create over 4000 throws DETAIL_TOO_LONG and writes nothing", () => {
+  const { tasks, events, dir } = mkTasks();
+  tasks.create({ title: "Existing" });
+  const file = path.join(dir, "tasks.json");
+  const before = fs.readFileSync(file, "utf8"), mtime = fs.statSync(file).mtimeMs, n = tasks.list().length, ev = events.length;
+  assert.throws(() => tasks.create({ title: "Too long", detail: "x".repeat(4001) }, "agent", { strict: true }),
+    (e) => e.code === "DETAIL_TOO_LONG" && e.length === 4001 && e.limit === 4000);
+  assert.strictEqual(tasks.list().length, n, "no card added");
+  assert.strictEqual(fs.readFileSync(file, "utf8"), before, "file content unchanged");
+  assert.strictEqual(fs.statSync(file).mtimeMs, mtime, "file not rewritten");
+  assert.strictEqual(events.length, ev, "no work.created event");
+});
+
+test("tasks U3: strict update over 4000 throws before any field changes — title stays, in memory and on disk", () => {
+  const { tasks, dir } = mkTasks();
+  const a = tasks.create({ title: "Original", detail: "short" });
+  assert.throws(() => tasks.update(a.id, { title: "ใหม่", detail: "x".repeat(4001) }, "agent", { strict: true }), (e) => e.code === "DETAIL_TOO_LONG");
+  assert.strictEqual(tasks.get(a.id).title, "Original");
+  assert.strictEqual(tasks.get(a.id).detail, "short");
+  tasks.create({ title: "Another write" });   // a later save must not persist a half-applied patch
+  const onDisk = JSON.parse(fs.readFileSync(path.join(dir, "tasks.json"), "utf8")).find((t) => t.id === a.id);
+  assert.strictEqual(onDisk.title, "Original");
+});
+
+test("tasks U4+U5: non-strict create keeps 4000, flags and logs; a short update clears the flag", () => {
+  const dir = tmp(); const logs = [];
+  const tasks = require("../tasks")({ file: path.join(dir, "tasks.json"), log: (m) => logs.push(m), now: () => Date.UTC(2026, 8, 12) });
+  const a = tasks.create({ title: "Delegated", detail: "y".repeat(4500), kind: "delegation", source: { kind: "delegation", ref: "r1" } });
+  assert.strictEqual(a.detail.length, 4000);
+  assert.strictEqual(a.detailTruncated.from, 4500);
+  assert.ok(a.detailTruncated.at > 0);
+  assert.strictEqual(logs.length, 1);
+  assert.ok(logs[0].includes(a.id) && /4500→4000 \(delegation\)/.test(logs[0]), logs[0]);
+  const b = tasks.update(a.id, { detail: "0123456789" });
+  assert.strictEqual(b.detail, "0123456789");
+  assert.strictEqual(b.detailTruncated, undefined, "U5: flag removed");
+});
+
+test("tasks U6: 4000 Thai characters pass strict", () => {
+  const { tasks } = mkTasks();
+  const a = tasks.create({ title: "ไทย", detail: "ก".repeat(4000) }, "agent", { strict: true });
+  assert.strictEqual(a.detail.length, 4000);
+});
+
+test("tasks U7: non-strict truncation never leaves a lone high surrogate", () => {
+  const { tasks } = mkTasks();
+  const a = tasks.create({ title: "Emoji", detail: "x".repeat(3999) + "😀" });   // 4001 code units
+  assert.ok(!/[\uD800-\uDBFF]$/.test(a.detail), "no lone high surrogate at the end");
+  assert.strictEqual(a.detail.length, 3999);
+  assert.strictEqual(a.detailTruncated.from, 4001);
+});
+
+test("tasks U8: existing callers without opts behave as before", () => {
+  const { tasks } = mkTasks();
+  const a = tasks.create({ title: "Plain" });
+  assert.strictEqual(a.detail, "");
+  assert.strictEqual(tasks.update(a.id, { priority: 1 }).priority, 1);
+  assert.strictEqual(tasks.get(a.id).detailTruncated, undefined);
+  assert.match(tasks.agentNote("main"), /detail max 4000 chars/);
+});
+
 // ---- calendar -------------------------------------------------------------------
 function mkCal(o = {}) {
   const dir = tmp();

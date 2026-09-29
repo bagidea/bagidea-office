@@ -266,6 +266,112 @@ test("upstreamFor: providerConfig.token overrides the main-key env", () => {
   assert.strictEqual(u.key, "pc");
 });
 
+// --- role:"system" inside messages (LM Studio "System message must be at the beginning") --
+// claude CLI 2.1.x sends its "# Environment" block as a role:"system" message
+// (array content on the live turn, a string when replayed on --resume).
+const onlyLeadingSystem = (o) =>
+  o.messages.forEach((m, i) => assert.ok(m.role !== "system" || i === 0, `system at index ${i}`));
+
+test("toOpenAI: mid-conversation system context stays beside its user turn", () => {
+  const o = toOpenAI({ system: "S", messages: [
+    { role: "user", content: "hi" },
+    { role: "system", content: "# Environment" },
+    { role: "assistant", content: "hello" },
+    { role: "user", content: "again" },
+  ] }, "m");
+  assert.deepStrictEqual(o.messages, [
+    { role: "system", content: "S" },
+    { role: "user", content: "hi\n\n<system-reminder>\n# Environment\n</system-reminder>" },
+    { role: "assistant", content: "hello" },
+    { role: "user", content: "again" },
+  ]);
+});
+
+test("toOpenAI: array-content system message is merged, never turned into assistant", () => {
+  const o = toOpenAI({ system: [{ type: "text", text: "S" }], messages: [
+    { role: "user", content: "hi" },
+    { role: "system", content: [{ type: "text", text: "Env A", cache_control: { type: "ephemeral" } },
+                                 { type: "text", text: "Env B" }] },
+  ] }, "m");
+  assert.deepStrictEqual(o.messages, [
+    { role: "system", content: "S" },
+    { role: "user", content: "hi\n\n<system-reminder>\nEnv A\nEnv B\n</system-reminder>" },
+  ]);
+  assert.ok(!o.messages.some((m) => m.role === "assistant"), "system became assistant");
+});
+
+test("toOpenAI: several system entries merge in original order", () => {
+  const o = toOpenAI({ system: "one", messages: [
+    { role: "user", content: "u1" },
+    { role: "system", content: "two" },
+    { role: "assistant", content: "a1" },
+    { role: "user", content: "u2" },
+    { role: "system", content: [{ type: "text", text: "three" }] },
+  ] }, "m");
+  assert.strictEqual(o.messages[0].content, "one");
+  assert.strictEqual(o.messages[1].content, "u1\n\n<system-reminder>\ntwo\n</system-reminder>");
+  assert.strictEqual(o.messages[3].content, "u2\n\n<system-reminder>\nthree\n</system-reminder>");
+  assert.deepStrictEqual(o.messages.slice(1).map((m) => m.role), ["user", "assistant", "user"]);
+  onlyLeadingSystem(o);
+});
+
+test("toOpenAI: no top-level system prompt: mid-conversation context stays in the user turn", () => {
+  const o = toOpenAI({ messages: [
+    { role: "user", content: "hi" },
+    { role: "system", content: [{ type: "text", text: "Env" }] },
+  ] }, "m");
+  assert.deepStrictEqual(o.messages, [{ role: "user", content: "hi\n\n<system-reminder>\nEnv\n</system-reminder>" }]);
+});
+
+test("toOpenAI: stray system entries keep tool_calls directly followed by their tool results", () => {
+  const o = toOpenAI({ system: "S", messages: [
+    { role: "user", content: "read it" },
+    { role: "system", content: "Env" },
+    { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "Read", input: { f: "x" } }] },
+    { role: "system", content: [{ type: "text", text: "reminder" }] },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "PAPAYA" },
+                              { type: "text", text: "go on" }] },
+  ] }, "m");
+  onlyLeadingSystem(o);
+  const i = o.messages.findIndex((m) => m.tool_calls);
+  assert.strictEqual(o.messages[i].role, "assistant");
+  assert.deepStrictEqual(o.messages[i + 1], { role: "tool", tool_call_id: "t1", content: "PAPAYA" });
+  assert.deepStrictEqual(o.messages[i + 2], { role: "user", content: "<system-reminder>\nreminder\n</system-reminder>\n\ngo on" });
+  assert.strictEqual(o.messages[0].content, "S");
+  assert.strictEqual(o.messages[1].content, "read it\n\n<system-reminder>\nEnv\n</system-reminder>");
+});
+
+test("toOpenAI: request with no stray system entries is unchanged", () => {
+  const a = { system: [{ type: "text", text: "A" }, { type: "text", text: "B" }], stream: true, max_tokens: 9,
+    messages: [
+      { role: "user", content: "hi" },
+      { role: "assistant", content: [{ type: "text", text: "x" }, { type: "tool_use", id: "t", name: "g", input: {} }] },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "t", content: [{ type: "text", text: "r" }] }] },
+    ] };
+  const snap = JSON.stringify(a);
+  assert.strictEqual(JSON.stringify(toOpenAI(a, "m")), JSON.stringify({ model: "m", messages: [
+    { role: "system", content: "A\nB" },
+    { role: "user", content: "hi" },
+    { role: "assistant", content: "x", tool_calls: [{ id: "t", type: "function", function: { name: "g", arguments: "{}" } }] },
+    { role: "tool", tool_call_id: "t", content: "r" },
+  ], stream: true, max_tokens: 9, stream_options: { include_usage: true } }));
+  assert.strictEqual(JSON.stringify(a), snap, "input mutated");
+});
+
+test("toOpenAI: claude CLI resume shape → system only at index 0", () => {
+  const o = toOpenAI({ system: [{ type: "text", text: "billing" }, { type: "text", text: "You are Claude" }],
+    messages: [
+      { role: "user", content: "task" },
+      { role: "system", content: "# Environment\ncwd" },
+      { role: "assistant", content: [{ type: "text", text: "done" }] },
+      { role: "user", content: "next" },
+      { role: "system", content: [{ type: "text", text: "<total_tokens>1</total_tokens>" }] },
+    ] }, "m");
+  onlyLeadingSystem(o);
+  assert.strictEqual(o.messages.filter((m) => m.role === "system").length, 1);
+  assert.strictEqual(o.messages[o.messages.length - 1].role, "user");
+});
+
 // Bug 2 (issue #15) proxy upstream timeout tests live in proxy-timeout.test.js.
 
 // --- Gemini thought signatures (400 "missing thought_signature in functionCall") --
