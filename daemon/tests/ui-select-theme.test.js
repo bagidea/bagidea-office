@@ -24,5 +24,23 @@ test("every select inside the modal has the theme as a floor", () => {
 });
 
 test("the board's owner picker is the case that was reported", () => {
-  assert.match(OVERLAY, /<select id="bdOwner" style="flex:0 0 120px"><\/select>/);
+  // Still a bare <select> in the .assistrow (no .field around it) — the layout
+  // of the row may change, the theme rules above must keep covering it.
+  assert.match(OVERLAY, /<div class="assistrow"[^>]*>\s*<input id="bdTitle"[^>]*>\s*<select id="bdOwner" style="[^"]*"><\/select>/);
+});
+
+// 📋 The board was reported as crowded (2026-10-01): four equal columns in a
+// 470px card gave each ~95px, two of them empty, and a title wrapped into a
+// ten-line ribbon. These are the rules that fix it; losing one brings it back.
+test("the task board is not four equal ribbons", () => {
+  assert.match(css, /#modalCard:has\(#bdCols\) \{ width: min\(880px, 94vw\); \}/, "the card widens for the board tab only");
+  assert.match(css, /\.board \{ display: flex;[^}]*overflow-x: auto;/, "the board scrolls sideways instead of squeezing");
+  assert.match(css, /\.bcol \{ flex: 1 1 0; min-width: 138px;/, "a column has a readable minimum width");
+  assert.match(css, /\.bcol\.empty \{ flex: 0 0 42px;/, "an empty column folds to a strip");
+  assert.match(css, /\.bcol\.empty\.drop \{ flex-basis: 138px; \}/, "…and opens under a dragged card");
+  assert.match(css, /\.card \.t \{[^}]*-webkit-line-clamp: 3;/, "a card title is clamped to three lines");
+  assert.ok(!/repeat\(4, minmax\(0, 1fr\)\)/.test(css), "no fixed four-column grid");
+  assert.match(OVERLAY, /col\.className = "bcol" \+ \(all\.length \? "" : " empty"\);/, "the fold follows the column's content");
+  assert.match(OVERLAY, /c\.title = t\.title \+/, "the clamped title is whole in the tooltip");
+  assert.match(OVERLAY, /const DONE_SHOWN = 6, folded = st === "done" && !_bdDoneAll && all\.length > DONE_SHOWN;/, "DONE lists the recent few until asked");
 });

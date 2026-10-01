@@ -824,13 +824,27 @@
   input::-ms-reveal { filter: invert(0.85); }
   .tabs .tab.on { color: var(--accent); border-color: var(--accent); background: rgba(94,200,255,0.1); }
   /* 📋 the task board (v1.4) */
-  .board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-  .bcol { background: rgba(255,255,255,.04); border-radius: 8px; padding: 6px; min-height: 90px; min-width: 0; }
-  .bcol h5 { margin: 0 0 6px; font-size: 10.5px; color: var(--dim); letter-spacing: .4px; font-weight: 600; }
-  .card { background: rgba(0,0,0,.28); border-radius: 7px; padding: 6px 7px; margin-bottom: 5px; font-size: 11.5px; cursor: grab; border-left: 3px solid transparent; word-break: break-word; }
+  /* 📋 The board. A 470px card cannot hold four equal columns of prose (each got
+     ~95px and a title wrapped into a ten-line ribbon), so: the card widens for
+     this tab, an EMPTY column folds to a strip (still a drop target — it opens
+     under a dragged card), a title is clamped to three lines (the editor and the
+     tooltip show it whole), DONE lists the recent few, and the board scrolls
+     sideways before a column gets unreadable. */
+  #modalCard:has(#bdCols) { width: min(880px, 94vw); }
+  .board { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+  .bcol { flex: 1 1 0; min-width: 138px; background: rgba(255,255,255,.04); border-radius: 10px; padding: 8px; min-height: 90px; transition: flex-basis .15s; }
+  .bcol h5 { margin: 0 0 8px; font-size: 10.5px; color: var(--dim); letter-spacing: .4px; font-weight: 600; white-space: nowrap; }
+  .bcol.empty { flex: 0 0 42px; min-width: 42px; padding: 8px 4px; }
+  .bcol.empty h5 { display: flex; flex-direction: column; align-items: center; gap: 5px; margin: 0; }
+  .bcol.empty .lb { display: none; }
+  .bcol.empty.drop { flex-basis: 138px; }
+  .card { background: rgba(0,0,0,.28); border-radius: 8px; padding: 8px 9px; margin-bottom: 6px; font-size: 11.5px; line-height: 1.45; cursor: grab; border-left: 3px solid transparent; overflow-wrap: anywhere; }
   .card:hover { background: rgba(0,0,0,.4); }
   .card.p1 { border-left-color: #ff6b6b; } .card.p2 { border-left-color: #ffcf5e; } .card.p4 { opacity: .75; }
-  .card .m { font-size: 10px; color: var(--dim); margin-top: 3px; }
+  .card .t { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .card .m { font-size: 10px; color: var(--dim); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bmore { font-size: 10.5px; color: var(--dim); text-align: center; padding: 5px; border-radius: 8px; cursor: pointer; border: 1px dashed var(--line); user-select: none; }
+  .bmore:hover { color: var(--text); border-color: rgba(111,211,255,.5); }
   .card.over .m { color: #ff8a8a; } .card.blocked { opacity: .6; }
   .bcol.drop { outline: 1px dashed #6fd3ff; }
   .arow {
@@ -6060,6 +6074,7 @@
   }
 
   let opsSeq = 0;   // render token: only the newest openOps() commits async DOM
+  let _bdDoneAll = false;   // 📋 board: DONE shows the recent few until asked for all
   async function openOps(tab) {
     modal.classList.add("open");
     const seq = ++opsSeq;
@@ -6097,9 +6112,9 @@
     } else if (tab === "board") {
       body = `<div id="bdSummary" style="font-size:11px;color:var(--dim);margin-bottom:6px"></div>
         <div class="assistrow" style="margin-bottom:8px;flex-wrap:wrap">
-          <input id="bdTitle" placeholder="＋ งานใหม่… เช่น เขียนโพสต์เปิดตัว" maxlength="200" style="flex:1 1 180px">
-          <select id="bdOwner" style="flex:0 0 120px"></select>
-          <input id="bdDue" type="date" style="flex:0 0 130px" title="กำหนดส่ง">
+          <input id="bdTitle" placeholder="＋ งานใหม่… เช่น เขียนโพสต์เปิดตัว" maxlength="200" style="flex:3 1 200px">
+          <select id="bdOwner" style="flex:1 0 110px"></select>
+          <input id="bdDue" type="date" style="flex:1 0 130px" title="กำหนดส่ง">
           <button class="primary" id="bdAdd">＋</button>
         </div>
         <div id="bdEdit"></div>
@@ -6481,20 +6496,33 @@
         ed.scrollIntoView({ block: "nearest" });
       };
       for (const [st, label] of [["todo", "📝 TODO"], ["doing", "🔨 DOING"], ["waiting", "⏸ WAITING"], ["done", "✅ DONE"]]) {
-        const col = document.createElement("div"); col.className = "bcol";
-        col.innerHTML = `<h5>${label} <span style="opacity:.6">${r.board[st].length}</span></h5>`;
+        const all = r.board[st];
+        // DONE is a log, not a to-do: the recent few by default, the rest one click away.
+        const DONE_SHOWN = 6, folded = st === "done" && !_bdDoneAll && all.length > DONE_SHOWN;
+        const list = folded ? all.slice(0, DONE_SHOWN) : all;
+        const col = document.createElement("div"); col.className = "bcol" + (all.length ? "" : " empty");
+        const sp = label.indexOf(" ");
+        col.title = label;
+        col.innerHTML = `<h5><span>${label.slice(0, sp)}</span><span class="lb"> ${label.slice(sp + 1)}</span> <span style="opacity:.6">${all.length}</span></h5>`;
         col.ondragover = (e) => { e.preventDefault(); col.classList.add("drop"); };
         col.ondragleave = () => col.classList.remove("drop");
         col.ondrop = (e) => { e.preventDefault(); col.classList.remove("drop"); const id = e.dataTransfer.getData("text/plain"); if (id) uiPost("/tasks/move", { id, status: st }).then(refresh); };
-        for (const t of r.board[st]) {
+        for (const t of list) {
           const c = document.createElement("div");
           c.className = "card p" + t.priority + (t.overdue ? " over" : "") + (t.blocked ? " blocked" : ""); c.draggable = true;
           c.ondragstart = (e) => e.dataTransfer.setData("text/plain", t.id);
           const meta = [who(t.owner), t.project ? "📁 " + t.project : "", t.due ? "⏰ " + new Date(t.due).toLocaleDateString() : "", t.blocked ? "🔒" : "", t.recurrence ? "🔁" : "", t.detailTruncated ? "✂️" : ""].filter(Boolean).join(" · ");
-          c.innerHTML = `<div>${KIND[t.kind] ? KIND[t.kind] + " " : ""}${esc(t.title)}</div><div class="m">${esc(meta)}</div>`;
-          if (t.detailTruncated) c.title = `✂️ ${tr("ถูกตัดจาก")} ${t.detailTruncated.from} ${tr("ตัวอักษร")}`;
+          c.innerHTML = `<div class="t">${KIND[t.kind] ? KIND[t.kind] + " " : ""}${esc(t.title)}</div><div class="m">${esc(meta)}</div>`;
+          // The title is clamped to three lines; the tooltip (and the editor) carry it whole.
+          c.title = t.title + (meta ? "\n" + meta : "") + (t.detailTruncated ? `\n✂️ ${tr("ถูกตัดจาก")} ${t.detailTruncated.from} ${tr("ตัวอักษร")}` : "");
           c.onclick = () => editCard(t);
           col.appendChild(c);
+        }
+        if (st === "done" && all.length > DONE_SHOWN) {
+          const more = document.createElement("div"); more.className = "bmore";
+          more.textContent = folded ? `▾ +${all.length - DONE_SHOWN}` : "▴";
+          more.onclick = () => { _bdDoneAll = !_bdDoneAll; refresh(); };
+          col.appendChild(more);
         }
         cols.appendChild(col);
       }
