@@ -35,9 +35,9 @@ test("the board's owner picker is the case that was reported", () => {
 test("the task board is not four equal ribbons", () => {
   assert.match(css, /#modalCard:has\(#bdCols\) \{ width: min\(880px, 94vw\); \}/, "the card widens for the board tab only");
   assert.match(css, /\.board \{ display: flex;[^}]*overflow-x: auto;/, "the board scrolls sideways instead of squeezing");
-  assert.match(css, /\.bcol \{ flex: 1 1 0; min-width: 138px;/, "a column has a readable minimum width");
+  assert.match(css, /\.bcol \{ flex: 1 1 0; min-width: 200px;/, "a column has a readable minimum width");
   assert.match(css, /\.bcol\.empty \{ flex: 0 0 42px;/, "an empty column folds to a strip");
-  assert.match(css, /\.bcol\.empty\.drop \{ flex-basis: 138px; \}/, "…and opens under a dragged card");
+  assert.match(css, /\.bcol\.empty\.drop \{ flex-basis: 200px; \}/, "…and opens under a dragged card");
   assert.match(css, /\.card \.t \{[^}]*-webkit-line-clamp: 3;/, "a card title is clamped to three lines");
   assert.ok(!/repeat\(4, minmax\(0, 1fr\)\)/.test(css), "no fixed four-column grid");
   assert.match(OVERLAY, /col\.className = "bcol" \+ \(all\.length \? "" : " empty"\);/, "the fold follows the column's content");

@@ -832,12 +832,12 @@
      sideways before a column gets unreadable. */
   #modalCard:has(#bdCols) { width: min(880px, 94vw); }
   .board { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
-  .bcol { flex: 1 1 0; min-width: 138px; background: rgba(255,255,255,.04); border-radius: 10px; padding: 8px; min-height: 90px; transition: flex-basis .15s; }
+  .bcol { flex: 1 1 0; min-width: 200px; background: rgba(255,255,255,.04); border-radius: 10px; padding: 8px; min-height: 90px; transition: flex-basis .15s; }
   .bcol h5 { margin: 0 0 8px; font-size: 10.5px; color: var(--dim); letter-spacing: .4px; font-weight: 600; white-space: nowrap; }
   .bcol.empty { flex: 0 0 42px; min-width: 42px; padding: 8px 4px; }
   .bcol.empty h5 { display: flex; flex-direction: column; align-items: center; gap: 5px; margin: 0; }
   .bcol.empty .lb { display: none; }
-  .bcol.empty.drop { flex-basis: 138px; }
+  .bcol.empty.drop { flex-basis: 200px; }
   .card { background: rgba(0,0,0,.28); border-radius: 8px; padding: 8px 9px; margin-bottom: 6px; font-size: 11.5px; line-height: 1.45; cursor: grab; border-left: 3px solid transparent; overflow-wrap: anywhere; }
   .card:hover { background: rgba(0,0,0,.4); }
   .card.p1 { border-left-color: #ff6b6b; } .card.p2 { border-left-color: #ffcf5e; } .card.p4 { opacity: .75; }

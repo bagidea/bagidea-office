@@ -4,7 +4,7 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
-## [Unreleased]
+## [1.8.1] — 📋 A task board you can read
 
 **Changed**
 - **📋 The task board is no longer four equal ribbons.** In the 470px card
@@ -13,8 +13,9 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
   column folds to a narrow strip (still a drop target; it opens under a
   dragged card), a card's title is clamped to three lines with the whole
   text in the tooltip and the editor, DONE lists the six most recent with a
-  `▾ +N` toggle, and the board scrolls sideways before a column gets
-  unreadable. The add row fits on one line.
+  `▾ +N` toggle, and a column never gets narrower than 200px — when more
+  columns have cards than fit, the board scrolls sideways instead of
+  squeezing. The add row fits on one line.
 
 ## [1.8.0] — 🧠 Local models that don't fall over
 
