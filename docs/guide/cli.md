@@ -55,7 +55,7 @@ AI features (use main API keys)
   bagidea keys                      View configured keys (values not shown)
   bagidea key set <NAME> <value>    Store an API key in the vault (env-injected)
   bagidea key rm <NAME> | test [NAME]   Remove a key / test one works
-  bagidea channels                  Status of Telegram · Discord · LINE · Slack · WhatsApp · Messenger
+  bagidea channels                  Status of Telegram · Discord · LINE · Slack · WhatsApp · Messenger · Feishu
 
 Move to a new machine
   bagidea export [file]         Pack agents · skills · memory · projects · plugins → one .tgz

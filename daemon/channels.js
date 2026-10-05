@@ -5,6 +5,7 @@
 //   • LINE     — Messaging API webhook (POST /channels/line/webhook — needs a
 //                public HTTPS URL, e.g. a cloudflared tunnel; replies are
 //                PUSHed so slow agent runs never outlive a reply token)
+//   • Slack / WhatsApp / Messenger / Feishu-Lark — webhooks of the same shape
 // Config lives in registry.json under reg.channels (edited in ⚙ CONNECT).
 
 const https = require("https");
@@ -99,11 +100,28 @@ function wsConnect(host, path, hooks) {
   return { send: (s) => sendRaw(s, 1), close: () => { try { sock.destroy(); } catch {} } };
 }
 
+// ---- Feishu / Lark helpers ---------------------------------------------------
+// With an Encrypt Key set, an event arrives as {"encrypt": base64(iv ‖ AES-256-CBC)}
+// under key = SHA-256(Encrypt Key). (Open Platform docs: "Encrypt Key encryption".)
+function feishuDecrypt(encryptKey, b64) {
+  const buf = Buffer.from(String(b64), "base64");
+  if (buf.length < 32 || buf.length % 16) throw new Error("bad ciphertext");
+  const key = crypto.createHash("sha256").update(String(encryptKey)).digest();
+  const d = crypto.createDecipheriv("aes-256-cbc", key, buf.subarray(0, 16));
+  return Buffer.concat([d.update(buf.subarray(16)), d.final()]).toString("utf8");
+}
+function safeEq(a, b) {
+  const x = Buffer.from(String(a)), y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
 // ---- connectors --------------------------------------------------------------
 module.exports = function initChannels(ctx) {
+  // ctx.jreq: a test seam for the outbound HTTPS calls (Feishu uses it).
+  const http_ = ctx.jreq || jreq;
   // ctx: getConfig() → reg.channels, onMessage(channel, from, text, reply), log(s)
   const state = { telegram: "off", discord: "off", line: "off",
-    slack: "off", whatsapp: "off", messenger: "off" };
+    slack: "off", whatsapp: "off", messenger: "off", feishu: "off" };
   // Generation tokens, NOT shared booleans: a restart bumps the generation,
   // and any in-flight long-poll / reconnect from an older generation dies
   // the moment it next checks — a shared "alive" flag resurrected old
@@ -400,6 +418,141 @@ module.exports = function initChannels(ctx) {
         null, { recipient: { id: to }, messaging_type: "RESPONSE", message: { text: part } }, () => {});
   }
 
+  // ---- Feishu / Lark (飞书): event-subscription webhook in, im/v1/messages out.
+  // A custom app with the Bot capability subscribes to `im.message.receive_v1`
+  // and posts it to /channels/feishu/webhook through a public HTTPS tunnel
+  // (same as LINE). Replies are sent with a tenant_access_token, which the
+  // platform issues for ~2 h from the app id + secret — cached here and fetched
+  // again shortly before it runs out. Feishu (open.feishu.cn) and Lark
+  // (open.larksuite.com) speak the same protocol on different hosts.
+  const FEISHU_HOSTS = { feishu: "open.feishu.cn", lark: "open.larksuite.com" };
+  const fsHost = (cfg) => FEISHU_HOSTS[cfg.domain] || FEISHU_HOSTS.feishu;
+  const fsReady = (cfg) => !!(cfg && cfg.enabled && cfg.appId && cfg.secret);
+  let fsTok = null;         // { key, token, exp }
+  let fsTokWait = null;     // { key, cbs } — one fetch in flight, however many senders ask
+  let fsCredBad = false;    // the last token fetch failed: an arriving event must not paint the light green
+  let lastFeishu = null;    // chat_id of the last sender, for relay()
+  const fsSeen = new Map(); // message_id / event_id → ts (Feishu can push one message twice)
+  function feishuToken(cfg, cb) {
+    const key = fsHost(cfg) + "|" + cfg.appId + "|" + cfg.secret;
+    if (fsTok && fsTok.key === key && fsTok.exp > Date.now()) return cb(null, fsTok.token);
+    if (fsTokWait && fsTokWait.key === key) return void fsTokWait.cbs.push(cb);
+    const wait = fsTokWait = { key, cbs: [cb] };
+    http_("POST", fsHost(cfg), "/open-apis/auth/v3/tenant_access_token/internal", null,
+      { app_id: cfg.appId, app_secret: cfg.secret }, (e, j) => {
+        if (fsTokWait === wait) fsTokWait = null;
+        let err = null, tok = null;
+        if (e || !j) err = (e && e.message) || "no response";
+        else if (j.code !== 0 || !j.tenant_access_token) err = j.msg || ("code " + j.code);
+        else {
+          tok = j.tenant_access_token;
+          // Renew five minutes early; never trust an expiry under a minute.
+          fsTok = { key, token: tok, exp: Date.now() + Math.max(60, (Number(j.expire) || 7200) - 300) * 1000 };
+        }
+        fsCredBad = !!err;
+        if (err) { state.feishu = "error: " + String(err).slice(0, 80); log("feishu token: " + err); }
+        else if (String(state.feishu).startsWith("error")) state.feishu = "ready — waiting for events";
+        for (const c of wait.cbs) { try { c(err, tok); } catch {} }
+      }, 15000);
+  }
+  // `to` is a chat_id (oc_…) or an open_id (ou_…); parts go out in order.
+  function sendFeishu(cfg, to, text, retried) {
+    if (!to) return;
+    const idType = String(to).startsWith("ou_") ? "open_id" : "chat_id";
+    feishuToken(cfg, (err, tok) => {
+      if (err) return;
+      const parts = chunk(String(text), 4000);
+      const next = (i) => {
+        if (i >= parts.length) return;
+        http_("POST", fsHost(cfg), "/open-apis/im/v1/messages?receive_id_type=" + idType,
+          { authorization: "Bearer " + tok },
+          { receive_id: to, msg_type: "text", content: JSON.stringify({ text: parts[i] }) },
+          (e, j) => {
+            // 99991663 / 99991665: the tenant token expired early or was revoked — fetch a fresh one, once.
+            if (j && [99991663, 99991665].includes(j.code) && !retried) {
+              fsTok = null;
+              return sendFeishu(cfg, to, parts.slice(i).join(""), true);
+            }
+            if (e || (j && j.code)) log("feishu send: " + (e ? e.message : j.code + " " + (j.msg || "")));
+            next(i + 1);
+          });
+      };
+      next(0);
+    });
+  }
+  function feishuWebhook(req, res, rawBody) {
+    const cfg = (ctx.getConfig().feishu) || {};
+    if (!fsReady(cfg)) { res.writeHead(404); return res.end(); }
+    // An unauthenticated webhook would let anyone who finds the tunnel URL give
+    // the office orders, so one of the two proofs Feishu offers is REQUIRED.
+    if (!cfg.verify && !cfg.encryptKey) {
+      state.feishu = "error: set the Verification Token or an Encrypt Key";
+      res.writeHead(403); return res.end();
+    }
+    const raw = rawBody.toString("utf8");
+    let j; try { j = JSON.parse(raw); } catch { res.writeHead(400); return res.end(); }
+    if (cfg.encryptKey) {
+      // With an Encrypt Key the platform signs the request and encrypts the body.
+      const sig = req.headers["x-lark-signature"];
+      if (sig) {
+        const mine = crypto.createHash("sha256").update(
+          String(req.headers["x-lark-request-timestamp"] || "") + String(req.headers["x-lark-request-nonce"] || "") +
+          cfg.encryptKey + raw).digest("hex");
+        if (!safeEq(mine, String(sig))) { res.writeHead(403); return res.end(); }
+      }
+      if (typeof j.encrypt !== "string") { res.writeHead(403); return res.end(); }
+      try { j = JSON.parse(feishuDecrypt(cfg.encryptKey, j.encrypt)); }
+      catch { state.feishu = "error: Encrypt Key does not match"; res.writeHead(403); return res.end(); }
+    } else if (typeof j.encrypt === "string") {
+      state.feishu = "error: events are encrypted — enter the Encrypt Key";
+      res.writeHead(400); return res.end();
+    }
+    if (cfg.verify && !safeEq(String((j.header && j.header.token) || j.token || ""), cfg.verify)) {
+      res.writeHead(403); return res.end();
+    }
+    // The one-time Request URL check: echo the challenge as JSON within a second.
+    if (j.type === "url_verification") {
+      if (!fsCredBad) state.feishu = "on";
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ challenge: j.challenge || "" }));
+    }
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end("{}");            // ack fast — Feishu redelivers anything slower than 3 s
+    if (!fsCredBad) state.feishu = "on";
+    const h = j.header || {};
+    if (h.event_type !== "im.message.receive_v1") return;
+    const ev = j.event || {}, m = ev.message || {}, sender = ev.sender || {};
+    // The platform documents duplicate pushes and says to dedupe on message_id
+    // (a redelivery can carry a new event_id); both are remembered.
+    const ids = [m.message_id && "m:" + m.message_id, h.event_id && "e:" + h.event_id].filter(Boolean);
+    if (ids.some((k) => fsSeen.has(k))) return;
+    for (const k of ids) fsSeen.set(k, Date.now());
+    if (fsSeen.size > 1000) for (const k of fsSeen.keys()) { fsSeen.delete(k); if (fsSeen.size <= 800) break; }
+    if (sender.sender_type && sender.sender_type !== "user") return;   // never answer another bot
+    if (m.message_type !== "text" || !m.chat_id) return;
+    let text = "";
+    try { text = String(JSON.parse(m.content).text || ""); } catch {}
+    // In a group the bot is addressed by a mention, which arrives as a placeholder.
+    text = text.replace(/@_(?:user_\d+|all)\s*/g, "").trim();
+    if (!text) return;
+    const openId = (sender.sender_id && sender.sender_id.open_id) || "";
+    // Optional allowlist: your own open_id, or one chat's chat_id.
+    if (cfg.chat && cfg.chat !== m.chat_id && cfg.chat !== openId) return;
+    lastFeishu = m.chat_id;
+    const chatId = m.chat_id;
+    ctx.onMessage("feishu", cfg.domain === "lark" ? "Lark user" : "Feishu user", text,
+      (reply) => sendFeishu(cfg, chatId, reply), () => {});
+  }
+  // Saving the card checks the credentials at once, so a wrong App Secret shows
+  // as an error here rather than as silence after the first message.
+  function startFeishu() {
+    const cfg = (ctx.getConfig().feishu) || {};
+    fsTok = null; fsCredBad = false;
+    if (!fsReady(cfg)) { state.feishu = "off"; return; }
+    state.feishu = "connecting";
+    feishuToken(cfg, (err) => { if (!err && state.feishu === "connecting") state.feishu = "ready — waiting for events"; });
+  }
+
   function chunk(s, n) {
     const out = [];
     for (let i = 0; i < s.length && out.length < 5; i += n) out.push(s.slice(i, i + n));
@@ -432,14 +585,18 @@ module.exports = function initChannels(ctx) {
     if (lastSlack && lastSlack.token) sendSlack(lastSlack.token, lastSlack.channel, t);
     if (lastWa && lastWa.token) sendWhatsApp(lastWa.token, lastWa.phone, lastWa.to, t);
     if (lastMsgr && lastMsgr.token) sendMessenger(lastMsgr.token, lastMsgr.to, t);
+    // Feishu: the last chat that spoke — or, before anyone has, the allowlisted id.
+    const fs_ = (ctx.getConfig().feishu) || {};
+    if (fsReady(fs_) && (lastFeishu || fs_.chat)) sendFeishu(fs_, lastFeishu || fs_.chat, t);
   }
 
   return {
-    restart() { stopAll(); setTimeout(() => { startTelegram(); startDiscord(); }, 300); },
+    restart() { stopAll(); setTimeout(() => { startTelegram(); startDiscord(); startFeishu(); }, 300); },
     lineWebhook,
     slackWebhook,
     whatsappWebhook,
     messengerWebhook,
+    feishuWebhook,
     relay,
     status: () => ({ ...state }),
   };
@@ -447,3 +604,4 @@ module.exports = function initChannels(ctx) {
 
 // The WSS client doubles as the Gemini Live transport (server.js /live).
 module.exports.wsConnect = wsConnect;
+module.exports.feishuDecrypt = feishuDecrypt;

@@ -90,7 +90,7 @@ badge) — that part is always on. The **rules** decide what else happens:
 | Where | What it is |
 |---|---|
 | **toast** | a pop-up in the corner of the chat window — and, since v1.2, a small always-on-top window in the corner of your **screen**, drawn by the office itself, so it shows even when the chat window is hidden or covered; click either to jump to the item |
-| **channel** | pushed to Telegram / Discord / LINE / Slack / WhatsApp / Messenger |
+| **channel** | pushed to Telegram / Discord / LINE / Slack / WhatsApp / Messenger / Feishu-Lark |
 | **sound** | one short cue (respects the office sound toggle) |
 
 …and **when**:

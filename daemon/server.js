@@ -6454,7 +6454,7 @@ end tell`;
     readBody(req, (body) => {
       try {
         const { kind, config } = JSON.parse(body);
-        if (!["telegram", "discord", "line", "slack", "whatsapp", "messenger"].includes(kind)) throw new Error("bad kind");
+        if (!["telegram", "discord", "line", "slack", "whatsapp", "messenger", "feishu"].includes(kind)) throw new Error("bad kind");
         reg.channels[kind] = {
           enabled: !!(config && config.enabled),
           token: String((config && config.token) || "").trim().slice(0, 300),
@@ -6462,8 +6462,14 @@ end tell`;
           channel: String((config && config.channel) || "").trim().slice(0, 80),
           secret: String((config && config.secret) || "").trim().slice(0, 200),
           phone: String((config && config.phone) || "").trim().slice(0, 80),     // WhatsApp phone number id
-          verify: String((config && config.verify) || "").trim().slice(0, 200),  // Meta webhook verify token
+          verify: String((config && config.verify) || "").trim().slice(0, 200),  // Meta webhook verify token · Feishu Verification Token
         };
+        // Feishu / Lark: app id + secret (above), an optional Encrypt Key, and which host.
+        if (kind === "feishu") Object.assign(reg.channels[kind], {
+          appId: String((config && config.appId) || "").trim().slice(0, 80),
+          encryptKey: String((config && config.encryptKey) || "").trim().slice(0, 200),
+          domain: config && config.domain === "lark" ? "lark" : "feishu",
+        });
         saveReg();
         channels.restart();
         res.writeHead(200); res.end("ok");
@@ -7043,6 +7049,10 @@ end tell`;
     // Messenger (Meta Graph) webhook — GET verifies, POST delivers.
     if (req.method === "GET") channels.messengerWebhook(req, res, null);
     else readBodyRaw(req, (raw) => channels.messengerWebhook(req, res, raw));
+
+  } else if (req.method === "POST" && req.url.split("?")[0] === "/channels/feishu/webhook") {
+    // Feishu / Lark event subscription (public HTTPS tunnel; same as LINE).
+    readBodyRaw(req, (raw) => channels.feishuWebhook(req, res, raw));
 
   } else if (req.method === "POST" && req.url === "/registry/heartbeat") {
     // Director overview cadence: 0 = off, otherwise minutes between passes.

@@ -1,4 +1,4 @@
-# Channels — command the office from Telegram / Discord / LINE / Slack / WhatsApp / Messenger
+# Channels — command the office from Telegram / Discord / LINE / Slack / WhatsApp / Messenger / Feishu-Lark
 
 Messages from outside go straight to the **Director**: he reads, replies, and has the authority to delegate
 (DELEGATE) just as if you'd commanded it yourself in chat — replies are sent back through the same channel.
@@ -75,8 +75,43 @@ the internet into your machine — the easiest is cloudflared:
 3. In Meta → Messenger → Webhooks → Callback URL =
    `https://xxx.trycloudflare.com/channels/messenger/webhook` + the same Verify token → subscribe to `messages`
 
-> 🧪 Slack / WhatsApp / Messenger are new — if you get stuck setting one up, file an
-> [issue](https://github.com/bagidea/bagidea-office/issues) with the step where you got stuck
+## 🐦 Feishu / Lark (飞书 · requires a public HTTPS URL · experimental 🧪)
+
+Feishu (open.feishu.cn) and Lark (open.larksuite.com) are the same platform on two
+hosts; pick yours in the card. Events arrive by webhook, so you need a tunnel as for LINE.
+
+1. Open the developer console ([open.feishu.cn/app](https://open.feishu.cn/app) ·
+   [open.larksuite.com/app](https://open.larksuite.com/app)) → **Create custom app**
+   → copy the **App ID** (`cli_…`) and **App Secret** from *Credentials & Basic Info*
+2. **Add features** → enable **Bot**
+3. **Permissions & Scopes** → add `im:message.p2p_msg:readonly` (receive messages sent to
+   the bot) and `im:message:send_as_bot` (reply) — plus `im:message.group_at_msg:readonly`
+   if you want to @mention the bot in a group chat
+4. Open a tunnel: `cloudflared tunnel --url http://127.0.0.1:8787`
+5. In **⚙ → 📡 CHANNELS → 🐦 Feishu / Lark**: pick the host, enter the App ID, the App Secret
+   and the **Verification Token** (shown on *Events & Callbacks → Encryption Strategy*)
+   → flip the switch → 💾. The light turns amber, *ready — waiting for events*, when the
+   credentials are accepted; a wrong secret shows as a red error straight away
+6. **Events & Callbacks** → Request URL = `https://xxx.trycloudflare.com/channels/feishu/webhook`
+   (the platform verifies it at once) → add the event **`im.message.receive_v1`**
+7. **Create a version** and publish it (a custom app only goes live once a version is
+   released), then message the bot
+
+- **Encrypt Key** (optional): if you set one on the *Encryption Strategy* page, enter the
+  same key in the card. Events are then encrypted and signed, and the office checks both.
+  The office refuses a webhook that has neither a Verification Token nor an Encrypt Key —
+  an open tunnel must not be an open door.
+- **Allowlist** (optional): your own `open_id` (`ou_…`) or one chat's `chat_id` (`oc_…`).
+  Only that sender or chat can give orders, and approvals and work updates are sent there
+  even before anyone has written to the bot.
+- Text messages only for now; a reply longer than 4,000 characters goes out in parts.
+  Approvals are answered by typing (`1 yes`, `2 no too risky`, `/inbox`).
+
+> 🧪 Slack / WhatsApp / Messenger / Feishu-Lark are new — if you get stuck setting one up, file an
+> [issue](https://github.com/bagidea/bagidea-office/issues) with the step where you got stuck.
+> Feishu / Lark was built from the platform's documentation and checked against its live
+> token endpoint, but not yet against a real published app — reports are very welcome
+> ([#65](https://github.com/bagidea/bagidea-office/issues/65))
 
 ---
 

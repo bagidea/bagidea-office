@@ -125,7 +125,7 @@ function help() {
   row("trust [allow|deny]", "🛡 Projects whose own hooks are waiting on your word");
   row("keys", "List configured API keys (values hidden)");
   row("key set <NAME> <value>", "Add a key · key rm <NAME> · key test [NAME]");
-  row("channels", "Telegram / Discord / LINE status");
+  row("channels", "Telegram / Discord / LINE / Slack / WhatsApp / Messenger / Feishu status");
   row("plugins", "Installed plugins");
   row("plugin install <git-url>", "Add a plugin · plugin remove <id>");
 

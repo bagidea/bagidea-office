@@ -4,6 +4,26 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [Unreleased]
+
+**Added**
+- **🐦 Feishu / Lark channel (飞书)** — the seventh. A custom app with the Bot
+  capability subscribes to `im.message.receive_v1` and posts to
+  `/channels/feishu/webhook`; a message becomes an order to the Director and
+  the answer goes back to the same chat. Approvals (typed replies), workflow
+  keywords, slash commands and work updates all reach it like any other
+  channel. Feishu (open.feishu.cn) and Lark (open.larksuite.com) are one
+  picker apart. Encrypted events (Encrypt Key) are decrypted and their
+  signature checked; a webhook with neither a Verification Token nor an
+  Encrypt Key is refused; an optional `open_id` / `chat_id` allowlist pins the
+  office to one sender or chat and gives notifications a target after a
+  restart. The tenant token is cached and renewed; saving the card checks the
+  credentials at once. Card in ⚙ → 📡 CHANNELS, pre-translated in 14 languages;
+  guide in `docs/guide/channels.md`. Requested in
+  [#65](https://github.com/bagidea/bagidea-office/issues/65). Built from the
+  platform documentation and checked against the live token endpoints — not
+  yet against a real published app.
+
 ## [1.8.1] — 📋 A task board you can read
 
 **Changed**

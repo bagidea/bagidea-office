@@ -3864,6 +3864,12 @@
         [["token", "Access token (Meta)"], ["phone", "Phone number ID"], ["verify", "Verify token (ตั้งเองให้ตรงกับ Meta)"]]],
       ["messenger", "💠 Messenger", "Facebook Page (Meta): ตั้ง Callback URL /channels/messenger/webhook + verify token ด้านล่าง ผ่าน public HTTPS",
         [["token", "Page access token"], ["verify", "Verify token (ตั้งเองให้ตรงกับ Meta)"]]],
+      ["feishu", "🐦 Feishu / Lark", "Feishu / Lark (飞书): สร้าง custom app เปิดความสามารถ Bot แล้ว subscribe event im.message.receive_v1 ชี้ Request URL มาที่ /channels/feishu/webhook ผ่าน public HTTPS (cloudflared)",
+        [["domain", "", [["feishu", "飞书 Feishu — open.feishu.cn"], ["lark", "Lark — open.larksuite.com"]]],
+         ["appId", "App ID (cli_…)"], ["secret", "App Secret"],
+         ["verify", "Verification Token (จากหน้า Events & Callbacks)"],
+         ["encryptKey", "(ไม่บังคับ) Encrypt Key — ถ้าตั้งไว้ใน Feishu ต้องใส่ให้ตรงกัน"],
+         ["chat", "(ไม่บังคับ) open_id หรือ chat_id ของคุณ — จำกัดให้สั่งได้คนเดียว และใช้ส่งแจ้งเตือน"]]],
     ];
     const box = modalCard.querySelector("#chbox");
     if (!box) return;
@@ -3883,15 +3889,18 @@
           <div class="switch ${cfg.enabled ? "on" : ""}" style="margin-left:auto"><div class="knob"></div></div>
         </div>
         <div style="font-size:10.5px;color:var(--dim);margin-bottom:6px">${hint}</div>` +
-        fields.map(([f, ph]) =>
-          `<input data-f="${f}" placeholder="${ph}" value="${esc(cfg[f] || "")}"
-            style="margin-bottom:5px" ${f === "token" || f === "secret" ? 'type="password"' : ""}>`).join("") +
+        fields.map(([f, ph, options]) => options
+          // A field with a fixed set of answers is a picker, not a box to type in.
+          ? `<select data-f="${f}" style="width:100%;margin-bottom:5px">` +
+            options.map(([v, label]) => `<option value="${v}" ${(cfg[f] || options[0][0]) === v ? "selected" : ""}>${esc(label)}</option>`).join("") + `</select>`
+          : `<input data-f="${f}" placeholder="${ph}" value="${esc(cfg[f] || "")}"
+            style="margin-bottom:5px" ${f === "token" || f === "secret" || f === "encryptKey" ? 'type="password"' : ""}>`).join("") +
         `<button class="bigbtn" style="margin-top:2px">💾 บันทึก + เชื่อมต่อ</button>`;
       const sw = card.querySelector(".switch");
       sw.onclick = () => sw.classList.toggle("on");
       card.querySelector(".bigbtn").onclick = async () => {
         const config = { enabled: sw.classList.contains("on") };
-        card.querySelectorAll("input[data-f]").forEach((i) => (config[i.dataset.f] = i.value.trim()));
+        card.querySelectorAll("input[data-f], select[data-f]").forEach((i) => (config[i.dataset.f] = i.value.trim()));
         await api("/registry/channel", { kind, config });
         setTimeout(() => renderChannels(), 900);  // show fresh status
       };
