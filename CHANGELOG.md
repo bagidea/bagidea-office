@@ -4,7 +4,7 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
-## [Unreleased]
+## [1.9.0] — 🐦 A seventh channel: Feishu / Lark
 
 **Added**
 - **🐦 Feishu / Lark channel (飞书)** — the seventh. A custom app with the Bot
