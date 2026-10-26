@@ -301,6 +301,10 @@ function create(deps = {}) {
     : (r) => fallback.localStatus(r, deps.fetchImpl ? { fetch: deps.fetchImpl } : {});
   const log = typeof deps.log === "function" ? deps.log : (s) => console.log(s);
   const redactor = typeof deps.redact === "function" ? deps.redact : null;
+  // slotLane(provider) → the local-model gate for that provider (server.js: localSlots.laneFor),
+  // or null when the provider has no cap. onUsage(provider, {in, out}) → cost stats.
+  const slotLane = typeof deps.slotLane === "function" ? deps.slotLane : () => null;
+  const onUsage = typeof deps.onUsage === "function" ? deps.onUsage : () => {};
 
   // Raw upstream text → safe to show / log: the office's keys, key shapes, home paths out.
   function redact(text, r, key) {
@@ -400,6 +404,9 @@ function create(deps = {}) {
       return bad(classifyHttp(st, em), { status: st || undefined, model }, redact(clip(em, 500), r, up.key), model);
     }
     const ch = (Array.isArray(j.choices) && j.choices[0]) || {};
+    if (j.usage && typeof j.usage === "object") {
+      try { onUsage(provider, { in: Number(j.usage.prompt_tokens) || 0, out: Number(j.usage.completion_tokens) || 0 }); } catch {}
+    }
     const text = stripThink(contentText(ch.message && ch.message.content != null ? ch.message.content : ch.text));
     if (!text) {
       return bad("EMPTY", { why: ch.finish_reason === "length" ? `${label} ran out of max tokens before answering (the model thought too long)` : "" },
@@ -424,12 +431,15 @@ function create(deps = {}) {
     let prompt = ctx.system + "\n\n---\n\n" + ctx.prompt;
     if (retryText != null) prompt += "\n\n---\n\n" + NUDGE;
     const TIMED_OUT = Symbol("timeout");
+    // On timeout the `claude -p` child is killed through the signal — otherwise it would
+    // run on to completion, spending tokens for an answer nobody is waiting for.
+    const ctrl = new AbortController();
     let timer;
     let out;
     try {
       out = await Promise.race([
-        Promise.resolve().then(() => claudeText(prompt, { provider, model: ctx.model })).catch(() => ""),
-        new Promise((res) => { timer = setTimeout(() => res(TIMED_OUT), timeoutMs); }),
+        Promise.resolve().then(() => claudeText(prompt, { provider, model: ctx.model, signal: ctrl.signal })).catch(() => ""),
+        new Promise((res) => { timer = setTimeout(() => { ctrl.abort(); res(TIMED_OUT); }, timeoutMs); }),
       ]);
     } finally { clearTimeout(timer); }
     if (out === TIMED_OUT) return bad("TIMEOUT", { ms: timeoutMs }, "", used);
@@ -468,6 +478,20 @@ function create(deps = {}) {
     return bad("BAD_JSON", {}, "retry failed: " + a2.code + (a2.detail ? " · " + a2.detail : ""), a1.model, a1.text);
   }
 
+  // The local-model slot for a copilot call: resolves { release } once a slot is held
+  // (at once when one is free), { cancelled: why } if the owner stopped the office while
+  // it waited, or {} for a provider with no gate.
+  function takeSlot(ctx) {
+    const lane = slotLane(ctx.provider);
+    if (!lane) return Promise.resolve({});
+    return new Promise((resolve) => {
+      const st = lane.enter({ agent: "main", task: "copilot:" + ctx.job, kind: "copilot", job: ctx.job,
+        onCancel: (why) => resolve({ cancelled: String(why || "cancelled while waiting for a local-model slot") }) },
+        (release) => resolve({ release }));
+      if (st.queued) try { log(`[copilot] ${ctx.job} waiting for a ${ctx.label} slot (${st.running}/${st.limit} running, #${st.position} in line)`); } catch {}
+    });
+  }
+
   // run({ job, prompt, system?, json?, maxTokens?, timeoutMs?, track?:{title}, provider?, model? })
   //   → { ok, text, json|null, brain:{ provider, model, label, source }, ms, error:null|{ code, message, detail } }
   async function run(o = {}) {
@@ -496,8 +520,15 @@ function create(deps = {}) {
       try { broadcast({ type: "task.started", agent: "main", task: tid, title: oneLine((o.track && o.track.title) || "✨ copilot", 90) }); } catch {}
     }
     let res;
-    try { res = await execute(ctx, !!o.json); }
+    // A gated local brain (LM Studio): wait for a slot like every other run. A 5th
+    // request while four delegates hold the slots is exactly what the gate exists for.
+    const slot = await takeSlot(ctx);
+    try {
+      if (slot.cancelled) res = bad("UPSTREAM", { why: slot.cancelled });
+      else res = await execute(ctx, !!o.json);
+    }
     catch (e) { res = bad("UPSTREAM", { why: "copilot failed" }, redact(oneLine(e && e.message, 300), r)); }
+    finally { if (slot.release) try { slot.release(); } catch {} }
 
     const ms = Date.now() - t0;
     const used = res.model || model;

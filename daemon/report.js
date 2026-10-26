@@ -152,6 +152,17 @@ function gpuInfo() {
 
 // The last `n` lines of a log (reads at most its final 512 KB). A missing file
 // comes back as missing.
+// Broadcast lines the daemon echoes to its stdout that carry people's words.
+const CHAT_LINE = /^\[oep\] → \{"type":"(?:chat\.message|voice\.say|task\.progress|subagent\.[a-z]+|collab\.[a-z]+|meeting\.[a-z]+|discuss\.[a-z]+)"/;
+function dropChatLines(lines, keep = FILE_LOG_LINES) {
+  const out = [];
+  let dropped = 0;
+  for (const l of lines || []) { if (CHAT_LINE.test(l)) dropped++; else out.push(l); }
+  const tail = out.slice(-keep);
+  if (dropped) tail.push(`(… ${dropped} chat / voice broadcast line${dropped === 1 ? "" : "s"} left out of this tail — they carry conversation text)`);
+  return tail;
+}
+
 function tailLines(file, n = FILE_LOG_LINES) {
   let fd = null;
   try {
@@ -289,11 +300,16 @@ function pruneReports(dir, keep = KEEP_REPORTS) {
 async function prepareReport(input, deps = {}) {
   const p = input && typeof input === "object" ? input : {};
   const daemonDir = deps.daemonDir || __dirname;
+  const logDir = deps.logDir || daemonDir;     // daemon.log is written next to the code by the shell
   const redOpts = { secrets: collectSecrets(deps.reg), username: deps.username, hostname: deps.hostname, home: deps.home };
   const red = (s) => redactSecrets(s, redOpts);
   const source = String(p.source || "ui").replace(/[^\w-]/g, "").slice(0, 40) || "ui";
   const logName = "daemon.log";
-  const tail = tailLines(path.join(daemonDir, logName), FILE_LOG_LINES);
+  // Read extra, then drop the broadcast lines that carry conversation text (chat
+  // bubbles, spoken lines, meeting turns) — a public issue gets the daemon's story, not
+  // the owner's. Keep the last FILE_LOG_LINES of what is left.
+  const rawTail = tailLines(path.join(logDir, logName), FILE_LOG_LINES * 4);
+  const tail = { missing: rawTail.missing, lines: dropChatLines(rawTail.lines, FILE_LOG_LINES) };
   const now = deps.now instanceof Date ? deps.now : new Date();
   // Redact the pieces BEFORE they are trimmed to fit, so a cut can never leave
   // half a token behind; the composed markdown is redacted once more.
@@ -329,5 +345,5 @@ async function prepareReport(input, deps = {}) {
 
 module.exports = {
   redactSecrets, collectSecrets, buildReport, reportTitle, cleanContext, issueLink, issueUrl, fitIssue,
-  prepareReport, tailLines, gpuInfo, officeVersion, ISSUE_NEW, URL_MAX,
+  prepareReport, tailLines, dropChatLines, gpuInfo, officeVersion, ISSUE_NEW, URL_MAX,
 };

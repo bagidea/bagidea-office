@@ -8199,7 +8199,7 @@
     "(ว่าง)": { en: "(empty)", zh: "（空）", ja: "（空）" },
     "แจ้งทีมพัฒนา": { en: "Report to the dev team", zh: "报告给开发团队", ja: "開発チームに報告" },
     "กำลังเตรียมรายงาน…": { en: "Preparing the report…", zh: "正在准备报告…", ja: "レポートを準備しています…" },
-    "ยังไม่มีอะไรถูกส่งออกไป — อ่านตรวจข้อความด้านล่างก่อน แล้วกด Submit บน GitHub เอง": { en: "Nothing has been sent. Review the text below, then press Submit on GitHub yourself.", zh: "尚未发送任何内容。请先检查下面的文字，然后自己在 GitHub 上点击 Submit。", ja: "まだ何も送信されていません。下の内容を確認してから、GitHub で自分で Submit を押してください。" },
+    "ยังไม่มีอะไรถูกส่งออกไป — อ่านตรวจข้อความด้านล่างก่อน ข้อความจะไปถึง GitHub เมื่อกด เปิด GitHub Issue และโพสต์ก็ต่อเมื่อคุณกด Submit ที่นั่นเอง": { en: "Nothing has been sent yet. Review the text below — it reaches GitHub when you press Open GitHub Issue, and is posted only when you press Submit there.", zh: "尚未发送任何内容。请先检查下面的文字——按下“打开 GitHub Issue”时内容才会送到 GitHub，只有你在那里点击 Submit 才会发布。", ja: "まだ何も送信されていません。下の内容を確認してください。「GitHub Issue を開く」を押すと内容が GitHub に渡り、そこで Submit を押したときにだけ投稿されます。" },
     "ซ่อน token, key, ชื่อผู้ใช้ และชื่อเครื่องให้อัตโนมัติแล้ว": { en: "Tokens, keys, your user name and the computer name were hidden automatically.", zh: "已自动隐藏 token、key、用户名和计算机名。", ja: "トークン、キー、ユーザー名、コンピューター名は自動的に伏せました。" },
     "คัดลอก": { en: "Copy", zh: "复制", ja: "コピー" },
     "คัดลอกแล้ว — วางใน GitHub issue ได้เลย": { en: "Copied — paste it into the GitHub issue.", zh: "已复制 — 可以粘贴到 GitHub issue 中。", ja: "コピーしました — GitHub の issue に貼り付けてください。" },
@@ -8527,7 +8527,7 @@
       name: "report", tone: "info", width: 580, sticky: true, focus: "close", title: "🐞 " + tr("แจ้งทีมพัฒนา"),
       html: `<div style="color:#dce6f2;margin-bottom:8px">${step ? esc(tr(step)) + " · " : ""}<code style="${mono};color:#8294ab">${esc(source)}</code></div>` +
         `<div style="padding:8px 10px;border-radius:9px;background:rgba(94,200,255,.07);border:1px solid rgba(94,200,255,.25);` +
-        `color:#cfe6ff;margin-bottom:6px">ℹ ${esc(tr("ยังไม่มีอะไรถูกส่งออกไป — อ่านตรวจข้อความด้านล่างก่อน แล้วกด Submit บน GitHub เอง"))}</div>` +
+        `color:#cfe6ff;margin-bottom:6px">ℹ ${esc(tr("ยังไม่มีอะไรถูกส่งออกไป — อ่านตรวจข้อความด้านล่างก่อน ข้อความจะไปถึง GitHub เมื่อกด เปิด GitHub Issue และโพสต์ก็ต่อเมื่อคุณกด Submit ที่นั่นเอง"))}</div>` +
         `<div style="font-size:11px;margin-bottom:8px">🔒 ${esc(tr("ซ่อน token, key, ชื่อผู้ใช้ และชื่อเครื่องให้อัตโนมัติแล้ว"))}</div>` +
         `<pre id="bagRepPreview" class="bagrep-preview" style="margin:0;max-height:min(44vh,380px);overflow:auto;white-space:pre-wrap;` +
         `word-break:break-word;${mono};color:#cdd8ea;background:#08101c;border:1px solid #1d2b44;border-radius:9px;padding:10px"></pre>` +

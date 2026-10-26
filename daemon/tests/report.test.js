@@ -206,18 +206,22 @@ test("wiring: overlay dialogs, the gated /reports/prepare route, and daemon/repo
 // ---- the real daemon ------------------------------------------------------------------
 test("integration: 403 without the UI header; /teams/hire hires once; /reports/prepare saves a redacted report", { timeout: 120000 }, async () => {
   const port = 19131 + Math.floor(Math.random() * 9);   // developer C's range (19130 is the UI harness)
-  // Runtime files the daemon writes — snapshot them and put them back afterwards.
-  const keep = ["daemon/registry.json", "daemon/journal.jsonl", "daemon/notifications.json", "workspace/.claude/settings.json"].map((p) => path.join(ROOT, p));
-  const saved = keep.map((f) => (fs.existsSync(f) ? fs.readFileSync(f) : null));
+  // An ISOLATED office: its own state dir + workspace under a temp folder (the
+  // OEP_STATE_DIR / OEP_WORKSPACE seams from v1.8.0). The checkout's live
+  // registry.json, sessions, journal and workspace/.claude/settings.json are never read
+  // or written — a test must not be able to lose a real office's agents.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bagidea-report-"));
+  const STATE = path.join(tmp, "state"), WS = path.join(tmp, "workspace");
+  fs.mkdirSync(STATE, { recursive: true }); fs.mkdirSync(WS, { recursive: true });
   const OFFICE_KEY = "zz-office-service-key-4242", TG = "zz-telegram-bot-token-4242";
-  fs.writeFileSync(keep[0], JSON.stringify({ agents: {}, autoPilot: false, triggers: [], lang: "en",
+  fs.writeFileSync(path.join(STATE, "registry.json"), JSON.stringify({ agents: {}, autoPilot: false, triggers: [], lang: "en",
     apiKeys: { ZZ_TEST_SERVICE_KEY: OFFICE_KEY }, channels: { telegram: { enabled: false, token: TG } } }));
-  const d = spawn(process.execPath, [path.join(DAEMON, "server.js")], { env: { ...process.env, OEP_PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"] });
+  const d = spawn(process.execPath, [path.join(DAEMON, "server.js")],
+    { env: { ...process.env, OEP_PORT: String(port), OEP_STATE_DIR: STATE, OEP_WORKSPACE: WS }, stdio: ["ignore", "pipe", "pipe"] });
   const logs = [];
   d.stdout.on("data", (c) => logs.push(String(c)));
   d.stderr.on("data", (c) => logs.push(String(c)));
   const exited = new Promise((r) => d.on("exit", r));
-  const made = [];
   const base = `http://127.0.0.1:${port}`;
   const post = (p, body, ui = true) => fetch(base + p, { method: "POST", headers: { "content-type": "application/json", ...(ui ? { "x-bagidea-ui": "1" } : {}) }, body: JSON.stringify(body || {}) });
   try {
@@ -253,17 +257,17 @@ test("integration: 403 without the UI header; /teams/hire hires once; /reports/p
     r = await post("/reports/prepare", { source: "hire-team", error: "x" }, false);
     assert.strictEqual(r.status, 403);
     r = await post("/reports/prepare", { source: "hire-team", step: "จ้างทีม", context: { team: "research-lab" },
-      error: `HTTP 500 · boom ${FAKE.hf} ${OFFICE_KEY} ${TG} at C:\\Users\\somchai\\bagidea and /home/somchai/x` });
+      error: `HTTP 500 · boom ${FAKE.hf} ${OFFICE_KEY} ${TG} at C:\\Users\\somchai\\work and /home/somchai/x` });
     assert.strictEqual(r.status, 200);
     const rep = await r.json();
-    made.push(rep.file);
-    assert.ok(rep.ok && rep.file.startsWith(path.join(DAEMON, "reports") + path.sep) && fs.existsSync(rep.file), "saved " + rep.file);
+    assert.ok(rep.ok && rep.file.startsWith(path.join(STATE, "reports") + path.sep) && fs.existsSync(rep.file), "saved in the office's own state dir: " + rep.file);
+    assert.ok(!fs.existsSync(path.join(DAEMON, "reports", path.basename(rep.file))), "nothing written into the checkout");
     assert.match(rep.id, /^\d{8}-\d{6}-hire-team(-\d+)?$/);
     const full = fs.readFileSync(rep.file, "utf8");
     for (const leak of [FAKE.hf, OFFICE_KEY, TG, "somchai"]) {
       assert.ok(!rep.body.includes(leak) && !full.includes(leak) && !decodeURIComponent(rep.issueUrl).includes(leak), "leaked " + leak.slice(0, 8));
     }
-    assert.ok(rep.body.includes("hf_[REDACTED]") && rep.body.includes("C:\\Users\\<user>\\bagidea"));
+    assert.ok(rep.body.includes("hf_[REDACTED]") && rep.body.includes("C:\\Users\\<user>\\work"), rep.body);
     for (const s of ["จ้างทีม", "`hire-team`", "team: `research-lab`", "Node: " + process.version]) assert.ok(rep.body.includes(s), "body has " + s);
     assert.match(rep.body, /Office: v\d+\.\d+\.\d+/);
     assert.ok(rep.issueUrl.startsWith(report.ISSUE_NEW + "?title=") && rep.issueUrl.length < 7000);
@@ -272,7 +276,6 @@ test("integration: 403 without the UI header; /teams/hire hires once; /reports/p
   } finally {
     d.kill("SIGTERM");
     await Promise.race([exited, sleep(10000)]);
-    keep.forEach((f, i) => { if (saved[i]) fs.writeFileSync(f, saved[i]); else fs.rmSync(f, { force: true }); });
-    for (const f of made) if (f) fs.rmSync(f, { force: true });
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
   }
 });

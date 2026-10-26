@@ -39,6 +39,29 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 - Tests read source files with line endings normalised, so they pass on a Windows (`core.autocrlf`) checkout.
 - New tests: `copilot`, `copilot-ui`, `edit-agent-nav`, `fallback`, `report`.
 
+**Follow-ups landed by the maintainer in the same release (review of #68)**
+- The 🐞 report button opened GitHub with the title only on Windows: `POST /open` ran
+  `cmd /c start <url>`, and cmd.exe splits an unquoted URL at the first `&` — the whole
+  `?body=` was lost. The launcher is now PowerShell `Start-Process` with the URL passed
+  through the environment, which no quoting rule can touch.
+- The report's `daemon.log` tail leaves out broadcast lines that carry conversation text
+  (chat bubbles, spoken lines, meeting turns); the tail notes how many it dropped. The dialog
+  now says when the text reaches GitHub (on *Open GitHub Issue*), not just when it is posted.
+  Reports are saved under the office's state dir (`reports/`), so an isolated office keeps
+  its own.
+- A copilot call on LM Studio takes a local-model slot like every other run (it could be the
+  request that overflowed the shared KV cache while four delegates held the slots), and its
+  tokens land in the per-brain cost stats. A timed-out copilot call now kills its `claude -p`
+  child instead of letting it run on unseen; `claudeText` takes an `AbortSignal`.
+- The copilot, fallback and report integration tests boot the daemon on `OEP_STATE_DIR` /
+  `OEP_WORKSPACE` temp dirs. Before, one of them overwrote the checkout's live
+  `registry.json` with a stub and the others copied the whole `daemon/` dir — a test runner
+  killed mid-way could cost a real office its agents. A fixture path that contained the
+  maintainer's own user name made the report test fail on his machine; the fixture no longer
+  depends on who runs it.
+- `README` documents the copilot and report routes as owner-UI only; the troubleshooting
+  guide has a section on the 🐞 report and what it contains.
+
 **Not included**
 - No vLLM: the vLLM provider, the ⚡ vLLM manager card in ⚙ CONNECT, its routes and its files stay out of this
   change.

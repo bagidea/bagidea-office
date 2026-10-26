@@ -947,13 +947,22 @@ function claudeText(prompt, opts = {}) {
       broadcast({ type: ok ? "task.completed" : "task.failed", agent: opts.track.agent, task: tid });
       tid = null;
     };
+    let settled = false;
+    const done = (v) => { if (settled) return; settled = true; resolve(v); };
+    // opts.signal: an AbortSignal — the caller gave up (a copilot timeout); kill the
+    // child so it stops spending tokens instead of running on to completion unseen.
+    if (opts.signal) {
+      const onAbort = () => { try { killTree(child); } catch {} endTask(false); done(""); };
+      if (opts.signal.aborted) onAbort();
+      else opts.signal.addEventListener("abort", onAbort, { once: true });
+    }
     child.stdin.write(prompt);
     child.stdin.end();
     let out = "";
     child.stdout.setEncoding("utf8");   // multibyte-safe across chunk boundaries (Thai etc.)
     child.stdout.on("data", (c) => (out += c));
-    child.on("close", () => { endTask(true); resolve(out.trim()); });
-    child.on("error", () => { endTask(false); resolve(""); });
+    child.on("close", () => { endTask(true); done(out.trim()); });
+    child.on("error", () => { endTask(false); done(""); });
   });
 }
 
@@ -961,7 +970,13 @@ function claudeText(prompt, opts = {}) {
 // draft, 🔍 workflow analyze — runs ONE-SHOT as the Director on the
 // Provider + Model the owner picked (reg.copilot; "" = the Director's own brain). Other
 // modules reach the same instance with require("./copilot").get().
-const shinoCopilot = require("./copilot").init({ getReg: () => reg, saveReg, claudeText, broadcast, upstreamFor: proxy.upstreamFor });
+const shinoCopilot = require("./copilot").init({ getReg: () => reg, saveReg, claudeText, broadcast, upstreamFor: proxy.upstreamFor,
+  // A copilot call on a gated local brain (LM Studio) takes a slot like every other run,
+  // so it can't be the request that overflows the shared KV cache; its tokens land in the
+  // same per-brain stats the dashboard shows (localSlots / brainBump are defined below —
+  // they are only called per request, long after startup).
+  slotLane: (provider) => localSlots.laneFor(provider),
+  onUsage: (provider, usage) => brainBump(provider, usage.in, usage.out, "main") });
 
 // ---------------------------------------------------------------- websocket
 
@@ -6577,7 +6592,11 @@ end tell`;
         // An http(s) URL → open it in the system browser (office webviews can't follow
         // target=_blank, so links route here instead). Only http/https; nothing else.
         if (/^https?:\/\//i.test(p)) {
-          if (process.platform === "win32") spawn("cmd", ["/c", "start", "", p], { detached: true, windowsHide: true });
+          // Windows: NOT `cmd /c start` — cmd.exe splits an unquoted URL at the first "&"
+          // (a GitHub new-issue link lost its whole ?body=). PowerShell reads the URL from
+          // the environment, so no quoting rule can touch it.
+          if (process.platform === "win32") spawn("powershell", ["-NoProfile", "-NonInteractive", "-Command", "Start-Process -FilePath ([string]$env:BAGIDEA_OPEN_URL)"],
+            { detached: true, windowsHide: true, env: { ...process.env, BAGIDEA_OPEN_URL: p } });
           else if (process.platform === "darwin") spawn("open", [p], { detached: true });
           else spawn("xdg-open", [p], { detached: true });
           res.writeHead(200); return res.end("ok");
@@ -6735,7 +6754,7 @@ end tell`;
       let report = null;
       try {
         report = require("./report");
-        const r = await report.prepareReport(JSON.parse(body || "{}"), { reg, daemonDir: __dirname, version: APP_VERSION });
+        const r = await report.prepareReport(JSON.parse(body || "{}"), { reg, daemonDir: STATE_DIR, logDir: __dirname, version: APP_VERSION });
         res.writeHead(200, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(r));
       } catch (e) {
         const msg = String((e && e.message) || e);

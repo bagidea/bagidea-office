@@ -173,16 +173,17 @@ const path = require("node:path");
 const { spawn } = require("node:child_process");
 
 const DAEMON_DIR = path.join(__dirname, "..");
-const SKIP = /[\\/](registry\.json|sessions\.json|journal\.jsonl|tests|tooldetail|reports)$|\.log$|\.bak$/;
 
 async function bootIsolated(t, stubReg) {
+  // The REAL server.js on an isolated state dir + workspace (OEP_STATE_DIR / OEP_WORKSPACE):
+  // nothing is copied from, read from or written into the checkout's live office.
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bagidea-fallback-"));
-  fs.cpSync(DAEMON_DIR, path.join(tmp, "daemon"), { recursive: true, filter: (src) => !SKIP.test(src) });
-  fs.mkdirSync(path.join(tmp, "workspace"), { recursive: true });
-  fs.writeFileSync(path.join(tmp, "daemon", "registry.json"), JSON.stringify(stubReg));
+  const STATE = path.join(tmp, "state"), WS = path.join(tmp, "workspace");
+  fs.mkdirSync(STATE, { recursive: true }); fs.mkdirSync(WS, { recursive: true });
+  fs.writeFileSync(path.join(STATE, "registry.json"), JSON.stringify(stubReg));
   const port = 19121 + Math.floor(Math.random() * 8);   // developer B's range 19120-19129
-  const child = spawn(process.execPath, [path.join(tmp, "daemon", "server.js")], {
-    env: { ...process.env, OEP_PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(process.execPath, [path.join(DAEMON_DIR, "server.js")], {
+    env: { ...process.env, OEP_PORT: String(port), OEP_STATE_DIR: STATE, OEP_WORKSPACE: WS }, stdio: ["ignore", "pipe", "pipe"] });
   const logs = [];
   child.stdout.on("data", (c) => logs.push(c.toString()));
   child.stderr.on("data", (c) => logs.push(c.toString()));

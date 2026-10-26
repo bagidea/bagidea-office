@@ -713,7 +713,8 @@ Full reference: [`docs/guide/cli.md`](docs/guide/cli.md).
 | `GET /sessions?agent=` · `GET /sessions/log?agent=&key=` · `POST /sessions/delete` | threads |
 | `GET /registry` · `POST /registry/agent` · `POST /registry/agent/delete` | staff CRUD |
 | `POST /registry/role` · `/registry/skill` · `/registry/mcp` · `/registry/autoskills` | libraries |
-| `POST /assist/prompt` `{name, role, brief}` | ✨ persona copilot (fills every field + picks fitting skills/tools) |
+| `POST /assist/prompt` `{name, role, brief}` · `POST /workflows/draft` · `POST /workflows/analyze` | 🧠 Director copilot — ✨ persona draft, 🪄 workflow draft, 🔍 workflow analysis, one-shot on the brain picked in `GET/POST /copilot/settings` (owner UI only) |
+| `POST /reports/prepare` `{source, step, error, context}` | 🐞 a redacted problem report + prefilled GitHub issue link (owner UI only; full copy under the office's `reports/`) |
 | `GET/POST /jobs` · `POST /jobs/update` | standing work orders (now / at / every) |
 | `GET/POST /notes` | shared note board (mirrors `workspace/notes.md`) |
 | `GET/POST /calendar` | appointments + Director reminders |

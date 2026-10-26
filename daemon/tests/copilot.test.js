@@ -95,7 +95,8 @@ test("run: claude + Anthropic-compatible providers go through claudeText with th
   assert.strictEqual(r.ok, true, JSON.stringify(r.error));
   assert.strictEqual(r.text, "done 1");
   assert.deepStrictEqual(r.brain, { provider: "claude", model: "claude-fable-5-1", label: "Claude · Anthropic", source: "director" });
-  assert.deepStrictEqual(cli[0].opts, { provider: "claude", model: "claude-fable-5-1" });
+  assert.deepStrictEqual({ provider: cli[0].opts.provider, model: cli[0].opts.model }, { provider: "claude", model: "claude-fable-5-1" });
+  assert.ok(cli[0].opts.signal instanceof AbortSignal, "an AbortSignal rides along so a timeout can kill the child");
   assert.match(cli[0].prompt, /^You are Shino, the Director of this BagIdea office, acting as the owner's copilot for designing a new teammate's persona/);
   assert.match(cli[0].prompt, /Thai, English on technical words/, "the Director's language rides along");
   assert.match(cli[0].prompt, /delegate to leads/, "…and a short excerpt of the Director's rules");
@@ -103,7 +104,8 @@ test("run: claude + Anthropic-compatible providers go through claudeText with th
   // Anthropic-compatible builtin (glm, has a token) and custom kind "anthropic"
   r = await inst.run({ job: "x", prompt: "p", provider: "glm", model: "glm-5.2" });
   assert.strictEqual(r.ok, true, JSON.stringify(r.error));
-  assert.deepStrictEqual(cli[1].opts, { provider: "glm", model: "glm-5.2" });
+  assert.deepStrictEqual({ provider: cli[1].opts.provider, model: cli[1].opts.model }, { provider: "glm", model: "glm-5.2" });
+  assert.ok(cli[1].opts.signal instanceof AbortSignal, "an AbortSignal rides along so a timeout can kill the child");
   r = await inst.run({ job: "x", prompt: "p", provider: "cpa", model: "some-model" });
   assert.strictEqual(r.ok, true, JSON.stringify(r.error));
   assert.strictEqual(cli[2].opts.provider, "cpa");
@@ -422,17 +424,18 @@ test("init()/get(): one shared instance", () => {
 
 // ==== end-to-end over the real routes ========================================
 const DAEMON_DIR = path.join(__dirname, "..");
-const SKIP = /[\\/](registry\.json|sessions\.json|journal\.jsonl|tests|tooldetail|reports)$|\.log$|\.bak$/;
 const PORT = 19221 + Math.floor(Math.random() * 4);   // developer G's range 19220-19229
 const STUB_PORT = 19225 + Math.floor(Math.random() * 4);
 
 async function bootIsolated(t, stubReg) {
+  // The REAL server.js on an isolated state dir + workspace (OEP_STATE_DIR / OEP_WORKSPACE):
+  // nothing is copied from, read from or written into the checkout's live office.
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bagidea-copilot-"));
-  fs.cpSync(DAEMON_DIR, path.join(tmp, "daemon"), { recursive: true, filter: (src) => !SKIP.test(src) });
-  fs.mkdirSync(path.join(tmp, "workspace"), { recursive: true });
-  fs.writeFileSync(path.join(tmp, "daemon", "registry.json"), JSON.stringify(stubReg));
-  const child = spawn(process.execPath, [path.join(tmp, "daemon", "server.js")], {
-    env: { ...process.env, OEP_PORT: String(PORT) }, stdio: ["ignore", "pipe", "pipe"] });
+  const STATE = path.join(tmp, "state"), WS = path.join(tmp, "workspace");
+  fs.mkdirSync(STATE, { recursive: true }); fs.mkdirSync(WS, { recursive: true });
+  fs.writeFileSync(path.join(STATE, "registry.json"), JSON.stringify(stubReg));
+  const child = spawn(process.execPath, [path.join(DAEMON_DIR, "server.js")], {
+    env: { ...process.env, OEP_PORT: String(PORT), OEP_STATE_DIR: STATE, OEP_WORKSPACE: WS }, stdio: ["ignore", "pipe", "pipe"] });
   const logs = [];
   child.stdout.on("data", (c) => logs.push(c.toString()));
   child.stderr.on("data", (c) => logs.push(c.toString()));
@@ -569,7 +572,7 @@ test("routes: /copilot/settings + the three copilot routes run one-shot on the p
   let journal = "";
   for (let i = 0; i < 40 && !/copilot · analyze workflow[\s\S]*task\.completed/.test(journal); i++) {
     await new Promise((res) => setTimeout(res, 50));
-    try { journal = fs.readFileSync(path.join(tmp, "daemon", "journal.jsonl"), "utf8"); } catch {}
+    try { journal = fs.readFileSync(path.join(tmp, "state", "journal.jsonl"), "utf8"); } catch {}
   }
   const evs = journal.trim().split("\n").map((l) => { try { return JSON.parse(l); } catch { return {}; } });
   const started = evs.filter((e) => e.type === "task.started" && /copilot/.test(e.title || ""));

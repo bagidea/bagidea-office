@@ -249,6 +249,26 @@ opens after a reload or a restart; a row from a run made while the store did
 not exist says *no detail was captured for this call*. Deleting a thread
 deletes its details.
 
+## 🐞 Report to the dev team
+
+When something fails in a panel (hiring a team, a copilot draft, …) the error popup
+has a **Report to the dev team** button. It prepares a problem report on your machine:
+office version, OS, Node, GPU, the step that failed, the error, and the tail of
+`daemon.log`. Before you see it, the report is **redacted** — API keys, tokens,
+passwords, your user name, your machine name and your home folder are replaced
+(`[REDACTED]`, `<user>`), and the log tail leaves out the broadcast lines that
+carry conversation text (chat bubbles, spoken lines, meeting turns). A full copy
+is kept under the office's `reports/` folder (`daemon/reports/` on a normal
+install; it is gitignored).
+
+Nothing leaves your computer until you choose: **Copy** puts the text on your
+clipboard; **Open GitHub Issue** opens a new issue on GitHub with the report
+prefilled in the form — that click sends the text to GitHub, and the issue is
+posted only when you press **Submit** there. Read the preview first; if you
+spot something you don't want to share, edit it on the GitHub page before
+submitting. Long reports are shortened to fit the link — attach the saved
+`reports/*.md` file to the issue in that case.
+
 ## View raw logs
 
 - All events: `daemon/journal.jsonl`
