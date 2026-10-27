@@ -107,5 +107,7 @@
   "BLUESKY_IDENTIFIER (your handle) and BLUESKY_PASSWORD (an app password, not your main one) in the environment": "BLUESKY_IDENTIFIER (handle của bạn) và BLUESKY_PASSWORD (app password, không phải mật khẩu chính) trong môi trường",
   "HubSpot's own server: contacts, companies, deals, tickets, notes and associations. A support or sales team's CRM the agents can read before replying and update after.": "Máy chủ chính thức của HubSpot: liên hệ, công ty, deal, ticket, ghi chú và liên kết. CRM của đội hỗ trợ hoặc bán hàng mà agent đọc trước khi trả lời và cập nhật sau đó.",
   "edits your CRM": "sửa CRM của bạn",
-  "PRIVATE_APP_ACCESS_TOKEN in the environment (a HubSpot private app token)": "PRIVATE_APP_ACCESS_TOKEN trong môi trường (token private app của HubSpot)"
+  "PRIVATE_APP_ACCESS_TOKEN in the environment (a HubSpot private app token)": "PRIVATE_APP_ACCESS_TOKEN trong môi trường (token private app của HubSpot)",
+  "Memory that stays on the owner's machine: each declared folder becomes a vault, and the agent recalls from it with vector plus keyword search. Also lists the other coding-agent sessions live on the same repo.": "Bộ nhớ nằm lại trên máy của chủ sở hữu: mỗi thư mục được khai báo trở thành một vault, và agent nhớ lại từ đó bằng tìm kiếm vector cộng từ khóa. Cũng liệt kê các phiên coding agent khác đang chạy trên cùng repo.",
+  "the Mnemosyne OS desktop app installed and running on the same machine": "ứng dụng Mnemosyne OS cho máy tính đã được cài và đang chạy trên cùng máy"
 }

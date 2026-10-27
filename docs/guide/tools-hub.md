@@ -1,8 +1,8 @@
 # 🧰 The Tools Hub — giving agents new abilities
 
 An agent can only do what its tools let it do. The **Tools Hub** is where you
-hand it more of them: a browsable catalog of **53 entries** — the 15 abilities
-every agent already has, and **29 MCP servers** you can add with one click.
+hand it more of them: a browsable catalog of **54 entries** — the 15 abilities
+every agent already has, and **30 MCP servers** you can add with one click.
 
 Open it from the **⋯** menu → **🧰 Tools Hub**, or browse the same catalog on the
 website: **[bagidea.github.io/bagidea-office/tools.html](https://bagidea.github.io/bagidea-office/tools.html)**

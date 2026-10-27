@@ -107,5 +107,7 @@
   "BLUESKY_IDENTIFIER (your handle) and BLUESKY_PASSWORD (an app password, not your main one) in the environment": "环境变量 BLUESKY_IDENTIFIER（你的 handle）和 BLUESKY_PASSWORD（应用密码，不是主密码）",
   "HubSpot's own server: contacts, companies, deals, tickets, notes and associations. A support or sales team's CRM the agents can read before replying and update after.": "HubSpot 官方服务器：联系人、公司、交易、工单、备注和关联。支持或销售团队的 CRM，代理回复前先读、回复后更新。",
   "edits your CRM": "会修改你的 CRM",
-  "PRIVATE_APP_ACCESS_TOKEN in the environment (a HubSpot private app token)": "环境变量 PRIVATE_APP_ACCESS_TOKEN（HubSpot 私有应用令牌）"
+  "PRIVATE_APP_ACCESS_TOKEN in the environment (a HubSpot private app token)": "环境变量 PRIVATE_APP_ACCESS_TOKEN（HubSpot 私有应用令牌）",
+  "Memory that stays on the owner's machine: each declared folder becomes a vault, and the agent recalls from it with vector plus keyword search. Also lists the other coding-agent sessions live on the same repo.": "留在主人机器上的记忆：每个声明的文件夹都成为一个 vault，代理用向量加关键词检索从中回忆。还会列出同一仓库上其他正在运行的编码代理会话。",
+  "the Mnemosyne OS desktop app installed and running on the same machine": "在同一台机器上安装并运行 Mnemosyne OS 桌面应用"
 }

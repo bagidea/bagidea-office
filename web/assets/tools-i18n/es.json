@@ -107,5 +107,7 @@
   "BLUESKY_IDENTIFIER (your handle) and BLUESKY_PASSWORD (an app password, not your main one) in the environment": "BLUESKY_IDENTIFIER (tu handle) y BLUESKY_PASSWORD (una contraseña de aplicación, no la principal) en el entorno",
   "HubSpot's own server: contacts, companies, deals, tickets, notes and associations. A support or sales team's CRM the agents can read before replying and update after.": "El servidor propio de HubSpot: contactos, empresas, negocios, tickets, notas y asociaciones. El CRM de un equipo de soporte o ventas que los agentes pueden leer antes de responder y actualizar después.",
   "edits your CRM": "edita tu CRM",
-  "PRIVATE_APP_ACCESS_TOKEN in the environment (a HubSpot private app token)": "PRIVATE_APP_ACCESS_TOKEN en el entorno (un token de aplicación privada de HubSpot)"
+  "PRIVATE_APP_ACCESS_TOKEN in the environment (a HubSpot private app token)": "PRIVATE_APP_ACCESS_TOKEN en el entorno (un token de aplicación privada de HubSpot)",
+  "Memory that stays on the owner's machine: each declared folder becomes a vault, and the agent recalls from it with vector plus keyword search. Also lists the other coding-agent sessions live on the same repo.": "Memoria que se queda en la máquina del dueño: cada carpeta declarada se convierte en un vault, y el agente recuerda desde ahí con búsqueda vectorial más palabras clave. También lista las otras sesiones de agentes de código activas en el mismo repo.",
+  "the Mnemosyne OS desktop app installed and running on the same machine": "la app de escritorio Mnemosyne OS instalada y en marcha en la misma máquina"
 }

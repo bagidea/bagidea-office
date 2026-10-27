@@ -276,6 +276,25 @@
       }
     },
     {
+      "id": "mnemosyne",
+      "kind": "mcp",
+      "group": "think",
+      "icon": "🏛️",
+      "name": "Mnemosyne OS",
+      "cmd": "npx -y -p @mnemosyne_os/mcp mnemosyne-mcp",
+      "repo": "https://github.com/Mnemosyne-OS/Mnemosyne-Neural-OS/tree/main/packages/mcp",
+      "en": {
+        "risk": "stores data locally",
+        "desc": "Memory that stays on the owner's machine: each declared folder becomes a vault, and the agent recalls from it with vector plus keyword search. Also lists the other coding-agent sessions live on the same repo.",
+        "needs": "the Mnemosyne OS desktop app installed and running on the same machine"
+      },
+      "th": {
+        "risk": "เก็บข้อมูลในเครื่อง",
+        "desc": "ความจำที่อยู่ในเครื่องของเจ้าของเท่านั้น: แต่ละโฟลเดอร์ที่กำหนดกลายเป็น vault และน้องเรียกคืนจากมันด้วยการค้นแบบเวกเตอร์บวกคีย์เวิร์ด พร้อมแสดงเซสชันของ coding agent ตัวอื่นที่กำลังทำงานบน repo เดียวกัน",
+        "needs": "ติดตั้งและเปิดแอป Mnemosyne OS บนเครื่องเดียวกันก่อน"
+      }
+    },
+    {
       "id": "seqthinking",
       "kind": "mcp",
       "group": "think",
