@@ -831,7 +831,7 @@ The full step-by-step guides, with screenshots:
 | [Codex](docs/guide/codex.md) | 🧑‍💻 a colleague you can call in — `DELEGATE: codex`, the workflow node, `bagidea codex`, a second-opinion review |
 | [Inbox](docs/guide/inbox.md) | 🔔 notifications with rules · 📥 one approvals queue · answer from your phone · quiet hours |
 | [Budgets](docs/guide/budget.md) | 💸 caps in money per day / agent / project · warn at 80 %, stop at 100 % · the morning digest |
-| [Tools Hub](docs/guide/tools-hub.md) | the 53-entry catalog · MCP servers · Blender/Godot/Unity/Unreal/Roblox · Codex · submitting one |
+| [Tools Hub](docs/guide/tools-hub.md) | the 54-entry catalog · MCP servers · Blender/Godot/Unity/Unreal/Roblox · Codex · submitting one |
 | [Plugins](docs/guide/plugins.md) | the extension system · music player · writing your own |
 | [Plugin Hub](docs/guide/plugin-hub.md) | browse, install and publish community plugins · 🕊️ **Emmaus**, the first official companion plugin (Bible counsel, 3D, voice) |
 | [Showcase](docs/guide/showcase.md) | get your office, project or plugin featured |
