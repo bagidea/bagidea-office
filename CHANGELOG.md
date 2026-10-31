@@ -42,6 +42,7 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 - Copilot error messages are English, following the v1.9.2 rule that the daemon speaks English.
 - Tests read source files with line endings normalised, so they pass on a Windows (`core.autocrlf`) checkout.
 - New tests: `copilot`, `copilot-ui`, `edit-agent-nav`, `fallback`, `report`.
+- CI and the release build make the macOS shell on the macOS 15 runner — GitHub retires the macOS 14 image on 2026-11-02 and was already browning it out.
 
 **Follow-ups landed by the maintainer in the same release (review of #68)**
 - The 🐞 report button opened GitHub with the title only on Windows: `POST /open` ran
