@@ -4,6 +4,45 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [Unreleased] — 🧭 Agents you can walk through, and a Director that thinks on any brain
+
+**Added**
+- **‹ › Walk the team inside Edit Agent.** Arrows on both sides of the panel (and Alt+←/→) open the next or
+  previous agent without closing the editor. A floating counter at the top shows who you're on
+  ("Shino 1 / 16"). Unsaved edits are saved before switching, and the field you were editing stays at the same
+  height, so one field can be edited across many agents in a row.
+- **🛡 Panels no longer close by accident.** If you have unsaved edits, ✕ / Cancel / Esc / a backdrop click ask
+  first: *Save · Discard · Keep editing*. Form panels shake instead of closing on a backdrop click. A drag
+  that ends on the backdrop no longer closes a modal. An unfinished ＋ Hire draft can be restored.
+- **🧠 The Director's copilot runs on the brain you pick.** One picker — "Director uses [provider] [model]" —
+  on every copilot page: the ✨ persona copilot in Edit Agent and 🪄 draft / 🔍 analyze in the Workflow Builder.
+  Pick it once and every page follows. Works with Claude, LM Studio, Ollama (showing whether each is running),
+  and any connected cloud or custom provider; the default is to follow the Director's own brain. Copilot jobs
+  are one-shot and never queue behind the Director's chats. Settings and job routes are owner-only.
+- **🐞 Report to the dev team.** A failure popup can prepare a problem report: office version, OS, Node, GPU,
+  the failed step, and the tail of `daemon.log`. Tokens, keys, user names and the machine name are redacted
+  first. It opens a prefilled GitHub issue; nothing is sent until you press Submit. A full copy is kept in
+  `daemon/reports/` (gitignored).
+
+**Fixed**
+- **👥 HIRE A TEAM did nothing.** `askConfirm` was missing from the overlay, so the button (and deleting a
+  TASKS card) silently failed. Hiring now asks first, showing who will be hired and who is skipped because the
+  office is full, then shows the result.
+- **🛟 The fallback-brain picker was always empty.** An out-of-scope `pcAll` crashed it. It now lists LM Studio and
+  Ollama with live ● running / ○ not-running status, connected cloud providers by name, and a searchable
+  model list. `GET /registry/local-status` is new; `POST /registry/fallback` is owner-only.
+- **Model ids were silently cut at 60 characters.** They now go up to 160 and are validated.
+- Newly hired agents no longer show a meeting dot.
+
+**Under the hood**
+- Copilot error messages are English, following the v1.9.2 rule that the daemon speaks English.
+- Tests read source files with line endings normalised, so they pass on a Windows (`core.autocrlf`) checkout.
+- New tests: `copilot`, `copilot-ui`, `edit-agent-nav`, `fallback`, `report`.
+
+**Not included**
+- No vLLM: the vLLM provider, the ⚡ vLLM manager card in ⚙ CONNECT, its routes and its files stay out of this
+  change.
+
 ## [1.9.2] — 🌐 The daemon speaks English
 
 **Fixed**

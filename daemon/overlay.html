@@ -810,6 +810,74 @@
   }
   #modalCard h3 { font-size: 13px; letter-spacing: 2px; color: var(--accent); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
   #modalCard h3 .x { margin-left: auto; }
+  /* status pill over the backdrop (form nudges, save errors) */
+  #modalHint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: 90%;
+    pointer-events: none; font-size: 11.5px; line-height: 1.4; text-align: center; color: var(--text);
+    background: rgba(12,19,34,0.95); border: 1px solid var(--line); border-radius: 14px; padding: 6px 14px;
+    opacity: 0; transition: opacity 0.18s ease; }
+  #modalHint.on { opacity: 1; }
+  #modalHint.err { color: #ffb4ab; border-color: rgba(255,116,104,0.6); }
+  #modalCard .fieldBad { border-color: #ff7468; box-shadow: 0 0 0 2px rgba(255,116,104,0.3); }
+  /* a form panel shakes instead of closing on a backdrop click (popIn stays first
+     in the list, so it is not replayed when the shake starts or ends) */
+  @keyframes modalShake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); }
+    40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
+  #modal.open #modalCard.shake { animation: popIn 0.3s cubic-bezier(.2,1.3,.4,1) both, modalShake 0.38s ease; }
+  /* unsaved-changes bar (requestCloseModal on a dirty form) */
+  #dirtyBar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    margin: 0 0 12px; padding: 8px 10px; border-radius: 10px; font-size: 12px; color: #ffd28a;
+    background: #1b2336; border: 1px solid rgba(255,176,84,0.55); box-shadow: 0 8px 22px rgba(0,0,0,0.5); }
+  /* ＋ Hire: "unfinished draft" banner */
+  #eDraftBar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; padding: 8px 10px;
+    border-radius: 10px; font-size: 12px; color: var(--text); background: rgba(94,200,255,0.08); border: 1px solid var(--line); }
+  #dirtyBar span, #eDraftBar span { flex: 1 1 150px; min-width: 0; overflow-wrap: anywhere; }
+  #dirtyBar button, #eDraftBar button { flex: none; padding: 6px 10px; font-size: 11.5px; }
+  #dirtyBar .primary, #eDraftBar .primary { color: #06121f; background: var(--accent); border-color: var(--accent); font-weight: 700; }
+  /* Edit Agent ‹ n / N › float over the card instead of scrolling away with its header:
+     #modalBox is exactly the card's box, #eFloat covers it and lets clicks through. The
+     counter pill sits on the card's top edge, ‹ › on its left / right edges at mid-height
+     (kept 22px inside a narrow window). Only the three controls take the pointer. */
+  #modalBox { position: relative; }
+  #eFloat { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  #eFloat[hidden] { display: none; }
+  #modal.open #eFloat { animation: chipIn 0.25s ease both; }
+  #eFloat > * { position: absolute; pointer-events: auto; }
+  #eFloat .eFArrow { top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; padding: 0; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font: 400 24px/1 system-ui, sans-serif; color: var(--accent);
+    background: rgba(12,19,34,0.96); border: 1px solid rgba(94,200,255,0.55); box-shadow: 0 8px 22px rgba(0,0,0,0.55);
+    cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; }
+  #eFloat #eNavPrev { left: max(0px, calc(22px - (100vw - 100%) / 2)); }
+  #eFloat #eNavNext { left: min(100%, calc(100% - 22px + (100vw - 100%) / 2)); }
+  #eFloat .eFArrow:hover { background: rgba(94,200,255,0.2); border-color: var(--accent); }
+  #eFloat .eFArrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #eFloat .eFArrow:disabled { cursor: wait; opacity: 0.55; }
+  #eFloat .eFArrow.spin { opacity: 1; color: transparent; border-color: rgba(255,210,138,0.75); }
+  #eFloat .eFArrow.spin::after { content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid rgba(255,210,138,0.25); border-top-color: #ffd28a; animation: eNavSpin 0.8s linear infinite; }
+  @keyframes eNavSpin { to { transform: rotate(360deg); } }
+  #eFloat #eNavPill { left: 50%; top: 0; transform: translate(-50%, -50%); width: max-content; max-width: calc(100% - 88px);
+    display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px 0 4px; border-radius: 999px; white-space: nowrap;
+    font-size: 12px; letter-spacing: normal; color: var(--text); background: rgba(12,19,34,0.97);
+    border: 1px solid rgba(94,200,255,0.75); box-shadow: 0 8px 22px rgba(0,0,0,0.55), 0 0 0 4px rgba(94,200,255,0.07); }
+  #eNavPill .av { flex: none; width: 22px; height: 22px; border-radius: 50%; background-color: #1b2740; background-repeat: no-repeat;
+    image-rendering: pixelated; border: 1px solid rgba(94,200,255,0.35); }
+  #eNavPill b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
+  #eNavCount { flex: none; color: var(--dim); font-variant-numeric: tabular-nums; }
+  #eNavPill .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #ffb054; box-shadow: 0 0 6px #ffb054; }
+  #eNavPill .msg { flex: none; font-weight: 600; }
+  #eNavPill.busy .msg { color: #ffd28a; }
+  #eNavPill.ok { border-color: rgba(123,227,107,0.85); }
+  #eNavPill.ok .msg { color: #7be36b; }
+  #eNavPill.err { border-color: rgba(255,116,104,0.85); }
+  #eNavPill.err .msg { color: #ffb4ab; }
+  /* the unsaved-changes bar sticks just under the pill on an agent form */
+  #modal[data-form="agent"] #dirtyBar { top: 16px; }
+  @media (prefers-reduced-motion: reduce) {
+    #modal.open #modalCard.shake { animation: popIn 0.3s cubic-bezier(.2,1.3,.4,1) both; border-color: #ffb054; }
+    #modalHint { transition: none; }
+    #modal.open #eFloat, #eFloat .eFArrow.spin::after { animation: none; }
+    #eFloat .eFArrow { transition: none; }
+  }
   /* Tabs share the row evenly — one line ALWAYS, scrollbar or not. */
   .tabs { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
   .tabs .tab {
@@ -1237,7 +1305,7 @@
     </div>
   </div>
 </div>
-<div id="modal"><div id="modalCard"></div></div>
+<div id="modal"><div id="modalBox"><div id="modalCard"></div><div id="eFloat" hidden><button type="button" class="eFArrow" id="eNavPrev">‹</button><div id="eNavPill" role="status" aria-live="polite"><span class="msg" id="eNavMsg" hidden></span><span class="av" id="eNavAv"></span><b id="eNavName"></b><span id="eNavCount"></span><span class="dot" id="eNavDirty" hidden></span></div><button type="button" class="eFArrow" id="eNavNext">›</button></div></div></div>
 <script src="/md.js"></script>
 
 <script>
@@ -3523,13 +3591,161 @@
   // ---- settings / editor / ID card -----------------------------------------
   const modal = document.getElementById("modal");
   const modalCard = document.getElementById("modalCard");
-  function closeModal() { _feedSavedModal = false; modal.classList.remove("open"); mapOpen = false; }
-  modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+  function closeModal() { _feedSavedModal = false; modal.classList.remove("open"); mapOpen = false; setModalForm(null); }
+  // 📝 Form panels (Edit/Hire Agent, the Skill editor) register a guard while
+  // they are on screen (modal.dataset.form): a backdrop click only nudges them.
+  // The guard lives as long as its header node — any other panel render, or
+  // closeModal(), drops it. Feed mode only hides the modal, so it survives that.
+  let _modalForm = null;
+  function setModalForm(g) {
+    _modalForm = g || null;
+    if (_modalForm) modal.dataset.form = _modalForm.kind || "form"; else delete modal.dataset.form;
+  }
+  function modalForm() {
+    const g = _modalForm;
+    if (g && !(g.head && g.head.isConnected && modalCard.contains(g.head))) setModalForm(null);
+    return _modalForm;
+  }
+  new MutationObserver(() => modalForm()).observe(modalCard, { childList: true });
+  let _shakeT = 0;
+  function nudgeModalForm() {
+    modalCard.classList.remove("shake");
+    void modalCard.offsetWidth;   // restart the keyframes on a repeat click
+    modalCard.classList.add("shake");
+    clearTimeout(_shakeT);
+    _shakeT = setTimeout(() => modalCard.classList.remove("shake"), 700);
+    modalToast(tr("กด ✕ หรือ ยกเลิก เพื่อปิด"));
+  }
+  // A backdrop click = the press AND the click both on #modal itself. Selecting
+  // text in a field and letting go outside the card fires `click` on #modal (the
+  // common ancestor) — that is a drag, not a dismissal. Capture phase, so no
+  // handler inside the card can hide the press from us.
+  let _pressOnBackdrop = false;
+  for (const type of ["pointerdown", "mousedown"])
+    modal.addEventListener(type, (e) => { _pressOnBackdrop = e.target === modal; }, true);
+  modal.addEventListener("click", (e) => {
+    const fromBackdrop = e.target === modal && _pressOnBackdrop;
+    _pressOnBackdrop = false;
+    if (!fromBackdrop) return;
+    if (modalForm()) nudgeModalForm();   // forms close only via ✕ / Cancel / Esc
+    else closeModal();
+  });
   document.getElementById("setBtn").onclick = () => openSettings("agents");
 
   function hdr(title) {
-    return `<h3>${title}<div class="winbtn x" onclick="document.getElementById('modal').classList.remove('open')">✕</div></h3>`;
+    return `<h3>${title}<div class="winbtn x" onclick="requestCloseModal()">✕</div></h3>`;
   }
+
+  // Curated en/zh/ja for the modal-guard / Edit Agent strings below (every
+  // other language is filled at runtime like the rest of the chrome).
+  (() => { const D = {
+    "บันทึกไม่สำเร็จ": { en: "Couldn't save", zh: "保存失败", ja: "保存に失敗しました" },
+    "ต้องใส่ชื่อ": { en: "A name is required", zh: "请填写名字", ja: "名前を入力してください" },
+    "กด ✕ หรือ ยกเลิก เพื่อปิด": { en: "Press ✕ or Cancel to close", zh: "按 ✕ 或“取消”关闭", ja: "✕ か「キャンセル」で閉じます" },
+    "มีการแก้ไขที่ยังไม่บันทึก": { en: "You have unsaved changes", zh: "有尚未保存的更改", ja: "保存していない変更があります" },
+    "บันทึก": { en: "Save", zh: "保存", ja: "保存" },
+    "ทิ้งการแก้ไข": { en: "Discard changes", zh: "放弃更改", ja: "変更を破棄" },
+    "กลับไปแก้ต่อ": { en: "Keep editing", zh: "继续编辑", ja: "編集を続ける" },
+    "agent ก่อนหน้า": { en: "Previous agent", zh: "上一个 agent", ja: "前の agent" },
+    "agent ถัดไป": { en: "Next agent", zh: "下一个 agent", ja: "次の agent" },
+    "บันทึกแล้ว ✓": { en: "Saved ✓", zh: "已保存 ✓", ja: "保存しました ✓" },
+    "บันทึกก่อนเปลี่ยน": { en: "saves first", zh: "会先保存", ja: "先に保存します" },
+    "กำลังบันทึก…": { en: "Saving…", zh: "正在保存…", ja: "保存中…" },
+    "มีร่างที่ค้างไว้": { en: "You have an unfinished draft", zh: "有未完成的草稿", ja: "作成途中の下書きがあります" },
+    "กู้ร่าง": { en: "Restore draft", zh: "恢复草稿", ja: "下書きを復元" },
+    "ทิ้ง": { en: "Discard", zh: "丢弃", ja: "破棄" },
+  };
+    for (const [k, v] of Object.entries(D)) { DICT[k] = v; if (LANG !== "th" && v[LANG]) TR[k] = v[LANG]; } })();
+
+  // A short status pill over the backdrop — the chat log (addChip) sits hidden
+  // behind the modal, so panel feedback has to show up here.
+  let _modalHintT = 0;
+  function modalToast(text, tone, ms = 2000) {
+    let el = document.getElementById("modalHint");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "modalHint"; el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite");
+      modal.appendChild(el);
+    }
+    el.textContent = text;
+    el.classList.toggle("err", tone === "err");
+    el.classList.add("on");
+    clearTimeout(_modalHintT);
+    _modalHintT = setTimeout(() => el.classList.remove("on"), ms);
+  }
+  // A save that failed: say why, then take the owner to the field to fix.
+  function flagFormField(field, error) {
+    if (error) modalToast("✗ " + tr("บันทึกไม่สำเร็จ") + ": " + String(error).slice(0, 160), "err", 3500);
+    const el = field && /^[\w-]+$/.test(field) ? modalCard.querySelector("#" + field) : null;
+    if (!el) return;
+    el.classList.add("fieldBad");
+    try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
+    try { el.focus({ preventScroll: true }); } catch {}
+    setTimeout(() => el.classList.remove("fieldBad"), 2600);
+  }
+
+  // ✕ · Cancel · Esc. Read-only panels close at once, exactly as before; a form
+  // with unsaved changes asks first — an in-panel bar, not the browser confirm().
+  // `next` = what closing means for the caller (Cancel goes back to its list).
+  function requestCloseModal(next) {
+    const go = typeof next === "function" ? next : closeModal;
+    const g = modalForm();
+    if (g && g.isDirty && g.isDirty()) { showDirtyBar(g, go); return false; }
+    if (g && g.leave) g.leave(false);
+    go();
+    return true;
+  }
+  function showDirtyBar(g, go) {
+    let bar = modalCard.querySelector("#dirtyBar");
+    if (!bar) {
+      const ae = document.activeElement;
+      bar = document.createElement("div");
+      bar.id = "dirtyBar"; bar.setAttribute("role", "alertdialog");
+      bar.innerHTML = `<span>⚠ ${esc(tr("มีการแก้ไขที่ยังไม่บันทึก"))}</span>` +
+        `<button type="button" class="primary" data-a="save">💾 ${esc(tr("บันทึก"))}</button>` +
+        `<button type="button" data-a="discard">${esc(tr("ทิ้งการแก้ไข"))}</button>` +
+        `<button type="button" data-a="back">${esc(tr("กลับไปแก้ต่อ"))}</button>`;
+      if (g.head && g.head.isConnected) g.head.after(bar); else modalCard.prepend(bar);
+      bar._back = ae && ae !== modalCard && modalCard.contains(ae) ? ae : null;
+    }
+    const btn = (a) => bar.querySelector(`[data-a="${a}"]`);
+    btn("save").onclick = async () => {
+      btn("save").disabled = true;
+      let r;
+      try { r = await g.save(); } catch (err) { r = { ok: false, error: String((err && err.message) || err) }; }
+      if (!bar.isConnected) return;   // another panel took over meanwhile
+      bar.remove();
+      if (r && r.ok) go(); else flagFormField(r && r.field, r && r.error);
+    };
+    btn("discard").onclick = () => { bar.remove(); if (g.leave) g.leave(true); go(); };
+    btn("back").onclick = () => {
+      const f = bar._back; bar.remove();
+      if (f && f.isConnected) try { f.focus({ preventScroll: true }); } catch {}
+    };
+    try { btn("save").focus({ preventScroll: true }); } catch {}
+  }
+  // Esc on a form panel = ✕ (read-only panels never closed on Esc — unchanged).
+  // Popups above the modal (confirmDanger · dupChoice · askConfirm · the image
+  // lightbox) own Esc while they are up, and an IME composition keeps its Esc.
+  function overlayAboveModal() {
+    const lb = document.getElementById("lightbox");
+    if (lb && lb.style.display === "flex") return true;
+    for (const el of document.body.children)
+      if (el !== modal && el.style && Number(el.style.zIndex) > 100 && el.style.display !== "none") return true;
+    return false;
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.isComposing || e.keyCode === 229) return;
+    if (!modal.classList.contains("open") || !modalForm() || overlayAboveModal()) return;
+    const t = e.target;
+    if (t && t !== document.body && t !== document.documentElement && !modal.contains(t)) return;
+    e.preventDefault();
+    const menu = modalCard.querySelector(".cbmenu.open");
+    if (menu) { menu.classList.remove("open"); return; }   // the first Esc folds an open picker
+    const bar = modalCard.querySelector("#dirtyBar");
+    if (bar) { bar.querySelector('[data-a="back"]').click(); return; }
+    requestCloseModal();
+  });
 
   // Type-to-filter for any .arow list — keeps long skill/tool/agent
   // collections usable as the office grows.
@@ -3660,10 +3876,12 @@
       };
     }
     // ── 🧠 model providers: paste key → Connect → live connected state.
+    // pcAll is function-scoped: the 🛟 fallback-brain section below reads it too (it was
+    // block-scoped here → ReferenceError → empty fallback picker + no scroll restore).
+    const pcAll = regAll.providerConfig || {};
     const provbox = modalCard.querySelector("#provbox");
     if (provbox) {
       provbox.innerHTML = "";
-      const pcAll = regAll.providerConfig || {};
       const mainKeys = regAll.apiKeys || {};
       const subhead = (txt) => { const d = document.createElement("div");
         d.style.cssText = "font-size:10px;color:var(--dim);font-weight:600;margin:9px 0 2px;opacity:.85"; d.textContent = txt; provbox.appendChild(d); };
@@ -3816,34 +4034,144 @@
         renderConnectTab();
       };
     }
-    // 🛟 Office-wide emergency fallback brain (opt-in). Only providers that are actually
-    // connected are offered, so failover can never be pointed at a dead brain. Claude is
-    // always usable (login/plan or key); the rest must show connected.
-    const fbProv = modalCard.querySelector("#fbProv");
-    const fbModel = modalCard.querySelector("#fbModel");
-    if (fbProv && fbModel) {
-      const LBL = { claude: "Claude · Anthropic", glm: "GLM · Z.AI", deepseek: "DeepSeek",
-        qwen: "Qwen", minimax: "MiniMax", moonshot: "Kimi · Moonshot", kimicode: "Kimi Code",
-        openai: "OpenAI", atlascloud: "Atlas Cloud", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA",
-        groq: "Groq", cerebras: "Cerebras", xai: "xAI · Grok", mistral: "Mistral",
-        together: "Together AI", fireworks: "Fireworks AI", ollama: "Ollama · local",
-        lmstudio: "LM Studio · local" };
-      const conn = Object.keys(pcAll).filter((id) => pcAll[id] && pcAll[id].connected && id !== "claude");
-      const opts = ["claude"].concat(conn);
-      // Keep the stored choice visible even if it's momentarily disconnected.
-      if (regAll.fallbackProvider && !opts.includes(regAll.fallbackProvider)) opts.push(regAll.fallbackProvider);
-      fbProv.innerHTML = `<option value="none">— ${tr("ไม่มี (ปิด)")} —</option>` +
-        opts.map((id) => `<option value="${id}">${esc(LBL[id] || id)}</option>`).join("");
-      fbProv.value = regAll.fallbackProvider || "none";
-      fbModel.value = regAll.fallbackModel || "";
-      fbModel.style.display = fbProv.value === "none" ? "none" : "";
-      const saveFb = () => api("/registry/fallback",
-        { provider: fbProv.value, model: fbProv.value === "none" ? "" : fbModel.value.trim() });
-      fbProv.onchange = () => { fbModel.style.display = fbProv.value === "none" ? "none" : ""; saveFb(); };
-      fbModel.onchange = saveFb;
-    }
+    // 🛟 Office-wide emergency fallback brain — its own function (below), fail-safe: whatever
+    // it hits, the rest of the tab and the scroll restore still run.
+    try { renderFallbackBrain(regAll, pcAll); } catch (e) { console.error("[fallback-brain]", e); }
     // All sections filled — put the scrollbar back where the owner had it.
     modalCard.scrollTop = _wasScroll;
+  }
+
+  // 🛟 Fallback-brain picker strings — curated en/zh/ja, so the options (built with tr())
+  // never show Thai while the runtime translator catches up.
+  (() => { const D = {
+      "ไม่มี (ปิด)": { en: "None (off)", zh: "无（关闭）", ja: "なし（オフ）" },
+      "Local · ในเครื่อง": { en: "Local · on this machine", zh: "本地 · 本机", ja: "ローカル · このPC" },
+      "● รันอยู่": { en: "● running", zh: "● 运行中", ja: "● 実行中" },
+      "○ ไม่ได้รัน": { en: "○ not running", zh: "○ 未运行", ja: "○ 停止中" },
+      "ยังไม่ได้เชื่อมต่อ": { en: "Not connected", zh: "未连接", ja: "未接続" },
+      "พิมพ์ชื่อโมเดลเองได้": { en: "Type a model name", zh: "可自行输入模型名", ja: "モデル名を入力" },
+      "โมเดล (เว้นว่าง = ดีฟอลต์)": { en: "Model (blank = default)", zh: "模型（留空 = 默认）", ja: "モデル（空欄 = デフォルト）" },
+      "ดีฟอลต์ = ปิด (ไม่มี) · Local ไม่ต้องใช้ key แต่ต้องเปิด server ค้างไว้ · Cloud เลือกได้เฉพาะที่เชื่อมต่อแล้ว · สลับเฉพาะตอนสมองหลักล่ม (5xx) หรือติดลิมิต (429) หลายครั้งติดกัน": {
+        en: "Default = off (none) · Local needs no key, but its server must be running · Cloud: connected providers only · switches only when the main brain keeps failing (5xx) or stays rate-limited (429)",
+        zh: "默认 = 关闭（无）· 本地无需 key，但其服务器必须保持运行 · 云端仅可选已连接的提供商 · 仅在主模型连续故障（5xx）或持续限流（429）时切换",
+        ja: "デフォルト = オフ（なし）· ローカルはキー不要ですがサーバーの起動が必要 · クラウドは接続済みのみ · メインの頭脳が落ち続ける（5xx）かレート制限（429）が続く時だけ切り替え" },
+    };
+    for (const [k, v] of Object.entries(D)) { DICT[k] = v; if (LANG !== "th" && v[LANG]) TR[k] = v[LANG]; } })();
+
+  // 🛟 Office-wide emergency fallback brain (opt-in) — ⚙ → CONNECT.
+  //   • Claude — always usable (login/plan or key).
+  //   • Local · ในเครื่อง — LM Studio / Ollama need no key, so both are ALWAYS
+  //     offered, with a live ● running / ○ not running from GET /registry/local-status
+  //     (fetched after render, so the tab never waits on a probe).
+  //   • Cloud — only providers that are actually connected (builtin + custom), by label, so
+  //     failover can't be pointed at a dead key. A stored choice that's no longer listed
+  //     stays visible + selected (marked ⚠).
+  // The model box is a searchable list fed like the Edit Agent picker (curated catalog +
+  // the provider's live list minus non-chat models; a running local server's /v1/models
+  // first). Typing filters it, any id can still be typed, blank = the provider's default.
+  function renderFallbackBrain(regAll, pcAll) {
+    const fbProv = modalCard.querySelector("#fbProv");
+    const fbModel = modalCard.querySelector("#fbModel");
+    if (!fbProv || !fbModel) return;
+    const fbWrap = modalCard.querySelector("#fbModelWrap") || fbModel;
+    const fbMenu = modalCard.querySelector("#fbModelMenu");
+    const fbSaved = modalCard.querySelector("#fbSaved");
+    regAll = regAll || {};
+    pcAll = pcAll || {};
+    const own = (o, k) => !!o && Object.prototype.hasOwnProperty.call(o, k);
+    const pc = (id) => (own(pcAll, id) && pcAll[id]) || {};
+    const CATALOG = regAll.providerCatalog || {};
+    const LOCAL = ["lmstudio", "ollama"];
+    const LBL = { claude: "Claude · Anthropic", glm: "GLM · Z.AI", deepseek: "DeepSeek",
+      qwen: "Qwen", minimax: "MiniMax", moonshot: "Kimi · Moonshot", kimicode: "Kimi Code",
+      openai: "OpenAI", atlascloud: "Atlas Cloud", gemini: "Gemini", openrouter: "OpenRouter", nvidia: "NVIDIA",
+      groq: "Groq", cerebras: "Cerebras", xai: "xAI · Grok", mistral: "Mistral",
+      together: "Together AI", fireworks: "Fireworks AI", ollama: "Ollama · local",
+      lmstudio: "LM Studio · local" };
+    const label = (id) => (own(LBL, id) ? LBL[id] : pc(id).label ? pc(id).label + " · custom" : id);
+    let live = null;   // GET /registry/local-status → { lmstudio: { running, models, url }, … }
+    const liveTag = (id) => (live && live[id] ? " · " + tr(live[id].running ? "● รันอยู่" : "○ ไม่ได้รัน") : "");
+    const cloud = Object.keys(pcAll)
+      .filter((id) => id !== "claude" && id !== "litellm" && !LOCAL.includes(id) && pc(id).connected)
+      .sort((a, b) => label(a).localeCompare(label(b)));
+    const saved = String(regAll.fallbackProvider || "");
+    const stray = saved && saved !== "none" && saved !== "claude" && !LOCAL.includes(saved) && !cloud.includes(saved) ? saved : "";
+    const opt = (id, text) => `<option value="${esc(id)}">${esc(text)}</option>`;
+    fbProv.innerHTML = `<option value="none">— ${esc(tr("ไม่มี (ปิด)"))} —</option>` + opt("claude", label("claude")) +
+      `<optgroup label="${esc(tr("Local · ในเครื่อง"))}">${LOCAL.map((id) => opt(id, label(id) + liveTag(id))).join("")}</optgroup>` +
+      (cloud.length || stray ? `<optgroup label="Cloud">${cloud.map((id) => opt(id, label(id))).join("")}` +
+        (stray ? opt(stray, label(stray) + " · ⚠ " + tr("ยังไม่ได้เชื่อมต่อ")) : "") + "</optgroup>" : "");
+    fbProv.value = saved || "none";
+    fbModel.value = regAll.fallbackModel || "";
+
+    // Same sources as the Edit Agent model picker.
+    const NONCHAT = /(image|tts|audio|speech|whisper|transcri|embedding|\bembed\b|moderation|rerank|guard|safety|dall|imagen|veo|sora|-live\b|realtime|\bclip\b|bison|gecko)/i;
+    const chatOnly = (ids) => {
+      const all = (Array.isArray(ids) ? ids : []).map((m) => String(m || "").replace(/^models\//, "")).filter(Boolean);
+      const chat = all.filter((m) => !NONCHAT.test(m));
+      return chat.length ? chat : all;
+    };
+    const modelsFor = (p) => {
+      if (!p || p === "none") return [];
+      const cat = own(CATALOG, p) && CATALOG[p] && Array.isArray(CATALOG[p].models) ? CATALOG[p].models : [];
+      const stat = cat.map((m) => String(m || "")).filter(Boolean);
+      const known = chatOnly(pc(p).models);
+      const now = LOCAL.includes(p) && live && live[p] ? chatOnly(live[p].models) : [];
+      return [...new Set(LOCAL.includes(p) ? [...now, ...known, ...stat] : [...stat, ...known])];
+    };
+
+    let flashT = 0;
+    const flash = (txt, bad) => {
+      if (!fbSaved) return;
+      fbSaved.textContent = txt; fbSaved.style.color = bad ? "#ff6258" : "#4ade80";
+      clearTimeout(flashT); if (!bad) flashT = setTimeout(() => { fbSaved.textContent = ""; }, 2500);
+    };
+    const saveFb = () => {
+      const provider = fbProv.value || "none";
+      const model = provider === "none" ? "" : fbModel.value.trim();
+      return uiPost("/registry/fallback", { provider, model })
+        .then(async (r) => { if (!r.ok) throw new Error((await r.text().catch(() => "")) || "HTTP " + r.status); flash("✓"); })
+        .catch((e) => flash("⚠ " + String((e && e.message) || e).slice(0, 80), true));
+    };
+
+    // Themed combobox (same look as the Edit Agent picker): focus shows the whole list,
+    // typing filters it; a pick saves at once, a typed id saves on change.
+    let typed = false;
+    const closeMenu = () => { if (fbMenu) fbMenu.classList.remove("open"); };
+    const showMenu = () => {
+      if (!fbMenu || fbProv.value === "none") return;
+      const f = typed ? fbModel.value.trim().toLowerCase() : "";
+      const list = modelsFor(fbProv.value).filter((m) => !f || m.toLowerCase().includes(f));
+      fbMenu.innerHTML = list.length
+        ? list.map((m) => `<div class="cbopt" title="${esc(m)}">${esc(m)}</div>`).join("")
+        : `<div class="cbopt" style="opacity:.55;cursor:default">${esc(tr("พิมพ์ชื่อโมเดลเองได้"))}</div>`;
+      [...fbMenu.querySelectorAll(".cbopt")].forEach((o, i) => {
+        if (list[i] != null) o.onmousedown = (e) => { e.preventDefault(); fbModel.value = list[i]; typed = false; closeMenu(); saveFb(); };
+      });
+      fbMenu.classList.add("open");
+    };
+    fbModel.onfocus = () => { typed = false; showMenu(); };
+    fbModel.oninput = () => { typed = true; showMenu(); };
+    fbModel.onblur = () => setTimeout(closeMenu, 150);
+    fbModel.onchange = () => saveFb();
+
+    const sync = () => { fbWrap.style.display = fbProv.value === "none" ? "none" : ""; };
+    sync();
+    fbProv.onchange = () => {
+      const p = fbProv.value, m = fbModel.value.trim();
+      // A model id belongs to its provider: switching brains clears one the new brain doesn't
+      // list (blank = that provider's default).
+      if (p === "none" || (m && !modelsFor(p).includes(m))) fbModel.value = "";
+      typed = false; closeMenu(); sync(); saveFb();
+    };
+
+    // Live ● / ○ for the local brains + their served model ids (cached 3 s server-side).
+    fetch("/registry/local-status").then((x) => x.json()).then((st) => {
+      if (!st || typeof st !== "object" || !fbProv.isConnected) return;
+      live = st;
+      for (const o of fbProv.querySelectorAll("option")) if (LOCAL.includes(o.value)) o.textContent = label(o.value) + liveTag(o.value);
+      if (fbMenu && fbMenu.classList.contains("open")) showMenu();
+    }).catch(() => {});
   }
 
   // Channels — now their own settings tab (split out of the crowded CONNECT tab).
@@ -4483,9 +4811,13 @@
         <div class="field"><label>🛟 สมองสำรอง (ทั้งออฟฟิศ) — ถ้าสมองของ agent ไหน overload ต่อเนื่อง จะสลับงานมารันบนตัวนี้ชั่วคราวอัตโนมัติ</label>
           <div class="assistrow" style="gap:6px;flex-wrap:wrap">
             <select id="fbProv" style="flex:1 1 150px;margin:0"></select>
-            <input id="fbModel" autocomplete="off" maxlength="60" placeholder="โมเดล (เว้นว่าง = ดีฟอลต์)" style="flex:1 1 150px;margin:0">
+            <div id="fbModelWrap" style="position:relative;flex:1 1 150px;min-width:0">
+              <input id="fbModel" autocomplete="off" spellcheck="false" maxlength="160" placeholder="โมเดล (เว้นว่าง = ดีฟอลต์)" style="margin:0;width:100%">
+              <div id="fbModelMenu" class="cbmenu" style="top:auto;bottom:100%;margin:0 0 3px"></div>
+            </div>
+            <span id="fbSaved" style="flex:0 0 auto;align-self:center;font-size:11px"></span>
           </div>
-          <div style="font-size:10.5px;color:var(--dim);margin-top:4px">ดีฟอลต์ = ปิด (ไม่มี) · เลือกได้เฉพาะ provider ที่เชื่อมต่อแล้ว · ใช้เฉพาะตอนสมองหลักล่มจริง (5xx) หลาย ๆ ครั้งติดกัน</div></div>`;
+          <div style="font-size:10.5px;color:var(--dim);margin-top:4px">ดีฟอลต์ = ปิด (ไม่มี) · Local ไม่ต้องใช้ key แต่ต้องเปิด server ค้างไว้ · Cloud เลือกได้เฉพาะที่เชื่อมต่อแล้ว · สลับเฉพาะตอนสมองหลักล่ม (5xx) หรือติดลิมิต (429) หลายครั้งติดกัน</div></div>`;
     } else if (tab === "channels") {
       bodyHtml = `<div style="font-size:11px;color:var(--dim);margin-bottom:10px">
           📡 คุยกับออฟฟิศจากภายนอกผ่าน Director (main) — เปิดช่องทางที่ต้องการ แล้วสั่งงานจากมือถือได้เลย<br>
@@ -4566,12 +4898,9 @@
     modalCard.querySelectorAll(".tab").forEach((t) => (t.onclick = () => openSettings(t.dataset.t)));
     if (tab === "agents") {
       const list = modalCard.querySelector("#alist");
-      // CEO first, Director (main) second, then the rest in registry order.
-      const rosterOrder = Object.keys(ROSTER);
-      const rosterIds = rosterOrder.slice().sort((a, b) => {
-        const w = (x) => (x === "ceo" ? 0 : x === "main" ? 1 : 2);
-        return w(a) - w(b) || rosterOrder.indexOf(a) - rosterOrder.indexOf(b);
-      });
+      // CEO first, Director (main) second, then the rest in registry order —
+      // the editor's ‹ › walks the same list (agentNavOrder, minus the CEO).
+      const rosterIds = agentListOrder();
       for (const id of rosterIds) {
         const a = ROSTER[id];
         const row = document.createElement("div");
@@ -4600,25 +4929,20 @@
       const scEl = modalCard.querySelector("#staffCount");
       if (scEl) scEl.textContent = `${nStaff} / ${MAXSTAFF} agents`;
       modalCard.querySelector("#officeTransferBtn").onclick = openOfficeTransfer;
-      // 👥 team templates (v1.5): a whole pre-built team in one click.
+      // 👥 team templates (v1.5): a whole pre-built team in one click. Each 👥 opens
+      // a confirm popup, then a result popup (hireTeamFlow, next to askConfirm).
       modalCard.querySelector("#hireTeam").onclick = async () => {
         const pick = modalCard.querySelector("#teamPick");
         if (pick.innerHTML) { pick.innerHTML = ""; return; }
-        const tj = await fetch("/teams").then((x) => x.json()).catch(() => ({ teams: [] }));
+        const tj = await loadTeams(false);   // a failure shows its own popup
+        if (!tj) return;
         pick.innerHTML = "";
-        for (const t of tj.teams || []) {
-          const row = document.createElement("div"); row.className = "arow"; row.style.cursor = "default";
+        for (const t of tj.teams) {
+          const row = document.createElement("div"); row.className = "arow"; row.style.cursor = "default"; row.dataset.team = t.id;
           const missing = t.agents.filter((a) => !a.present).length;
-          row.innerHTML = `<div class="meta"><b>${esc(t.name)}</b><span>${esc(t.tagline)} · ${t.agents.map((a) => (a.present ? "✓ " : "") + a.name + " (" + a.role + ")").join(", ")}</span></div>` +
-            `<div class="winbtn" title="จ้างทีมนี้">${missing ? "👥" : "✓"}</div>`;
-          row.querySelector(".winbtn").onclick = async () => {
-            if (!missing) return addChip(tr("ทีมนี้อยู่ในออฟฟิศแล้ว"));
-            if (!(await askConfirm(tr("จ้างทีมนี้ทั้งชุด?") + " " + t.name + " — " + missing + " " + tr("คน")))) return;
-            const rr = await uiPost("/teams/hire", { id: t.id });
-            const j = await rr.json().catch(async () => ({ hired: [], error: await rr.text() }));
-            addChip(j.hired && j.hired.length ? `👥 ${tr("จ้างแล้ว")}: ${j.hired.join(", ")}` + (j.skipped && j.skipped.length ? ` · ${tr("ข้าม")} ${j.skipped.length}` : "") : tr("✗ จ้างไม่สำเร็จ") + ": " + String(j.error || "").slice(0, 80));
-            openSettings("agents");
-          };
+          row.innerHTML = `<div class="meta"><b>${esc(t.name)}</b><span>${esc(t.tagline)} · ${t.agents.map((a) => (a.present ? "✓ " : "") + esc(a.name) + " (" + esc(a.role) + ")").join(", ")}</span></div>` +
+            `<div class="winbtn" title="${missing ? "จ้างทีมนี้" : "ทีมนี้อยู่ในออฟฟิศแล้ว"}">${missing ? "👥" : "✓"}</div>`;
+          row.querySelector(".winbtn").onclick = () => hireTeamFlow(t);
           pick.appendChild(row);
         }
       };
@@ -5063,17 +5387,23 @@
     modalCard.querySelector("#sName").value = s.name;
     modalCard.querySelector("#sDesc").value = s.description || "";
     modalCard.querySelector("#sBody").value = s.content || "";
-    modalCard.querySelector("#sCancel").onclick = () => openSettings("skills");
+    modalCard.querySelector("#sCancel").onclick = () => requestCloseModal(() => openSettings("skills"));
     if (locked) return;
-    modalCard.querySelector("#sSave").onclick = async () => {
+    const skVals = () => ["#sName", "#sDesc", "#sBody"].map((q) => modalCard.querySelector(q).value).join("\u0000");
+    const skBase = skVals();
+    const saveSkill = async () => {
       const name = modalCard.querySelector("#sName").value.trim();
-      if (!name) return;
+      if (!name) return { ok: false, error: tr("ต้องใส่ชื่อ"), field: "sName" };
       await api("/registry/skill", {
         id, name,
         description: modalCard.querySelector("#sDesc").value,
         content: modalCard.querySelector("#sBody").value,
       });
-      openSettings("skills");
+      return { ok: true };
+    };
+    setModalForm({ kind: "skill", head: modalCard.querySelector("h3"), isDirty: () => skVals() !== skBase, save: saveSkill });
+    modalCard.querySelector("#sSave").onclick = async () => {
+      if ((await saveSkill()).ok) openSettings("skills");
     };
     const del = modalCard.querySelector("#sDel");
     if (del) del.onclick = async () => {
@@ -5083,7 +5413,277 @@
     };
   }
 
-  function openEditor(id) {
+  // ⚙ → AGENTS order: CEO first, Director (main) second, then registry order.
+  function agentListOrder() {
+    const ids = Object.keys(ROSTER);
+    return ids.slice().sort((a, b) => {
+      const w = (x) => (x === "ceo" ? 0 : x === "main" ? 1 : 2);
+      return w(a) - w(b) || ids.indexOf(a) - ids.indexOf(b);
+    });
+  }
+  // The Edit Agent ‹ › order: that same list without the CEO (you — no AI fields).
+  function agentNavOrder() { return agentListOrder().filter((x) => x !== "ceo"); }
+
+  // The Edit/Hire Agent form on screen (set by openEditor): collect() builds the
+  // /registry/agent payload, alive() = its panel is still the one in the card.
+  let _agentForm = null;
+  // Dirty-check key: the payload as JSON, list fields order-free.
+  function agentFormKey(p) { return JSON.stringify(p, (k, v) => (Array.isArray(v) ? v.map(String).sort() : v)); }
+  // SAVE, the unsaved-changes bar and ‹ › all save through here. close:true is
+  // the SAVE button (close, then chat with the agent — as before); close:false
+  // keeps the editor open. → { ok, error, field } (field = the input to fix).
+  async function saveAgentForm({ close = true } = {}) {
+    const f = _agentForm;
+    if (!f || !f.alive()) return { ok: false, error: "editor closed", field: null };
+    // Brain list / voices / memory still loading → wait (briefly), never save a half-built form.
+    if (f.ready) await Promise.race([f.ready, new Promise((r) => setTimeout(r, 3000))]);
+    if (!f.alive()) return { ok: false, error: "editor closed", field: null };
+    const payload = f.collect();
+    if (!payload.name) return { ok: false, error: tr("ต้องใส่ชื่อ"), field: "eName" };
+    // Same gate as the disabled SAVE button: never save onto an unconnected provider.
+    const sb = modalCard.querySelector("#eSave");
+    if (!f.isUser && sb && sb.disabled) return { ok: false, error: tr("⚠ ยังไม่ได้เชื่อมต่อ provider นี้"), field: "eProvider" };
+    let res, text = "";
+    try { res = await uiPost("/registry/agent", payload); text = await res.text(); }
+    catch (err) { return { ok: false, error: String((err && err.message) || err), field: null }; }
+    if (!res.ok) return { ok: false, error: text.slice(0, 200) || "HTTP " + res.status, field: null };
+    let r = {};
+    try { r = JSON.parse(text) || {}; } catch {}
+    if (f.saved) f.saved(payload);
+    paintAgentNav();
+    if (close) {
+      closeModal();
+      if (r.id && !f.isUser) { ensureAgent(r.id); setTarget(r.id); }
+    } else if (r.id && ROSTER[r.id]) {
+      // roster.sync follows over the socket; until it lands, reopening this
+      // agent (‹ ›) must show what was just saved, not the old values.
+      const { id: _id, ...fields } = payload;
+      Object.assign(ROSTER[r.id], JSON.parse(JSON.stringify(fields)));
+    }
+    return { ok: true, id: r.id || f.id || null, error: null, field: null };
+  }
+
+  // ‹ › — the floating layer over the Edit Agent card (#eFloat) walks agentNavOrder(),
+  // wrapping around. Unsaved edits are saved first; a failed save stays put and points
+  // at the field.
+  const IS_MAC = /Mac|iPhone|iPad/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "");
+  function isTextField(el) {
+    if (!el) return false;
+    if (el.isContentEditable || el.tagName === "TEXTAREA") return true;
+    return el.tagName === "INPUT" && !/^(button|checkbox|color|file|hidden|image|radio|range|reset|submit)$/i.test(el.type || "text");
+  }
+  async function navAgent(dir) {
+    const f = _agentForm;
+    if (!f || f.busy || !f.navigable || !f.alive() || !modal.classList.contains("open")) return false;
+    let saved = false;
+    for (let n = 0; n < 3 && f.isDirty(); n++) {   // edits typed while a save is in flight get saved too
+      if (f.setBusy) f.setBusy(true, dir);
+      const r = await saveAgentForm({ close: false });
+      if (f.setBusy) f.setBusy(false, dir);
+      // the panel moved on (or was closed) meanwhile — never pop it back open
+      if (_agentForm !== f || !f.alive() || !modal.classList.contains("open")) return false;
+      if (!r.ok) { agentNavNote("err", "✗ " + tr("บันทึกไม่สำเร็จ"), 2600); flagFormField(r.field, r.error); return false; }
+      saved = true;
+    }
+    if (f.isDirty()) return false;
+    const order = agentNavOrder(), i = order.indexOf(f.id);
+    if (i < 0 || order.length < 2) return false;
+    const savedName = saved ? String(f.collect().name || "") : "";
+    openEditor(order[(i + dir + order.length) % order.length], { restore: captureEditorState(), saved, savedName });
+    return true;
+  }
+  // What ‹ › carries over to the next agent: the field you are working on, kept at the
+  // same height on screen (bulk edits land on the same field, whatever the text above it
+  // holds), the focused field (+ caret / selection) and the skills/tools picker filters.
+  // scrollTop is the fallback when the field is not on the next form.
+  let _editorField = null;   // the last .field typed or clicked in (focus may be on ‹ › by now)
+  function editorFields() { return [...modalCard.querySelectorAll(".field")].filter((x) => x.offsetParent !== null); }
+  function editorFieldKey(f) {
+    if (!f) return null;
+    if (f.id) return f.id;
+    const el = f.querySelector("[id]");
+    return el ? el.id : null;
+  }
+  // The field to keep in place: the focused one, else the last one worked in, else the top
+  // one on screen — each only while it is on screen. → { key, idx, dy } | null
+  function editorAnchor() {
+    const fields = editorFields(), cr = modalCard.getBoundingClientRect();
+    const seen = (x) => { const r = x.getBoundingClientRect(); return r.bottom > cr.top + 4 && r.top < cr.bottom - 4; };
+    const ae = document.activeElement;
+    let f = ae && ae !== modalCard && modalCard.contains(ae) ? ae.closest(".field") : null;
+    if (!f || !seen(f)) f = _editorField && _editorField.isConnected && modalCard.contains(_editorField) && seen(_editorField) ? _editorField : null;
+    if (!f) f = fields.find((x) => x.getBoundingClientRect().bottom > cr.top + 8) || null;
+    if (!f) return null;
+    return { key: editorFieldKey(f), idx: fields.indexOf(f), dy: Math.round(f.getBoundingClientRect().top - cr.top) };
+  }
+  function captureEditorState() {
+    const ae = document.activeElement;
+    const st = { scrollTop: modalCard.scrollTop, anchor: editorAnchor(), focus: null, sel: null, filters: {} };
+    if (ae && ae.id && ae !== modalCard && modalCard.contains(ae)) {
+      st.focus = ae.id;
+      try {
+        if (isTextField(ae) && typeof ae.selectionStart === "number") {
+          st.sel = [ae.selectionStart, ae.selectionEnd, ae.selectionDirection || "none"];
+          st.atEnd = ae.selectionStart === ae.selectionEnd && ae.selectionEnd === String(ae.value || "").length;   // appending
+        }
+      } catch {}
+    }
+    for (const sid of ["eSkillsSearch", "eToolsSearch"]) {
+      const s = modalCard.querySelector("#" + sid);
+      if (s) st.filters[sid] = { q: s.value, open: !!s.closest(".cbmenu.open") };
+    }
+    return st;
+  }
+  // The anchored field back at the same height on screen. → false when this form has no such field.
+  // A shorter form cannot scroll that far (a tall window, fewer skills below the field): #eNavPad, an
+  // empty block under the buttons, grows by what is missing — so the field still lands at the same
+  // height instead of lower (live, 2026-09-30: 260 px → 480 px on a 1558 px window). It shrinks back
+  // as the async sections fill the form, and a new render starts it at 0.
+  function alignEditorAnchor(st) {
+    const a = st && st.anchor;
+    if (!a) return false;
+    let f = a.key && /^[\w-]+$/.test(a.key) ? modalCard.querySelector("#" + a.key) : null;
+    if (f && !f.classList.contains("field")) f = f.closest(".field");
+    if (!f || f.offsetParent === null) f = editorFields()[a.idx] || null;
+    if (!f) return false;
+    const want = modalCard.scrollTop + f.getBoundingClientRect().top - modalCard.getBoundingClientRect().top - a.dy;
+    const pad = modalCard.querySelector("#eNavPad");
+    if (pad) {
+      const now = pad.offsetHeight;
+      const room = modalCard.scrollHeight - now - modalCard.clientHeight;   // how far the form scrolls on its own
+      const need = Math.max(0, Math.ceil(want - room));
+      if (need !== now) pad.style.height = need + "px";
+    }
+    modalCard.scrollTop = want;
+    return true;
+  }
+  // Applied right after the render, and again while the async sections settle (they change
+  // the panel height) — see settleEditorView().
+  function restoreEditorState(st, again) {
+    if (!again) {
+      for (const [sid, fl] of Object.entries(st.filters || {})) {
+        const s = modalCard.querySelector("#" + sid);
+        if (!s) continue;
+        if (s.value !== fl.q) { s.value = fl.q; s.dispatchEvent(new Event("input")); }
+        if (fl.open && st.focus === sid) { const m = s.closest(".cbmenu"); if (m) m.classList.add("open"); }
+      }
+    }
+    if (!alignEditorAnchor(st) && !again) modalCard.scrollTop = st.scrollTop;
+    const el = st.focus && /^[\w-]+$/.test(st.focus) ? modalCard.querySelector("#" + st.focus) : null;
+    if (!el) return;
+    const ae = document.activeElement;
+    if (again && ae && ae !== document.body && ae !== el) return;
+    if (ae !== el) {
+      try { el.focus({ preventScroll: true }); } catch {}
+      // a caret at the end (adding to every agent's text) goes to the end of this agent's text
+      const end = String(el.value || "").length;
+      if (st.atEnd) try { el.setSelectionRange(end, end); } catch {}
+      else if (st.sel) try { el.setSelectionRange(st.sel[0], st.sel[1], st.sel[2]); } catch {}
+    }
+  }
+  // After ‹ ›: keep the anchored field in place while the brain list, voices and memory
+  // sections load — until the owner scrolls, clicks or types (then the view is theirs).
+  function settleEditorView(st, form) {
+    const evs = ["wheel", "touchstart", "pointerdown", "keydown"];
+    const stop = () => { st.moved = true; };
+    for (const t of evs) modalCard.addEventListener(t, stop, { passive: true });
+    const again = () => { if (!st.moved && form.alive()) restoreEditorState(st, true); };
+    requestAnimationFrame(again);
+    form.ready.then(again);
+    setTimeout(again, 450);
+    setTimeout(() => { again(); for (const t of evs) modalCard.removeEventListener(t, stop); }, 1500);
+  }
+  // ── the floating ‹ n / N › (static markup in #modalBox, beside the card). Shown for a
+  // navigable Edit Agent form only; any other panel render hides it (observer below).
+  const eFloat = document.getElementById("eFloat");
+  const eNavPill = document.getElementById("eNavPill");
+  let _navNoteT = 0;
+  function showAgentNav(info) {
+    const k = IS_MAC ? "⌥" : "Alt+";
+    const prev = document.getElementById("eNavPrev"), next = document.getElementById("eNavNext");
+    prev.title = tr("agent ก่อนหน้า") + " (" + k + "←) · " + tr("บันทึกก่อนเปลี่ยน");
+    next.title = tr("agent ถัดไป") + " (" + k + "→) · " + tr("บันทึกก่อนเปลี่ยน");
+    prev.setAttribute("aria-label", tr("agent ก่อนหน้า"));
+    next.setAttribute("aria-label", tr("agent ถัดไป"));
+    const av = document.getElementById("eNavAv"), s = 22 / 36;   // the face, as the ID card crops it
+    av.style.backgroundImage = "url(/char/npc" + npcOf(info.id) + ".png)";
+    av.style.backgroundSize = 256 * s + "px " + 512 * s + "px";
+    av.style.backgroundPosition = -14 * s + "px " + -12 * s + "px";
+    document.getElementById("eNavName").textContent = info.name || info.id;
+    document.getElementById("eNavCount").textContent = info.n + " / " + info.N;
+    document.getElementById("eNavDirty").title = tr("มีการแก้ไขที่ยังไม่บันทึก");
+    agentNavNote(null);
+    setAgentNavBusy(false);
+    eFloat.hidden = false;
+    paintAgentNav();
+  }
+  function hideAgentNav() {
+    if (eFloat.hidden) return;
+    eFloat.hidden = true;
+    setAgentNavBusy(false);
+    agentNavNote(null);
+  }
+  // The amber dot on the pill = this form has unsaved edits (‹ › will save them first).
+  function paintAgentNav() {
+    const f = _agentForm, dot = document.getElementById("eNavDirty");
+    dot.hidden = !(f && f.navigable && f.alive() && f.isDirty && f.isDirty());
+  }
+  // The pill's message: "busy" (saving), "ok" (saved), "err" (the save failed); null clears it.
+  function agentNavNote(kind, text, ms) {
+    const msg = document.getElementById("eNavMsg");
+    clearTimeout(_navNoteT);
+    eNavPill.classList.remove("busy", "ok", "err");
+    if (!kind) { msg.hidden = true; msg.textContent = ""; return; }
+    eNavPill.classList.add(kind);
+    msg.textContent = text;
+    msg.hidden = false;
+    if (ms) _navNoteT = setTimeout(() => agentNavNote(null), ms);
+  }
+  // While ‹ › saves: both arrows wait, the pressed one spins, the pill says so.
+  function setAgentNavBusy(b, dir) {
+    for (const [el, d] of [[document.getElementById("eNavPrev"), -1], [document.getElementById("eNavNext"), 1]]) {
+      el.disabled = !!b;
+      el.classList.toggle("spin", !!b && d === dir);
+    }
+    if (b) agentNavNote("busy", "⏳ " + tr("กำลังบันทึก…"));
+    else if (eNavPill.classList.contains("busy")) agentNavNote(null);
+  }
+  document.getElementById("eNavPrev").onclick = () => navAgent(-1);
+  document.getElementById("eNavNext").onclick = () => navAgent(1);
+  // A mouse press on ‹ › must not take the caret out of the field being edited: the next
+  // agent opens with the cursor back in that field. (Tab + Enter on an arrow still works.)
+  for (const bid of ["eNavPrev", "eNavNext"]) document.getElementById(bid).addEventListener("mousedown", (e) => e.preventDefault());
+  // Another panel in the card (or no navigable agent form left) → the layer goes.
+  new MutationObserver(() => { const f = _agentForm; if (!(f && f.navigable && f.alive())) hideAgentNav(); }).observe(modalCard, { childList: true });
+  modalCard.addEventListener("focusin", (e) => { const fl = e.target && e.target.closest ? e.target.closest(".field") : null; if (fl) _editorField = fl; });
+  let _navDirtyRaf = 0;
+  for (const type of ["input", "change", "click"])
+    modalCard.addEventListener(type, () => { cancelAnimationFrame(_navDirtyRaf); _navDirtyRaf = requestAnimationFrame(paintAgentNav); });
+  // 📝 ＋ Hire draft: while a new-agent form has unsaved edits it is kept in
+  // localStorage (debounced) and offered back on the next ＋ Hire; dropped on a
+  // successful save or an explicit discard. Per machine, best effort.
+  const HIRE_DRAFT_KEY = "draft:hireAgent";
+  function readHireDraft() {
+    try { const d = JSON.parse(localStorage.getItem(HIRE_DRAFT_KEY) || "null"); return d && d.p && typeof d.p === "object" ? d : null; } catch { return null; }
+  }
+  function writeHireDraft(p) { try { localStorage.setItem(HIRE_DRAFT_KEY, JSON.stringify({ v: 1, t: Date.now(), p })); return true; } catch { return false; } }
+  function dropHireDraft() { try { localStorage.removeItem(HIRE_DRAFT_KEY); } catch {} }
+  for (const type of ["input", "change", "click", "mousedown"])
+    modalCard.addEventListener(type, () => { const f = _agentForm; if (f && f.onEdit && f.alive()) f.onEdit(); });
+  // Alt+← / Alt+→ (⌥ on macOS — but not inside a text field, where ⌥←/→ moves by word).
+  document.addEventListener("keydown", (e) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.isComposing) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const f = _agentForm;
+    if (!f || !f.navigable || !f.alive() || !modal.classList.contains("open") || overlayAboveModal()) return;
+    const t = e.target;
+    if (t && t !== document.body && t !== document.documentElement && !modal.contains(t)) return;
+    if (IS_MAC && isTextField(t)) return;
+    e.preventDefault();   // Alt+← is also "back" in a browser
+    navAgent(e.key === "ArrowRight" ? 1 : -1);
+  });
+
+  function openEditor(id, nav) {   // nav = { restore, saved } when ‹ › switched agents
     modal.classList.add("open");
     const a = id ? (ROSTER[id] || {}) : { name: "", role: REGROLES[2] || "Specialist", avatar: 1, prompt: "" };
     const isUser = !!a.isUser;  // the CEO is YOU — no prompt/skills/tools
@@ -5092,6 +5692,9 @@
     const mySkills = new Set(a.skills || []);
     const myTools = new Set(a.tools || []);
     const myMem = new Set(a.memoryPlugins || []);   // 🧠 memory plugins opted into (v1.4)
+    // Async sections (voices · brain list · memory plugins): the dirty baseline
+    // and the ‹ › view restore wait for them.
+    let voicesP = null, provP = null, memP = null;
     const AURAS = [["", "✨ none", "#8294ab"], ["fire", "🔥 fire", "#ff9540"],
       ["ice", "❄ ice", "#6fd3ff"], ["nature", "🍃 nature", "#7be36b"],
       ["arcane", "🔮 arcane", "#cf7dff"], ["shadow", "🌑 shadow", "#6e7488"],
@@ -5112,7 +5715,7 @@
        <div class="field"><label>🧠 สมอง (โมเดล/ผู้ให้บริการ) — ดีฟอลต์คือ Claude</label>
          <select id="eProvider"></select>
          <div id="eModelWrap" style="position:relative;margin-top:6px">
-           <input id="eModel" autocomplete="off" maxlength="60" style="margin:0;width:100%" placeholder="โมเดล (เว้นว่าง = ดีฟอลต์ของผู้ให้บริการ)">
+           <input id="eModel" autocomplete="off" maxlength="160" style="margin:0;width:100%" placeholder="โมเดล (เว้นว่าง = ดีฟอลต์ของผู้ให้บริการ)">
            <div id="eModelMenu" class="cbmenu"></div>
          </div>
          <div id="eModelRefreshRow" style="margin-top:5px;display:flex;align-items:center;gap:8px">
@@ -5125,11 +5728,13 @@
          </div>
          <div style="font-size:10.5px;color:var(--dim);margin-top:4px">Claude ใช้ login/แผนเดิม · เจ้าอื่นใช้ key แยก (ประหยัดกว่า)</div>
        </div>
-       <div class="field"><label>✨ PERSONA COPILOT — บอกสั้นๆ ว่าอยากได้ agent แบบไหน (เติมให้ทุกช่อง)</label>
-         <div class="assistrow">
+       <div class="field" id="eCopilot"><label>✨ PERSONA COPILOT — บอกสั้นๆ ว่าอยากได้ agent แบบไหน (เติมให้ทุกช่อง)</label>
+         <div id="eCopilotPick"></div>
+         <div class="assistrow scp-assist">
            <input id="eBrief" placeholder='เช่น "นักออกแบบ UI เน้น minimal พูดติดตลก" แล้วกด ✨'>
-           <button class="sparkle" id="eAssist">✨ Draft</button>
-         </div></div>
+           <button class="sparkle" id="eAssist">✨</button>
+         </div>
+         <div id="eAssistMsg" class="scp-msg" role="status" aria-live="polite" hidden></div></div>
        <div class="field"><label>SYSTEM PROMPT — ตัวตนและภารกิจหลัก</label>
          <textarea id="ePrompt"></textarea></div>
        <div class="field"><label>🛠 ความเชี่ยวชาญ / ขอบเขตงาน</label>
@@ -5160,7 +5765,8 @@
          ${id && !a.protected ? `<button class="danger" id="eDel">🗑 Delete</button>` : ""}
          <button id="eCancel">Cancel</button>
          <button class="primary" id="eSave">💾 Save</button>
-       </div>`;
+       </div>
+       <div id="eNavPad" aria-hidden="true"></div>`;
     // aura picker chips
     const auBox = modalCard.querySelector("#eAura");
     for (const [val, label, colr] of AURAS) {
@@ -5184,7 +5790,7 @@
     const vSel = modalCard.querySelector("#eVoice");
     if (vSel) {
       vSel.innerHTML = `<option value="">${tr("🔇 ไม่มีเสียง")}</option>`;
-      fetch("/tts/presets").then((x) => x.json()).then((ps) => {
+      voicesP = fetch("/tts/presets").then((x) => x.json()).then((ps) => {
         // Group by gender (the ♀/♂ marker in the label) so the long list is
         // easy to scan: two labelled sections instead of one flat dropdown.
         const groups = { "♀": null, "♂": null, "•": null };
@@ -5234,6 +5840,7 @@
       menu.className = "cbmenu";
       const search = document.createElement("input");
       search.placeholder = "🔍 " + tr("ค้นหา");
+      if (box.id) search.id = box.id + "Search";   // eSkillsSearch / eToolsSearch — ‹ › keeps focus + filter
       search.style.cssText = "width:100%;margin:0;border:0;border-bottom:1px solid var(--line);border-radius:9px 9px 0 0;padding:8px 12px;font-size:12px;background:#0e1626;color:var(--text)";
       const opts = document.createElement("div");
       menu.append(search, opts);
@@ -5459,22 +6066,38 @@
       const refBtn = modalCard.querySelector("#eRefreshModels");
       if (refBtn) refBtn.onclick = () => forceRefreshModels(provSel.value);
       renderModels(false);
-      fetch("/registry").then((x) => x.json()).then((rg) => { pcAll = rg.providerConfig || {}; CATALOG = rg.providerCatalog || {}; buildProviderOptions(); renderModels(false); refreshModels(provSel.value); }).catch(() => {});
+      provP = fetch("/registry").then((x) => x.json()).then((rg) => { pcAll = rg.providerConfig || {}; CATALOG = rg.providerCatalog || {}; buildProviderOptions(); renderModels(false); refreshModels(provSel.value); }).catch(() => {});
     }
       modalCard.querySelector("#ePrompt").value = a.prompt || "";
       modalCard.querySelector("#eExpertise").value = px.expertise || "";
       modalCard.querySelector("#ePersonality").value = px.personality || "";
       modalCard.querySelector("#eLanguage").value = px.language || "";
       modalCard.querySelector("#eRules").value = px.rules || "";
-      modalCard.querySelector("#eAssist").onclick = async (e) => {
-        const btn = e.target;
-        btn.disabled = true; btn.textContent = "⏳ thinking…";
+      // ✨ Persona copilot: the Director drafts the persona with the brain picked right here —
+      // daemon/copilot-ui.js (SPEC2 C6). The labels name the ROLE ("Director"), never the Director's
+      // own name, which the owner can change. Errors are readable and reportable; a reply that
+      // lands after ‹ › / close is dropped (it belongs to that form).
+      const SC = window.ShinoCopilot || null;
+      const aBtn = modalCard.querySelector("#eAssist"), aMsg = modalCard.querySelector("#eAssistMsg");
+      const cpT = (s, v) => (SC ? SC.t(s, v) : tr(s).replace(/\{(\w+)\}/g, (m, k) => (v && v[k] != null ? v[k] : m)));
+      const cpName = () => (SC && typeof SC.roleName === "function" ? SC.roleName() : "Director");
+      const paintAssist = () => { if (!aBtn.disabled) aBtn.textContent = cpT("✨ ให้ {name} ร่าง persona", { name: cpName() }); };
+      paintAssist();
+      if (SC) SC.mountPicker(modalCard.querySelector("#eCopilotPick"), { onChange: paintAssist });
+      aBtn.onclick = async () => {
+        aBtn.disabled = true; aBtn.textContent = "⏳ " + cpT("{name} กำลังร่าง…", { name: cpName() });
+        if (SC) SC.notice(aMsg, null); else aMsg.hidden = true;
+        const body = { name: modalCard.querySelector("#eName").value || "Agent", role: roleSel.value,
+          brief: modalCard.querySelector("#eBrief").value };
         try {
-          const r = await api("/assist/prompt", {
-            name: modalCard.querySelector("#eName").value || "Agent",
-            role: roleSel.value,
-            brief: modalCard.querySelector("#eBrief").value,
-          });
+          const res = SC ? await SC.request("/assist/prompt", body) : { ok: true, data: await api("/assist/prompt", body, true) };
+          if (!aBtn.isConnected) return;
+          if (!res.ok) {
+            SC.notice(aMsg, { title: "ร่าง persona ไม่สำเร็จ", error: res.error, brain: res.brain,
+              report: { source: "copilot", step: "ร่าง persona" } });
+            return;
+          }
+          const r = res.data || {};
           // The copilot fills EVERY persona field it designed.
           if (r.prompt) modalCard.querySelector("#ePrompt").value = r.prompt;
           if (r.expertise) modalCard.querySelector("#eExpertise").value = r.expertise;
@@ -5488,7 +6111,11 @@
           if (Array.isArray(r.tools)) {
             myTools.clear(); r.tools.forEach((t) => myTools.add(t)); renderToolChips();
           }
-        } finally { btn.disabled = false; btn.textContent = "✨ Draft"; }
+          if (SC) SC.notice(aMsg, { brain: res.brain, done: "ร่างโดย {brain}" });
+          if (form.onEdit && form.alive()) form.onEdit();   // ＋ Hire keeps the drafted form as its draft
+        } catch (err) {
+          if (aBtn.isConnected) { aMsg.hidden = false; aMsg.textContent = "⚠ " + String((err && err.message) || err); }
+        } finally { aBtn.disabled = false; paintAssist(); }
       };
     }
     // Where this teammate runs. The blank option is not 'local' — it means
@@ -5503,11 +6130,12 @@
         `<option value="${v}"${(a.backend || "") === v ? " selected" : ""}>${l}</option>`).join("");
     }
     modalCard.querySelector("#eName").value = a.name;
-    modalCard.querySelector("#eCancel").onclick = () => openSettings("agents");
-    modalCard.querySelector("#eSave").onclick = async () => {
+    modalCard.querySelector("#eCancel").onclick = () => requestCloseModal(() => openSettings("agents"));
+    // The form → the /registry/agent payload. SAVE, the unsaved-changes bar and
+    // ‹ › all post it through saveAgentForm(); dirty tracking compares it.
+    const collectPayload = () => {
       const name = modalCard.querySelector("#eName").value.trim();
-      if (!name) return modalCard.querySelector("#eName").focus();
-      const payload = isUser
+      return isUser
         ? { id, name, avatar, aura: myAura }  // the CEO row keeps no AI fields
         : { id, name, role: roleSel.value, avatar, aura: myAura,
             prompt: modalCard.querySelector("#ePrompt").value,
@@ -5523,12 +6151,18 @@
               rules: modalCard.querySelector("#eRules").value,
             },
             skills: [...mySkills], tools: [...myTools], memoryPlugins: [...myMem] };
-      const r = await api("/registry/agent", payload);
-      closeModal();
-      if (r.id && !isUser) { ensureAgent(r.id); setTarget(r.id); }
+    };
+    const edHead = modalCard.querySelector("h3");
+    const form = _agentForm = { id, isUser, head: edHead, collect: collectPayload,
+      alive: () => edHead.isConnected && modalCard.contains(edHead) };
+    setModalForm({ kind: "agent", head: edHead, isDirty: () => !!(form.isDirty && form.isDirty()),
+      save: () => saveAgentForm({ close: false }), leave: (discarded) => form.leave && form.leave(discarded) });
+    modalCard.querySelector("#eSave").onclick = async () => {
+      const r = await saveAgentForm({ close: true });
+      if (!r.ok) flagFormField(r.field, r.field === "eName" ? "" : r.error);
     };
     // 🧠 memory plugins (v1.4): shown only when a loaded plugin provides memory.
-    if (!isUser) Promise.all([fetch("/plugins").then((x) => x.json()), id ? fetch("/registry").then((x) => x.json()) : Promise.resolve({})]).then(([pj, rg]) => {
+    if (!isUser) memP = Promise.all([fetch("/plugins").then((x) => x.json()), id ? fetch("/registry").then((x) => x.json()) : Promise.resolve({})]).then(([pj, rg]) => {
       const cur = rg && rg.agents && rg.agents[id];
       if (cur && Array.isArray(cur.memoryPlugins)) { myMem.clear(); cur.memoryPlugins.forEach((m) => myMem.add(m)); }
       const provs = (pj.plugins || []).filter((p) => p.hooks && p.hooks.memory);
@@ -5536,7 +6170,7 @@
       if (!provs.length || !f || !box) return;
       f.style.display = "";
       for (const p of provs) {
-        const d = document.createElement("div"); d.className = "chk" + (myMem.has(p.id) ? " on" : ""); d.textContent = p.name || p.id;
+        const d = document.createElement("div"); d.className = "chk" + (myMem.has(p.id) ? " on" : ""); d.textContent = p.name || p.id; d.dataset.id = p.id;
         d.onclick = () => { if (myMem.has(p.id)) myMem.delete(p.id); else myMem.add(p.id); d.classList.toggle("on", myMem.has(p.id)); };
         box.appendChild(d);
       }
@@ -5548,6 +6182,81 @@
       await api("/registry/agent/delete", { id });
       closeModal();
     };
+    // ── unsaved changes ── baseline = the payload as rendered. Each async
+    // section re-baselines only the fields it fills (voice · provider/model ·
+    // memoryPlugins), so an edit typed while they load still counts.
+    form.base = collectPayload();
+    const rebase = (...keys) => { if (!form.alive()) return; const cur = collectPayload(); for (const k of keys) form.base[k] = cur[k]; };
+    form.ready = Promise.allSettled([
+      voicesP && voicesP.then(() => rebase("voice")),
+      provP && provP.then(() => rebase("provider", "model")),
+      memP && memP.then(() => rebase("memoryPlugins")),
+    ]);
+    form.isDirty = () => agentFormKey(collectPayload()) !== agentFormKey(form.base);
+    form.saved = (p) => { form.base = JSON.parse(JSON.stringify(p)); };
+    // ── ‹ n / N › — agentNavOrder() (⚙ AGENTS order without the CEO); hidden for ＋ Hire.
+    // The floating layer over the card (showAgentNav): the pill on the top edge, ‹ › on the sides.
+    const order = agentNavOrder(), at = id ? order.indexOf(id) : -1;
+    form.navigable = at >= 0 && order.length > 1;
+    if (form.navigable) {
+      showAgentNav({ id, name: a.name, n: at + 1, N: order.length });
+      form.setBusy = (b, dir) => { form.busy = b; setAgentNavBusy(b, dir); };
+      form.ready.then(paintAgentNav);
+    } else hideAgentNav();
+    if (nav && nav.restore) {
+      restoreEditorState(nav.restore);
+      settleEditorView(nav.restore, form);
+    } else modalCard.scrollTop = 0;   // a fresh open starts at the top
+    if (nav && nav.saved) agentNavNote("ok", (nav.savedName ? nav.savedName + " · " : "") + tr("บันทึกแล้ว ✓") + " →", 1800);
+    // ── ＋ Hire: offer the unfinished draft; keep saving this one while it is dirty.
+    if (!id && !isUser) {
+      form.apply = (p) => {   // fill the form from a saved payload (the same shape collectPayload builds)
+        const has = (el, v) => el.tagName !== "SELECT" || [...el.options].some((o) => o.value === String(v));
+        const set = (k, v) => { const el = modalCard.querySelector("#" + k); if (el && v !== undefined && v !== null && has(el, v)) el.value = v; };
+        set("eName", p.name);
+        const av = grid.querySelectorAll(".av")[(Number(p.avatar) || 1) - 1]; if (av) av.click();
+        const ai = AURAS.findIndex(([v]) => v === (p.aura || "")); if (ai >= 0 && auBox.children[ai]) auBox.children[ai].click();
+        set("eRole", p.role); set("eTier", String(p.tier || 3)); set("eBackend", p.backend || "");
+        const ps = modalCard.querySelector("#eProvider");
+        if (ps && p.provider && p.provider !== ps.value && has(ps, p.provider)) { ps.value = p.provider; if (ps.onchange) ps.onchange(); }
+        set("eModel", p.model); set("ePrompt", p.prompt);
+        const dx = p.persona || {};
+        set("eExpertise", dx.expertise); set("ePersonality", dx.personality); set("eLanguage", dx.language); set("eRules", dx.rules);
+        set("eVoice", p.voice || "");
+        mySkills.clear(); (p.skills || []).forEach((x) => mySkills.add(x)); renderSkillChips();
+        myTools.clear(); (p.tools || []).forEach((x) => myTools.add(x)); renderToolChips();
+        myMem.clear(); (p.memoryPlugins || []).forEach((x) => myMem.add(x));
+        modalCard.querySelectorAll("#eMemory .chk").forEach((d) => d.classList.toggle("on", myMem.has(d.dataset.id)));
+      };
+      const draft = readHireDraft();
+      if (draft) {
+        const bar = document.createElement("div");
+        bar.id = "eDraftBar";
+        bar.innerHTML = `<span>📝 ${esc(tr("มีร่างที่ค้างไว้"))}${draft.p.name ? " — " + esc(String(draft.p.name).slice(0, 40)) : ""}</span>` +
+          `<button type="button" class="primary" id="eDraftRestore">${esc(tr("กู้ร่าง"))}</button>` +
+          `<button type="button" id="eDraftDrop">${esc(tr("ทิ้ง"))}</button>`;
+        edHead.after(bar);
+        bar.querySelector("#eDraftRestore").onclick = async () => {
+          bar.remove();
+          await form.ready;   // voices / brain list first, or they would overwrite the draft
+          if (form.alive()) form.apply(draft.p);
+        };
+        bar.querySelector("#eDraftDrop").onclick = () => { bar.remove(); dropHireDraft(); };
+      }
+      let draftT = 0, wrote = false;
+      form.onEdit = () => {
+        clearTimeout(draftT);
+        draftT = setTimeout(() => {
+          if (!form.alive()) return;
+          if (form.isDirty()) {
+            if (writeHireDraft(form.collect())) { wrote = true; const b = modalCard.querySelector("#eDraftBar"); if (b) b.remove(); }
+          } else if (wrote) { dropHireDraft(); wrote = false; }
+        }, 600);
+      };
+      form.leave = (discarded) => { clearTimeout(draftT); if (discarded || wrote) dropHireDraft(); };
+      const savedBase = form.saved;
+      form.saved = (p) => { savedBase(p); clearTimeout(draftT); dropHireDraft(); };
+    }
   }
 
   function openCard(id) {
@@ -7454,6 +8163,386 @@
     });
   }
 
+  // ---- 💬 themed dialogs · 👥 hire-a-team popups · 🐞 report to the dev team ----
+  // Curated en/zh/ja for the strings below (the big DICT stays untouched).
+  (() => { const D = {
+    "ตกลง": { en: "OK", zh: "确定", ja: "OK" },
+    "ปิด": { en: "Close", zh: "关闭", ja: "閉じる" },
+    "ลบการ์ดนี้?": { en: "Delete this card?", zh: "删除这张卡片？", ja: "このカードを削除しますか？" },
+    "จ้างทีม": { en: "Hire team", zh: "雇用团队", ja: "チームを雇う" },
+    "จ้างทีมนี้": { en: "Hire this team", zh: "雇用这个团队", ja: "このチームを雇う" },
+    "จ้างใหม่": { en: "new hire", zh: "新雇用", ja: "新規採用" },
+    "ข้าม — มีอยู่แล้ว": { en: "skip — already here", zh: "跳过 — 已在办公室", ja: "スキップ — 在籍中" },
+    "ข้าม — ออฟฟิศเต็ม": { en: "skip — office full", zh: "跳过 — 办公室已满", ja: "スキップ — 満員" },
+    "พนักงานหลังจ้าง": { en: "Staff after hiring", zh: "雇用后的员工数", ja: "雇用後のスタッフ数" },
+    "พนักงานตอนนี้": { en: "Staff now", zh: "当前员工数", ja: "現在のスタッフ数" },
+    "จ้าง %n คน": { en: "Hire %n", zh: "雇用 %n 人", ja: "%n 人を雇う" },
+    "ออฟฟิศเต็ม — จะข้าม %n คน": { en: "Office full — %n will be skipped", zh: "办公室已满 — 将跳过 %n 人", ja: "満員 — %n 人はスキップされます" },
+    "ออฟฟิศเต็มแล้ว — จ้างเพิ่มไม่ได้": { en: "The office is full — no one can be hired", zh: "办公室已满 — 无法再雇用", ja: "オフィスは満員です — これ以上雇えません" },
+    "อยากได้ครบทีม? ลบ agent ที่ไม่ได้ใช้ออกก่อน แล้วค่อยจ้างใหม่": { en: "Want the whole team? Remove agents you no longer use, then hire again.", zh: "想要完整的团队？先移除不再使用的 agent，再重新雇用。", ja: "チーム全員を雇うには、使っていない agent を削除してから、もう一度雇ってください。" },
+    "ทีมนี้อยู่ในออฟฟิศแล้ว": { en: "This team is already in the office", zh: "这个团队已经在办公室里了", ja: "このチームはすでにオフィスにいます" },
+    "ทุกคนในทีมนี้ทำงานอยู่ในออฟฟิศแล้ว — ไม่ต้องจ้างเพิ่ม": { en: "Everyone on this team already works here — nothing to hire.", zh: "这个团队的成员都已在办公室工作 — 无需再雇用。", ja: "このチームの全員がすでに在籍しています — 雇う必要はありません。" },
+    "จ้างแล้ว %n คน": { en: "Hired %n", zh: "已雇用 %n 人", ja: "%n 人を雇いました" },
+    "จ้างแล้ว": { en: "hired", zh: "已雇用", ja: "雇用済み" },
+    "ดูทีมใหม่": { en: "View the new team", zh: "查看新团队", ja: "新しいチームを見る" },
+    "ใหม่": { en: "NEW", zh: "新", ja: "新規" },
+    "ออฟฟิศเต็ม — ไม่ได้จ้างใครเพิ่ม": { en: "Office full — no one was hired", zh: "办公室已满 — 没有雇用任何人", ja: "満員 — 誰も雇われませんでした" },
+    "จ้างทีมไม่สำเร็จ": { en: "Couldn't hire the team", zh: "无法雇用这个团队", ja: "チームを雇えませんでした" },
+    "โหลดรายชื่อทีม": { en: "Load the team list", zh: "加载团队列表", ja: "チーム一覧の読み込み" },
+    "โหลดรายชื่อทีมไม่สำเร็จ": { en: "Couldn't load the team list", zh: "无法加载团队列表", ja: "チーム一覧を読み込めませんでした" },
+    "ไม่พบเทมเพลตทีมนี้ — อาจถูกลบหรือเปลี่ยนชื่อไปแล้ว": { en: "This team template wasn't found — it may have been removed or renamed.", zh: "找不到这个团队模板 — 可能已被删除或改名。", ja: "このチームテンプレートが見つかりません — 削除または名前が変更された可能性があります。" },
+    "daemon ไม่ยอมรับคำขอ — ต้องสั่งจากหน้าออฟฟิศเท่านั้น (403)": { en: "The daemon refused the request — only the office window may do this (403).", zh: "daemon 拒绝了请求 — 只能在办公室界面中操作 (403)。", ja: "daemon がリクエストを拒否しました — オフィス画面からのみ操作できます (403)。" },
+    "ติดต่อ daemon ไม่ได้ — ออฟฟิศอาจปิดอยู่หรือกำลังรีสตาร์ต": { en: "Can't reach the daemon — the office may be closed or restarting.", zh: "无法连接 daemon — 办公室可能已关闭或正在重启。", ja: "daemon に接続できません — オフィスが閉じているか、再起動中の可能性があります。" },
+    "daemon ตอบกลับในรูปแบบที่อ่านไม่ได้": { en: "The daemon sent a reply that couldn't be read.", zh: "daemon 返回了无法读取的响应。", ja: "daemon から読み取れない応答が返されました。" },
+    "daemon ตอบกลับด้วยข้อผิดพลาด": { en: "The daemon replied with an error", zh: "daemon 返回了错误", ja: "daemon がエラーを返しました" },
+    "รายละเอียด": { en: "Details", zh: "详情", ja: "詳細" },
+    "(ว่าง)": { en: "(empty)", zh: "（空）", ja: "（空）" },
+    "แจ้งทีมพัฒนา": { en: "Report to the dev team", zh: "报告给开发团队", ja: "開発チームに報告" },
+    "กำลังเตรียมรายงาน…": { en: "Preparing the report…", zh: "正在准备报告…", ja: "レポートを準備しています…" },
+    "ยังไม่มีอะไรถูกส่งออกไป — อ่านตรวจข้อความด้านล่างก่อน แล้วกด Submit บน GitHub เอง": { en: "Nothing has been sent. Review the text below, then press Submit on GitHub yourself.", zh: "尚未发送任何内容。请先检查下面的文字，然后自己在 GitHub 上点击 Submit。", ja: "まだ何も送信されていません。下の内容を確認してから、GitHub で自分で Submit を押してください。" },
+    "ซ่อน token, key, ชื่อผู้ใช้ และชื่อเครื่องให้อัตโนมัติแล้ว": { en: "Tokens, keys, your user name and the computer name were hidden automatically.", zh: "已自动隐藏 token、key、用户名和计算机名。", ja: "トークン、キー、ユーザー名、コンピューター名は自動的に伏せました。" },
+    "คัดลอก": { en: "Copy", zh: "复制", ja: "コピー" },
+    "คัดลอกแล้ว — วางใน GitHub issue ได้เลย": { en: "Copied — paste it into the GitHub issue.", zh: "已复制 — 可以粘贴到 GitHub issue 中。", ja: "コピーしました — GitHub の issue に貼り付けてください。" },
+    "คัดลอกไม่ได้ — เลือกข้อความแล้วกด Ctrl+C เอง": { en: "Couldn't copy — select the text and press Ctrl+C.", zh: "无法复制 — 请选中文字后按 Ctrl+C。", ja: "コピーできません — テキストを選択して Ctrl+C を押してください。" },
+    "เปิด GitHub Issue": { en: "Open GitHub Issue", zh: "打开 GitHub Issue", ja: "GitHub Issue を開く" },
+    "เปิดเบราว์เซอร์แล้ว — ตรวจข้อความอีกครั้ง แล้วกด Submit new issue": { en: "Opened in your browser — check the text again, then press Submit new issue.", zh: "已在浏览器中打开 — 请再检查一遍文字，然后点击 Submit new issue。", ja: "ブラウザーで開きました — 内容をもう一度確認してから Submit new issue を押してください。" },
+    "เปิดเบราว์เซอร์ไม่ได้ — กดคัดลอกแล้วไปวางที่ GitHub เองได้": { en: "Couldn't open the browser — copy the text and paste it on GitHub yourself.", zh: "无法打开浏览器 — 可以复制文字后自行粘贴到 GitHub。", ja: "ブラウザーを開けません — テキストをコピーして GitHub に自分で貼り付けてください。" },
+    "บันทึกรายงานฉบับเต็มไว้ที่": { en: "Full report saved at", zh: "完整报告已保存到", ja: "完全なレポートの保存先" },
+    "ลิงก์ถูกตัดให้สั้นลง — แนบไฟล์รายงานฉบับเต็มใน issue ด้วย": { en: "The link was shortened — please attach the full report file to the issue.", zh: "链接已被缩短 — 请把完整报告文件附加到 issue 中。", ja: "リンクは短縮されました — 完全なレポートファイルを issue に添付してください。" },
+    "เตรียมรายงานไม่สำเร็จ": { en: "Couldn't prepare the report", zh: "无法准备报告", ja: "レポートを準備できませんでした" },
+    "ลองใหม่": { en: "Try again", zh: "重试", ja: "再試行" },
+  };
+    for (const [k, v] of Object.entries(D)) { DICT[k] = v; if (LANG !== "th" && v[LANG]) TR[k] = v[LANG]; } })();
+  // Raw error text and report previews are data — never machine-translated.
+  NO_I18N.add("hireRawDetail"); NO_I18N.add("bagRepPreview");
+
+  // bagDialog() is the floating card behind askConfirm() and the popups below:
+  // the same look as confirmDanger (fixed overlay z 99999, Esc = cancel, Enter =
+  // the focused or primary button) in neutral / status colours. Only the TOP
+  // dialog reacts to keys, so a popup opened from a popup never double-closes.
+  // o = { name, title (text), tone: "info"|"ok"|"warn"|"error"|"danger",
+  //       html (trusted markup — esc() any data), width, sticky (the backdrop
+  //       doesn't close it), escValue, focus (value of the button to focus),
+  //       onOpen(ctx), buttons: [{ label, value, primary, danger, disabled,
+  //       keep (run onClick, stay open), onClick(ctx) }] }
+  // → Promise<the pressed button's value | escValue>.
+  // ctx = { el, body, close(v), btn(v) → <button>, enable(v, on) }.
+  const _bagDlgs = [];
+  const BAGDLG_TONE = { info: "#9fd0ff", ok: "#7be3a4", warn: "#ffc861", error: "#ff7a6b", danger: "#ff7a6b" };
+  function bagDialog(o = {}) {
+    return new Promise((resolve) => {
+      const ov = document.createElement("div");
+      ov.className = "bagdlg";
+      if (o.name) ov.dataset.dlg = o.name;
+      ov.style.cssText = "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;" +
+        "justify-content:center;background:rgba(2,6,14,0.55);backdrop-filter:blur(2px);font:inherit";
+      ov.innerHTML =
+        `<div class="bagdlg-card" role="dialog" aria-modal="true" style="width:min(${Number(o.width) || 380}px,92vw);` +
+        `max-height:88vh;overflow:auto;background:#0e1626;border:1px solid #2a3a55;border-radius:14px;` +
+        `padding:18px 18px 15px;box-shadow:0 20px 60px rgba(0,0,0,.6)">` +
+        `<div class="bagdlg-title" style="font-size:14px;font-weight:700;margin-bottom:8px;color:${BAGDLG_TONE[o.tone] || BAGDLG_TONE.info}"></div>` +
+        `<div class="bagdlg-body" style="font-size:12px;color:#aebbd0;line-height:1.6;margin-bottom:15px">${o.html || ""}</div>` +
+        `<div class="bagdlg-btns" style="display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap"></div></div>`;
+      const titleEl = ov.querySelector(".bagdlg-title");
+      if (o.title) titleEl.textContent = o.title; else titleEl.remove();
+      const specs = o.buttons && o.buttons.length ? o.buttons : [{ label: tr("ปิด"), value: o.escValue, primary: true }];
+      const els = new Map();
+      const prevFocus = document.activeElement;
+      let done = false;
+      const close = (v) => {
+        if (done) return;
+        done = true;
+        window.removeEventListener("keydown", onKey, true);
+        const i = _bagDlgs.indexOf(ov);
+        if (i >= 0) _bagDlgs.splice(i, 1);
+        ov.remove();
+        try { if (prevFocus && prevFocus.focus && document.contains(prevFocus)) prevFocus.focus(); } catch {}
+        resolve(v);
+      };
+      const paint = (b) => {
+        const el = els.get(b);
+        el.disabled = !!b.disabled;
+        el.style.cssText = "font:inherit;font-size:12px;padding:8px 15px;border-radius:9px;" +
+          (b.danger ? "border:1px solid #d9483b;background:#c2362a;color:#fff;font-weight:700;"
+            : b.primary ? "border:1px solid #3d7fd9;background:#1f5fb8;color:#fff;font-weight:700;"
+            : "border:1px solid #2a3a55;background:transparent;color:#cdd8ea;") +
+          (b.disabled ? "opacity:.45;cursor:not-allowed" : "cursor:pointer");
+      };
+      const ctx = {
+        el: ov, body: ov.querySelector(".bagdlg-body"), close,
+        btn: (v) => { for (const [b, el] of els) if (b.value === v) return el; return null; },
+        enable: (v, on = true) => { for (const b of specs) if (b.value === v) { b.disabled = !on; paint(b); } },
+      };
+      const press = async (b) => {
+        if (done || b.disabled) return;
+        if (b.onClick) { try { await b.onClick(ctx); } catch (e) { console.warn("[dialog]", e); } }
+        if (!b.keep) close(b.value);
+      };
+      const row = ov.querySelector(".bagdlg-btns");
+      for (const b of specs) {
+        const el = document.createElement("button");
+        el.type = "button"; el.textContent = b.label; el.dataset.btn = String(b.value);
+        els.set(b, el); paint(b);
+        el.onclick = (e) => { e.stopPropagation(); press(b); };
+        row.appendChild(el);
+      }
+      const onKey = (e) => {
+        if (_bagDlgs[_bagDlgs.length - 1] !== ov) return;
+        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(o.escValue); }
+        else if (e.key === "Enter") {
+          if (e.target && ov.contains(e.target) && /^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName || "")) return;
+          e.preventDefault(); e.stopPropagation();
+          const b = specs.find((x) => els.get(x) === document.activeElement) || specs.find((x) => x.primary && !x.disabled);
+          if (b) press(b);
+        }
+      };
+      ov.onclick = (e) => { if (e.target === ov && !o.sticky) close(o.escValue); };
+      window.addEventListener("keydown", onKey, true);
+      _bagDlgs.push(ov);
+      document.body.appendChild(ov);
+      const f = specs.find((x) => (o.focus !== undefined ? x.value === o.focus : x.primary && !x.disabled)) || specs.find((x) => !x.disabled);
+      if (f) els.get(f).focus();
+      if (o.onOpen) { try { o.onOpen(ctx); } catch (e) { console.warn("[dialog]", e); } }
+    });
+  }
+
+  // askConfirm(message, opts?) → Promise<boolean> — the neutral twin of
+  // confirmDanger. opts = { title, okLabel, cancelLabel, html (message is trusted
+  // markup), danger (red confirm button) }. Esc / backdrop → false, Enter → true.
+  function askConfirm(message, opts = {}) {
+    const body = opts.html ? String(message == null ? "" : message) : esc(message).replace(/\n/g, "<br>");
+    return bagDialog({
+      name: "confirm", tone: opts.danger ? "danger" : "info",
+      title: opts.title ? (opts.danger ? "⚠ " : "") + opts.title : "",
+      html: `<div class="bagdlg-msg" style="${opts.title ? "" : "font-size:13px;color:#dce6f2"}">${body}</div>`,
+      buttons: [{ label: opts.cancelLabel || tr("ยกเลิก"), value: false },
+        { label: opts.okLabel || tr("ตกลง"), value: true, primary: true, danger: !!opts.danger }],
+      escValue: false,
+    }).then((v) => v === true);
+  }
+
+  // 👥 HIRE A TEAM — confirm first (who joins, who's already here, the staff count
+  // after hiring vs the cap, who won't fit), then a result popup; a failure gets a
+  // readable message + the raw detail + 🐞 report. (Before: the handler called an
+  // askConfirm that didn't exist here, so the click did nothing at all.)
+  const _hireLine = (a, tag, color) =>
+    `<div class="hire-agent" style="display:flex;gap:10px;justify-content:space-between;align-items:baseline;` +
+    `padding:4px 0;border-bottom:1px solid rgba(110,180,255,.08)">` +
+    `<span><b style="color:#dce6f2;font-weight:600">${esc(a.name)}</b> <span style="color:#8294ab">· ${esc(a.role || "")}</span></span>` +
+    (tag ? `<span style="color:${color};white-space:nowrap;font-size:11px">${esc(tag)}</span>` : "") + `</div>`;
+  const _hireStaff = (label, n, max) =>
+    `<div style="margin-top:10px;display:flex;justify-content:space-between;gap:10px"><span>${esc(label)}</span>` +
+    `<b class="hire-staff" style="color:${n >= max ? "#ffc861" : "#dce6f2"}">${n} / ${max}</b></div>`;
+  const _hireWarn = (msg) =>
+    `<div class="hire-warn" style="margin-top:10px;padding:8px 10px;border-radius:9px;background:rgba(255,200,97,.08);` +
+    `border:1px solid rgba(255,200,97,.35);color:#ffc861">${msg ? "⚠ " + esc(msg) : ""}` +
+    `<div style="color:#aebbd0;${msg ? "margin-top:3px" : ""}">${esc(tr("อยากได้ครบทีม? ลบ agent ที่ไม่ได้ใช้ออกก่อน แล้วค่อยจ้างใหม่"))}</div></div>`;
+
+  // GET /teams → { teams, staff, max } | null. quiet: no error popup (the caller has data).
+  async function loadTeams(quiet) {
+    let r = null, text = "";
+    try { r = await fetch("/teams"); text = await r.text(); }
+    catch (e) { if (!quiet) hireTeamFailed(null, { kind: "net", detail: String((e && e.message) || e) }, "โหลดรายชื่อทีม"); return null; }
+    if (r.ok) { try { const j = JSON.parse(text); if (j && Array.isArray(j.teams)) return j; } catch {} }
+    if (!quiet) hireTeamFailed(null, { kind: r.ok ? "json" : "http", status: r.status, detail: text }, "โหลดรายชื่อทีม");
+    return null;
+  }
+
+  async function hireTeamFlow(team) {
+    // Fresh numbers — the list may be minutes old (another hire, a fired agent…).
+    const fresh = await loadTeams(true);
+    const t = (fresh && fresh.teams.find((x) => x.id === team.id)) || team;
+    const max = Number(fresh && fresh.max) || MAXSTAFF;
+    let staff = Number(fresh && fresh.staff);
+    if (!fresh || !Number.isFinite(staff)) staff = Object.keys(ROSTER).filter((x) => x !== "ceo").length;
+    const agents = Array.isArray(t.agents) ? t.agents : [];
+    const want = agents.filter((a) => !a.present), have = agents.filter((a) => a.present);
+    const free = Math.max(0, max - staff), fit = want.slice(0, free), over = want.slice(free);
+    const name = `<div style="color:#dce6f2;font-weight:700;margin-bottom:4px">${esc(t.name)}</div>`;
+    if (!want.length) {   // the whole team already works here — say so (not in a hidden chat chip)
+      await bagDialog({
+        name: "hire-info", tone: "info", width: 420, title: "✓ " + tr("ทีมนี้อยู่ในออฟฟิศแล้ว"),
+        html: name + `<div style="margin-bottom:6px">${esc(tr("ทุกคนในทีมนี้ทำงานอยู่ในออฟฟิศแล้ว — ไม่ต้องจ้างเพิ่ม"))}</div>` +
+          have.map((a) => _hireLine(a, "✓", "#7be3a4")).join(""),
+        buttons: [{ label: tr("ปิด"), value: "close", primary: true }], escValue: "close",
+      });
+      return;
+    }
+    const go = await bagDialog({
+      name: "hire-confirm", tone: fit.length ? "info" : "warn", width: 420, title: "👥 " + tr("จ้างทีม") + " · " + t.name,
+      html: (t.tagline ? `<div style="margin-bottom:8px">${esc(t.tagline)}</div>` : "") +
+        fit.map((a) => _hireLine(a, "＋ " + tr("จ้างใหม่"), "#9fd0ff")).join("") +
+        have.map((a) => _hireLine(a, "✓ " + tr("ข้าม — มีอยู่แล้ว"), "#7be3a4")).join("") +
+        over.map((a) => _hireLine(a, "⚠ " + tr("ข้าม — ออฟฟิศเต็ม"), "#ffc861")).join("") +
+        _hireStaff(tr("พนักงานหลังจ้าง"), staff + fit.length, max) +
+        (over.length ? _hireWarn(fit.length ? tr("ออฟฟิศเต็ม — จะข้าม %n คน").replace("%n", over.length) : tr("ออฟฟิศเต็มแล้ว — จ้างเพิ่มไม่ได้")) : ""),
+      buttons: [{ label: tr("ยกเลิก"), value: false },
+        { label: tr("จ้าง %n คน").replace("%n", fit.length), value: true, primary: true, disabled: !fit.length }],
+      escValue: false,
+    });
+    if (go !== true) return;
+    let res = null, text = "";
+    try { res = await uiPost("/teams/hire", { id: t.id }); text = await res.text(); }
+    catch (e) { return hireTeamFailed(t, { kind: "net", detail: String((e && e.message) || e) }); }
+    if (!res.ok) return hireTeamFailed(t, { kind: "http", status: res.status, detail: text });
+    let j = null;
+    try { j = JSON.parse(text); } catch {}
+    if (!j || j.ok !== true || !Array.isArray(j.hired)) return hireTeamFailed(t, { kind: "json", status: res.status, detail: text });
+    return hireTeamResult(t, j);
+  }
+
+  async function hireTeamResult(t, j) {
+    const who = (id) => (t.agents || []).find((a) => a.id === id) || { name: id, role: "" };
+    const hired = j.hired, skipped = Array.isArray(j.skipped) ? j.skipped : [];
+    const full = skipped.filter((s) => s.why === "office full");
+    const html = `<div style="color:#dce6f2;font-weight:700;margin-bottom:4px">${esc(t.name)}</div>` +
+      hired.map((id) => _hireLine(who(id), "＋ " + tr("จ้างแล้ว"), "#7be3a4")).join("") +
+      skipped.map((s) => (s.why === "office full"
+        ? _hireLine(who(s.id), "⚠ " + tr("ข้าม — ออฟฟิศเต็ม"), "#ffc861")
+        : _hireLine(who(s.id), "✓ " + tr("ข้าม — มีอยู่แล้ว"), "#7be3a4"))).join("") +
+      (Number.isFinite(Number(j.staff)) && Number(j.max) ? _hireStaff(tr("พนักงานตอนนี้"), Number(j.staff), Number(j.max)) : "") +
+      (full.length ? _hireWarn("") : "");
+    if (!hired.length) {   // nothing changed: the office is full (warning) or everyone was already here
+      await bagDialog({
+        name: "hire-result", tone: full.length ? "warn" : "info", width: 420,
+        title: full.length ? "⚠ " + tr("ออฟฟิศเต็ม — ไม่ได้จ้างใครเพิ่ม") : "✓ " + tr("ทีมนี้อยู่ในออฟฟิศแล้ว"),
+        html, buttons: [{ label: tr("ปิด"), value: "close", primary: true }], escValue: "close",
+      });
+      return;
+    }
+    const v = await bagDialog({
+      name: "hire-result", tone: "ok", width: 420, title: "✅ " + tr("จ้างแล้ว %n คน").replace("%n", hired.length),
+      html, buttons: [{ label: tr("ปิด"), value: "close" }, { label: "👀 " + tr("ดูทีมใหม่"), value: "view", primary: true }],
+      escValue: "close",
+    });
+    await refreshAgentsTab(hired, v === "view");
+  }
+
+  // A failed hire / team-list load → readable message + raw detail + 🐞 report.
+  function hireFailMessage(f) {
+    if (f.kind === "net") return tr("ติดต่อ daemon ไม่ได้ — ออฟฟิศอาจปิดอยู่หรือกำลังรีสตาร์ต");
+    if (f.kind === "json") return tr("daemon ตอบกลับในรูปแบบที่อ่านไม่ได้");
+    if (f.status === 403) return tr("daemon ไม่ยอมรับคำขอ — ต้องสั่งจากหน้าออฟฟิศเท่านั้น (403)");
+    if (/no such team template/i.test(f.detail || "")) return tr("ไม่พบเทมเพลตทีมนี้ — อาจถูกลบหรือเปลี่ยนชื่อไปแล้ว");
+    return tr("daemon ตอบกลับด้วยข้อผิดพลาด") + ` (HTTP ${f.status})`;
+  }
+  async function hireTeamFailed(t, f, step = "จ้างทีม") {
+    const raw = ((f.status ? `HTTP ${f.status} · ` : "") + String(f.detail || "").trim()).slice(0, 2000) || tr("(ว่าง)");
+    const v = await bagDialog({
+      name: "hire-error", tone: "error", width: 440,
+      title: "✗ " + (step === "โหลดรายชื่อทีม" ? tr("โหลดรายชื่อทีมไม่สำเร็จ") : tr("จ้างทีมไม่สำเร็จ")),
+      html: (t ? `<div style="color:#dce6f2;font-weight:700;margin-bottom:4px">${esc(t.name)}</div>` : "") +
+        `<div class="hire-errmsg" style="color:#dce6f2;margin-bottom:8px">${esc(hireFailMessage(f))}</div>` +
+        `<div style="font-size:10.5px;letter-spacing:1px;color:#8294ab;margin-bottom:4px">${esc(tr("รายละเอียด"))}</div>` +
+        `<pre id="hireRawDetail" style="margin:0;max-height:160px;overflow:auto;white-space:pre-wrap;word-break:break-word;` +
+        `font:11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:#cdd8ea;background:#08101c;` +
+        `border:1px solid #1d2b44;border-radius:9px;padding:8px 10px">${esc(raw)}</pre>`,
+      buttons: [{ label: "🐞 " + tr("แจ้งทีมพัฒนา"), value: "report" }, { label: tr("ปิด"), value: "close", primary: true }],
+      escValue: "close",
+    });
+    if (v === "report") openReportDialog({ source: "hire-team", step, error: raw, context: t ? { team: t.id } : {} });
+  }
+
+  // Re-render ⚙ AGENTS once the roster push carrying the new hires has landed
+  // (≤ 3 s); with highlight, light up those rows and scroll to the first one.
+  async function refreshAgentsTab(ids = [], highlight = true) {
+    for (let i = 0; i < 30 && ids.some((id) => !ROSTER[id]); i++) await new Promise((r) => setTimeout(r, 100));
+    if (!modal.classList.contains("open") || !modalCard.querySelector("#alist")) return;   // the owner moved on
+    openSettings("agents");
+    if (!highlight) return;
+    let first = null;
+    for (const row of modalCard.querySelectorAll("#alist .arow")) {
+      const sp = row.querySelector(".meta span");
+      const id = row.dataset.id || String((sp && sp.textContent) || "").split(" · ")[1] || "";
+      if (!ids.includes(id.trim())) continue;
+      row.dataset.newhire = "1";
+      row.style.background = "rgba(123,227,164,0.10)";
+      row.style.boxShadow = "inset 3px 0 0 #7be3a4";
+      const b = row.querySelector(".meta b");
+      if (b) b.insertAdjacentHTML("beforeend", ` <span class="newhire-tag" style="display:inline-block;font-size:9.5px;font-weight:700;` +
+        `letter-spacing:1px;color:#0e1626;background:#7be3a4;border-radius:6px;padding:0 6px;vertical-align:1px">${esc(tr("ใหม่"))}</span>`);
+      first = first || row;
+    }
+    if (first) first.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  // 🐞 แจ้งทีมพัฒนา — report to the dev team. Shared by every failure popup:
+  // hire-team here, and any other page via window.bagReport.open({ source, step, error,
+  // context }). The daemon builds + REDACTS the report
+  // (POST /reports/prepare, daemon/report.js) and keeps the full copy in
+  // daemon/reports/; this dialog only shows it. Nothing is sent anywhere:
+  // "เปิด GitHub Issue" opens a prefilled page in the browser, and an issue exists
+  // only if the owner presses Submit there.
+  function openReportDialog({ source = "ui", step = "", error = "", context = {}, logSource = "daemon" } = {}) {
+    let rep = null;
+    const mono = "font:11px/1.5 ui-monospace,SFMono-Regular,Consolas,'Cascadia Mono',monospace";
+    const say = (c, msg, color) => { const el = c.el.querySelector(".bagrep-status"); el.style.color = color || "#8294ab"; el.textContent = msg || ""; };
+    const load = async (c) => {
+      const pv = c.el.querySelector(".bagrep-preview"), meta = c.el.querySelector(".bagrep-meta");
+      rep = null; c.enable("copy", false); c.enable("github", false);
+      pv.textContent = tr("กำลังเตรียมรายงาน…"); meta.innerHTML = ""; say(c, "");
+      try {
+        const r = await uiPost("/reports/prepare", { source, step, error: String(error == null ? "" : error), context: context || {}, logSource });
+        const text = await r.text();
+        if (!r.ok) throw new Error(`HTTP ${r.status}${text ? " · " + text.slice(0, 400) : ""}`);
+        const j = JSON.parse(text);
+        if (!j || !j.ok || typeof j.body !== "string") throw new Error(text.slice(0, 400));
+        rep = j;
+      } catch (e) {
+        pv.textContent = "✗ " + tr("เตรียมรายงานไม่สำเร็จ") + "\n" + String((e && e.message) || e);
+        meta.innerHTML = `<button type="button" class="bagrep-retry" style="font:inherit;font-size:11px;padding:5px 11px;border-radius:8px;` +
+          `border:1px solid #2a3a55;background:transparent;color:#cdd8ea;cursor:pointer">↻ ${esc(tr("ลองใหม่"))}</button>`;
+        meta.querySelector(".bagrep-retry").onclick = () => load(c);
+        return;
+      }
+      pv.textContent = rep.body;
+      meta.innerHTML = `${esc(tr("บันทึกรายงานฉบับเต็มไว้ที่"))} <code class="bagrep-file" style="${mono};color:#cdd8ea;user-select:all;` +
+        `word-break:break-all">${esc(rep.file || "")}</code>` +
+        (rep.truncated ? `<div style="color:#ffc861;margin-top:4px">✂ ${esc(tr("ลิงก์ถูกตัดให้สั้นลง — แนบไฟล์รายงานฉบับเต็มใน issue ด้วย"))}</div>` : "");
+      c.enable("copy", true); c.enable("github", !!rep.issueUrl);
+    };
+    const copy = async (c) => {
+      if (!rep) return;
+      let ok = false;
+      try { await navigator.clipboard.writeText(rep.body); ok = true; } catch {}
+      if (!ok) {
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = rep.body; ta.style.cssText = "position:fixed;left:-9999px;top:0";
+          document.body.appendChild(ta); ta.select(); ok = !!document.execCommand("copy"); ta.remove();
+        } catch {}
+      }
+      say(c, ok ? "✓ " + tr("คัดลอกแล้ว — วางใน GitHub issue ได้เลย") : tr("คัดลอกไม่ได้ — เลือกข้อความแล้วกด Ctrl+C เอง"), ok ? "#7be3a4" : "#ffc861");
+    };
+    const openIssue = async (c) => {
+      if (!rep || !rep.issueUrl) return;
+      try {   // the office is a webview: links must go out through /open to the system browser
+        const r = await fetch("/open", { method: "POST", headers: { "content-type": "application/json", "x-bagidea-ui": "1" },
+          body: JSON.stringify({ path: rep.issueUrl }) });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        say(c, "✓ " + tr("เปิดเบราว์เซอร์แล้ว — ตรวจข้อความอีกครั้ง แล้วกด Submit new issue"), "#7be3a4");
+      } catch { say(c, "✗ " + tr("เปิดเบราว์เซอร์ไม่ได้ — กดคัดลอกแล้วไปวางที่ GitHub เองได้"), "#ffc861"); }
+    };
+    return bagDialog({
+      name: "report", tone: "info", width: 580, sticky: true, focus: "close", title: "🐞 " + tr("แจ้งทีมพัฒนา"),
+      html: `<div style="color:#dce6f2;margin-bottom:8px">${step ? esc(tr(step)) + " · " : ""}<code style="${mono};color:#8294ab">${esc(source)}</code></div>` +
+        `<div style="padding:8px 10px;border-radius:9px;background:rgba(94,200,255,.07);border:1px solid rgba(94,200,255,.25);` +
+        `color:#cfe6ff;margin-bottom:6px">ℹ ${esc(tr("ยังไม่มีอะไรถูกส่งออกไป — อ่านตรวจข้อความด้านล่างก่อน แล้วกด Submit บน GitHub เอง"))}</div>` +
+        `<div style="font-size:11px;margin-bottom:8px">🔒 ${esc(tr("ซ่อน token, key, ชื่อผู้ใช้ และชื่อเครื่องให้อัตโนมัติแล้ว"))}</div>` +
+        `<pre id="bagRepPreview" class="bagrep-preview" style="margin:0;max-height:min(44vh,380px);overflow:auto;white-space:pre-wrap;` +
+        `word-break:break-word;${mono};color:#cdd8ea;background:#08101c;border:1px solid #1d2b44;border-radius:9px;padding:10px"></pre>` +
+        `<div class="bagrep-meta" style="font-size:11px;margin-top:8px"></div>` +
+        `<div class="bagrep-status" style="font-size:11px;margin-top:4px;min-height:14px"></div>`,
+      buttons: [
+        { label: "📋 " + tr("คัดลอก"), value: "copy", keep: true, disabled: true, onClick: copy },
+        { label: "🐙 " + tr("เปิด GitHub Issue"), value: "github", keep: true, disabled: true, primary: true, onClick: openIssue },
+        { label: tr("ปิด"), value: "close" },
+      ],
+      escValue: "close", onOpen: load,
+    });
+  }
+  window.bagReport = { open: openReportDialog };
+
   // A plugin with this id already exists → ask the owner what to do. Resolves
   // "overwrite" | "new" | null(cancel).
   function dupChoice(id) {
@@ -7671,7 +8760,9 @@
       return;
     }
     if (ev.agent) ensureAgent(ev.agent);
-    if (ev.agents) ev.agents.forEach((a) => { if (typeof a === "string") ensureAgent(a, "meeting"); });
+    // team.hired lists the NEW hires in ev.agents — they arrive via roster.sync;
+    // seating them as "meeting" gave every fresh hire a false meeting dot.
+    if (ev.agents && ev.type !== "team.hired") ev.agents.forEach((a) => { if (typeof a === "string") ensureAgent(a, "meeting"); });
 
     if (ev.type === "chat.message") {
       // The pane is per-conversation: bubble only for the current agent's
@@ -8181,4 +9272,5 @@
     document.body.style.border = "none";
   }
 </script>
+<script src="/copilot-ui.js"></script>
 </html>

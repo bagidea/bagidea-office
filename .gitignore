@@ -37,6 +37,7 @@ daemon/monitors.txt
 daemon/monitor-debug.log
 daemon/proposals.json
 daemon/tooldetail/
+daemon/reports/
 
 # Adapter session workspace (keep only the permission-hook config)
 workspace/*

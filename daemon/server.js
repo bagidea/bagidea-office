@@ -594,17 +594,13 @@ const FAILOVER_AFTER = 3;
 // (reg.fallbackProvider), an agent whose own brain is SUSTAINEDLY overloaded (repeated
 // 5xx) is re-run on this brain instead of dying on the retry loop. Unset → null → the
 // office behaves exactly as before (fail-open; the same brain just retries hard). Never
-// falls back onto the same provider, and only onto one that's actually configured
-// (Claude via login/plan, or a hosted key / local endpoint), so it can't route a task
-// into a second dead brain.
+// falls back onto the same provider, and only onto one that's actually usable: Claude
+// (login/plan), a LOCAL server (Ollama / LM Studio — no key needed), or a cloud
+// provider with a credential (token / baseUrl / openai+gemini main key). The decision
+// lives in fallback.js (pickFallback) so it is unit-tested.
+const fallbackBrain = require("./fallback");
 function officeFallback(curProvider) {
-  const p = reg.fallbackProvider;
-  if (!p || p === curProvider) return null;
-  if (p !== "claude") {
-    const pc = (reg.providerConfig || {})[p];
-    if (!pc || (!pc.token && !pc.baseUrl)) return null;   // not connected / no credential
-  }
-  return { provider: p, model: reg.fallbackModel || "" };
+  return fallbackBrain.pickFallback(reg, curProvider, providers.PROVIDERS);
 }
 
 // A failure that means "the request was too big for this backend" — either a real
@@ -960,6 +956,12 @@ function claudeText(prompt, opts = {}) {
     child.on("error", () => { endTask(false); resolve(""); });
   });
 }
+
+// 🧠 Shino copilot core (daemon/copilot.js): every copilot job — ✨ persona, 🪄 workflow
+// draft, 🔍 workflow analyze — runs ONE-SHOT as the Director on the
+// Provider + Model the owner picked (reg.copilot; "" = the Director's own brain). Other
+// modules reach the same instance with require("./copilot").get().
+const shinoCopilot = require("./copilot").init({ getReg: () => reg, saveReg, claudeText, broadcast, upstreamFor: proxy.upstreamFor });
 
 // ---------------------------------------------------------------- websocket
 
@@ -5006,6 +5008,14 @@ const server = http.createServer((req, res) => {
     try { res.end(fs.readFileSync(path.join(__dirname, "md.js"))); }
     catch { res.end("window.esc=function(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]});};window.md=function(t){if(t==null)t='';return window.esc(String(t)).replace(/\\n/g,'<br>');};"); }
 
+  } else if (req.method === "GET" && req.url.split("?")[0] === "/copilot-ui.js") {
+    // 🧠 Director-copilot picker + shared helpers (SPEC2 C6), loaded by overlay.html (✨ persona
+    // copilot) and workflow.html (🪄 draft · 🔍 analyze). It only talks to /copilot/settings and
+    // the copilot job routes; without it the pages keep their plain behaviour.
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-store" });
+    try { res.end(fs.readFileSync(path.join(__dirname, "copilot-ui.js"))); }
+    catch { res.end("window.ShinoCopilot=window.ShinoCopilot||null;"); }
+
   } else if (req.method === "GET" && req.url.split("?")[0] === "/watch") {
     // Read-only live activity stream for an agent (opened as its own window) —
     // it only listens on the WS, never sends, so it can't disturb the agent.
@@ -5502,7 +5512,9 @@ const server = http.createServer((req, res) => {
           // Accept both built-in PROVIDERS and custom ones from providerConfig.
           provider: (providers.PROVIDERS[p.provider] || (reg.providerConfig && reg.providerConfig[p.provider]))
             ? p.provider : (cur.provider || "claude"),
-          model: String(p.model !== undefined ? p.model : (cur.model || "")).slice(0, 60),
+          // Model ids ride into `claude --model` — validated, and long enough for
+          // LM Studio's path-style ids (the old 60-char slice cut them silently).
+          model: p.model !== undefined ? fallbackBrain.cleanFallbackModel(p.model) : String(cur.model || ""),
           // 📦 where this agent RUNS (local / a configured container / another
           // machine). Unset means the office default.
           backend: String(p.backend !== undefined ? p.backend : (cur.backend || "")).slice(0, 40),
@@ -6712,6 +6724,26 @@ end tell`;
       } catch (e) { res.writeHead(400, { "content-type": "text/plain; charset=utf-8" }); res.end(String(e.message)); }
     });
 
+  // ---- 🐞 "แจ้งทีมพัฒนา" — a problem report for the dev team -------------------
+  } else if (req.method === "POST" && req.url === "/reports/prepare") {
+    // Builds a REDACTED report (version/OS/GPU, the failed step + error, the log
+    // tail), saves the full copy under daemon/reports/ and returns a prefilled
+    // GitHub issue link. Nothing leaves this machine: the owner reviews the text
+    // and presses Submit on GitHub. See daemon/report.js.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, async (body) => {
+      let report = null;
+      try {
+        report = require("./report");
+        const r = await report.prepareReport(JSON.parse(body || "{}"), { reg, daemonDir: __dirname, version: APP_VERSION });
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(r));
+      } catch (e) {
+        const msg = String((e && e.message) || e);
+        res.writeHead(400, { "content-type": "text/plain; charset=utf-8" });
+        res.end(report ? report.redactSecrets(msg, { reg }) : msg);
+      }
+    });
+
   } else if (req.method === "POST" && req.url === "/plugins/reload") {
     // load() syntax-checks every index.js (node --check) before require(), so a
     // JS-broken plugin is rejected with a clear parser error instead of crashing
@@ -7286,23 +7318,53 @@ end tell`;
       }
     });
 
-  } else if (req.method === "POST" && req.url === "/assist/prompt") {
-    // ✨ Persona copilot: the owner types a one-line brief ("UI designer who
-    // sweats microcopy") and a quick claude call drafts the whole persona —
-    // AND picks the skills + tools that fit the role from what's available.
-    readBody(req, async (body) => {
+  } else if (req.method === "GET" && (req.url === "/copilot/settings" || req.url.startsWith("/copilot/settings?"))) {
+    // 🧠 Shino copilot brain (daemon/copilot.js): what the owner picked ({ provider, model },
+    // "" = follow the Director), the effective brain, the Director, and the providers a
+    // picker can offer — claude · local (● running + served models, fallback.js's probe) ·
+    // cloud / custom that hold a credential. Read-only; never carries a key.
+    shinoCopilot.settings().then((out) => {
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify(out));
+    }).catch((e) => { try { res.writeHead(500); res.end(String((e && e.message) || e)); } catch {} });
+
+  } else if (req.method === "POST" && req.url === "/copilot/settings") {
+    // Owner-only: picks the copilot brain — and a model id that can end up on a
+    // `claude --model` command line — so it is validated like the fallback brain.
+    // provider "" / "director" = follow the Director. Every open picker hears copilot.settings.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
+    readBody(req, (body) => {
+      let out, code = 200;
       try {
-        const { name = "Agent", role = "Specialist", brief = "" } = JSON.parse(body);
-        const skillMenu = Object.entries(reg.skills)
-          .map(([id, s]) => `  ${id}: ${s.description || s.name || id}`).join("\n");
+        const b = JSON.parse(body || "{}") || {};
+        out = { ok: true, effective: shinoCopilot.setBrain(b.provider, b.model) };
+      } catch (e) { code = 400; out = { ok: false, error: { code: "INVALID", message: String((e && e.message) || e) } }; }
+      res.writeHead(code, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify(out));
+    });
+
+  } else if (req.method === "POST" && req.url === "/assist/prompt") {
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only — copilot jobs are the owner's"); }
+    // ✨ Persona copilot: the owner types a one-line brief ("UI designer who
+    // sweats microcopy") and the Director drafts the whole persona — AND picks the
+    // skills + tools that fit the role from what's available. One-shot through the Shino
+    // copilot on the brain the owner picked (reg.copilot; "" = the Director's own).
+    // → the persona fields + brain; failure → 502 { ok:false, error:{ code, message }, brain }.
+    readBody(req, async (body) => {
+      const send = (code, o) => { try { res.writeHead(code, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(o)); } catch {} };
+      let b;
+      try { b = JSON.parse(body || "{}") || {}; } catch { return send(400, { ok: false, error: { code: "INVALID", message: "bad json" } }); }
+      try {
+        const { name = "Agent", role = "Specialist", brief = "" } = b;
+        const skillMenu = Object.entries(reg.skills || {})
+          .map(([id, s]) => `  ${id}: ${String((s && (s.description || s.name)) || id).replace(/\s+/g, " ").slice(0, 200)}`).join("\n");
         const toolMenu = Object.entries(BUILTIN_TOOLS_EN)
           .map(([id, d]) => `  ${id}: ${d}`).join("\n");
-        const skillIds = Object.keys(reg.skills);
+        const skillIds = Object.keys(reg.skills || {});
         const toolIds = Object.keys(BUILTIN_TOOLS);
-        // Draft with the Director's (main agent's) brain — predictable, and it
-        // works for an office with no Claude key (whatever provider the Director runs).
-        const director = (reg.agents || {}).main;
-        const draft = await claudeText(
+        const r = await shinoCopilot.run({ job: "persona", json: true, maxTokens: 4096, timeoutMs: 180000, localTimeoutMs: 300000,
+          track: { title: "✨ copilot · persona — " + String(name).replace(/\s+/g, " ").slice(0, 40) },
+          prompt:
           `Design a complete persona for an AI agent in a software office, and ` +
           `pick the skills + tools that fit its job.\n` +
           `Agent name: ${name}\nJob title: ${role}\nOwner's brief: ${brief}\n\n` +
@@ -7319,19 +7381,24 @@ end tell`;
           `"tools":["ToolName", ...]}\n` +
           `Every field must genuinely reflect the brief. skills/tools MUST be chosen ` +
           `ONLY from the lists above (exact ids/names). Match the brief's language ` +
-          `(Thai brief → Thai text fields; skill ids and tool names stay verbatim).`,
-          { provider: director && director.provider, model: director && director.model });
-        let out = { prompt: draft };
-        const m = draft.match(/\{[\s\S]*\}/);
-        if (m) try { out = JSON.parse(m[0]); } catch {}
+          `(Thai brief → Thai text fields; skill ids and tool names stay verbatim).` });
+        const out = r.ok && r.json && !Array.isArray(r.json) ? { ...r.json } : null;
+        if (!out) {
+          const error = r.error || { code: "BAD_JSON", message: r.brain.label + " did not reply with readable persona JSON" };
+          return send(502, { ok: false, error, brain: r.brain, ...(r.text ? { text: String(r.text).slice(0, 4000) } : {}) });
+        }
+        // Text fields go straight into the editor's text boxes: a list becomes lines.
+        for (const k of ["prompt", "expertise", "personality", "language", "rules"]) {
+          const v = out[k];
+          if (Array.isArray(v)) out[k] = v.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join("\n");
+          else if (v != null && typeof v !== "string") out[k] = typeof v === "object" ? JSON.stringify(v) : String(v);
+        }
         // Keep only ids/names that actually exist — never invent capabilities.
         if (Array.isArray(out.skills)) out.skills = out.skills.filter((s) => skillIds.includes(s));
         if (Array.isArray(out.tools)) out.tools = out.tools.filter((t) => toolIds.includes(t));
-        res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-        res.end(JSON.stringify(out));
+        send(200, { ...out, ok: true, brain: r.brain });
       } catch (e) {
-        res.writeHead(500);
-        res.end(String(e.message));
+        send(500, { ok: false, error: { code: "UPSTREAM", message: String((e && e.message) || e) }, brain: null });
       }
     });
 
@@ -7445,55 +7512,72 @@ end tell`;
     } catch {} res.writeHead(200); res.end("ok"); });
 
   } else if (req.method === "POST" && req.url === "/workflows/analyze") {
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only — copilot jobs are the owner's"); }
     // The Director reads the human-language workflow and returns a plan (which
     // skills/tools/agents/permissions it needs). P1: plan only, never auto-runs.
-    readBody(req, (body) => { try {
-      const w = JSON.parse(body || "{}");
-      queueDirectorTurn((release) => {
-        runClaude("main", WORKFLOW_ANALYZE_PROMPT + "\n\n" + workflowToText(w), {
-          logPrompt: "🔀 Analysing workflow: " + (w.name || ""),
-          onDone: (out, ok) => {
-            release();
-            res.writeHead(200, { "content-type": "application/json" });
-            res.end(JSON.stringify({ ok: !!ok, analysis: ok && out ? out : "Analysis failed — try again" }));
-          },
-        });
-      });
-    } catch (e) { res.writeHead(400); res.end(String(e.message)); } });
+    // One-shot Shino copilot call (no longer a queued Director turn) with the office
+    // context in the prompt, so the plan names REAL agents, skills and tools.
+    // → { ok, analysis, brain }; failure → 502 { ok:false, error, brain, analysis:<Thai reason> }.
+    readBody(req, async (body) => {
+      const send = (code, o) => { try { res.writeHead(code, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(o)); } catch {} };
+      let w, prompt;
+      try {
+        w = JSON.parse(body || "{}");
+        if (!w || typeof w !== "object" || Array.isArray(w)) throw new Error("bad workflow");
+        prompt = WORKFLOW_ANALYZE_PROMPT + "\n" +
+          "When you name an agent / skill / tool, use ONLY the real ids from the OFFICE CONTEXT below — if nothing fits yet, propose a new one (name + what it does)\n\n" +
+          shinoCopilot.officeContext(reg, { tools: Object.keys(BUILTIN_TOOLS) }) + "\n\n" + workflowToText(w);
+      } catch (e) { res.writeHead(400); return res.end(String(e.message)); }
+      try {
+        const r = await shinoCopilot.run({ job: "workflow-analyze", prompt, maxTokens: 4096, timeoutMs: 240000, localTimeoutMs: 360000,
+          track: { title: "🔍 copilot · analyze workflow — " + String(w.name || "").replace(/\s+/g, " ").slice(0, 40) } });
+        if (r.ok && r.text) return send(200, { ok: true, analysis: r.text, brain: r.brain });
+        const error = r.error || { code: "EMPTY", message: "analysis failed" };
+        send(502, { ok: false, analysis: "Analysis failed — " + error.message, error, brain: r.brain });
+      } catch (e) {
+        send(500, { ok: false, analysis: "Analysis failed — try again", error: { code: "UPSTREAM", message: String((e && e.message) || e) }, brain: null });
+      }
+    });
 
   } else if (req.method === "POST" && req.url === "/workflows/draft") {
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only — copilot jobs are the owner's"); }
     // 🪄 Director drafts a workflow from a plain-language goal → returns Builder nodes
-    // the owner can edit. (Approach C — the reverse of analyze.)
-    readBody(req, (body) => { try {
-      const goal = String(JSON.parse(body || "{}").goal || "").slice(0, 800);
+    // the owner can edit. (Approach C — the reverse of analyze.) One-shot Shino copilot
+    // call on the owner's copilot brain — no longer a queued Director turn.
+    // → { ok, workflow, brain }; failure → 502 { ok:false, workflow:null, error, brain }.
+    readBody(req, async (body) => {
+      const send = (code, o) => { try { res.writeHead(code, { "content-type": "application/json; charset=utf-8" }); res.end(JSON.stringify(o)); } catch {} };
+      let goal;
+      try { goal = String((JSON.parse(body || "{}") || {}).goal || "").slice(0, 800); }
+      catch (e) { res.writeHead(400); return res.end(String(e.message)); }
       if (!goal.trim()) { res.writeHead(400); return res.end('{"ok":false}'); }
-      queueDirectorTurn((release) => {
-        runClaude("main",
+      try {
+        const r = await shinoCopilot.run({ job: "workflow-draft", json: true, maxTokens: 4096, timeoutMs: 150000, localTimeoutMs: 300000,
+          track: { title: "🪄 copilot · draft workflow — " + goal.replace(/\s+/g, " ").slice(0, 40) },
+          prompt:
           `Draft a workflow for this goal:\n"""${goal}"""\n\n` +
           `Reply with ONLY a JSON object, no prose: ` +
           `{"name":"<short title>","steps":["<step 1>","<step 2>", ...]}. ` +
-          `3–8 short imperative steps in order, in the language of the goal.`,
-          { noSub: true, logPrompt: "🪄 Drafting workflow: " + goal.slice(0, 40),
-            onDone: (out, ok) => {
-              release();
-              let wf = null;
-              try {
-                const m = String(out || "").match(/\{[\s\S]*\}/);
-                const j = m ? JSON.parse(m[0]) : null;
-                if (j && Array.isArray(j.steps) && j.steps.length)
-                  wf = buildWorkflowFromSteps(j.name || goal.slice(0, 40), j.steps);
-              } catch {}
-              // Fallback: treat non-empty reply lines as steps so we never come back empty.
-              if (!wf && ok && out) {
-                const lines = String(out).split("\n").map((l) => l.replace(/^\s*(?:\d+[.)]|[-*•])\s*/, "").trim()).filter(Boolean);
-                if (lines.length) wf = buildWorkflowFromSteps(goal.slice(0, 40), lines.slice(0, 8));
-              }
-              res.writeHead(200, { "content-type": "application/json" });
-              res.end(JSON.stringify({ ok: !!wf, workflow: wf }));
-            },
-          });
-      });
-    } catch (e) { res.writeHead(400); res.end(String(e.message)); } });
+          `3–8 short imperative steps in order, in the language of the goal.` });
+        let wf = null;
+        const j = r.ok ? r.json : null;
+        const steps = Array.isArray(j) ? j : j && Array.isArray(j.steps) ? j.steps : [];
+        const clean = steps.map((x) => (typeof x === "string" ? x
+          : x && typeof x === "object" ? String(x.text || x.step || x.title || x.name || x.action || "") : String(x == null ? "" : x)))
+          .filter((x) => x.trim());
+        if (clean.length) wf = buildWorkflowFromSteps((j && !Array.isArray(j) && j.name) || goal.slice(0, 40), clean);
+        // Fallback: treat non-empty reply lines as steps so we never come back empty.
+        if (!wf && r.text && (r.ok || (r.error && r.error.code === "BAD_JSON"))) {
+          const lines = String(r.text).split("\n").map((l) => l.replace(/^\s*(?:\d+[.)]|[-*•])\s*/, "").trim())
+            .filter((l) => l && !/^[\s[\]{}",:`]*$/.test(l));
+          if (lines.length) wf = buildWorkflowFromSteps(goal.slice(0, 40), lines.slice(0, 8));
+        }
+        if (wf) return send(200, { ok: true, workflow: wf, brain: r.brain });
+        send(502, { ok: false, workflow: null, error: r.error || { code: "EMPTY", message: "draft failed" }, brain: r.brain });
+      } catch (e) {
+        send(500, { ok: false, workflow: null, error: { code: "UPSTREAM", message: String((e && e.message) || e) }, brain: null });
+      }
+    });
 
   } else if (req.method === "POST" && req.url === "/workflows/run") {
     // Run it NOW through the engine: each node executes on its own, in parallel
@@ -8075,19 +8159,35 @@ end tell`;
       } catch { res.writeHead(400); res.end("bad json"); }
     });
 
+  } else if (req.method === "GET" && req.url === "/registry/local-status") {
+    // 🛟 Are the in-machine brains (Ollama :11434 / LM Studio :1234, or
+    // providerConfig[id].baseUrl) up right now, and which models do they serve? Parallel
+    // GET <base>/models probes, 1.5 s timeout, cached 3 s. Read-only (the fallback-brain
+    // picker shows ● running / ○ not running and offers the live model ids).
+    fallbackBrain.localStatus(reg).then((out) => {
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify(out));
+    }).catch((e) => {
+      try { res.writeHead(500); res.end(String((e && e.message) || e)); } catch {}
+    });
+
   } else if (req.method === "POST" && req.url === "/registry/fallback") {
     // OPT-IN office-wide emergency fallback brain: which backend a sustainedly-overloaded
-    // agent is re-run on. Empty / "none" clears it (feature off). Only a known builtin or a
+    // agent is re-run on. Empty / "none" clears it (feature off). Only a known builtin, a
+    // local id (ollama / lmstudio) or a
     // configured custom provider is accepted — so a typo can't silently disable failover.
+    // Owner-only: it picks a brain AND a model id that ends up on the agent's command line.
+    if (!req.headers["x-bagidea-ui"]) { res.writeHead(403); return res.end("human UI only"); }
     readBody(req, (body) => {
       try {
         const b = JSON.parse(body);
         const p = String(b.provider || "").trim();
         if (!p || p === "none") { reg.fallbackProvider = ""; reg.fallbackModel = ""; }
         else {
-          if (!providers.PROVIDERS[p] && !((reg.providerConfig || {})[p])) throw new Error("unknown provider");
+          if (!fallbackBrain.validFallbackProvider(p, reg, providers.PROVIDERS)) throw new Error("unknown provider");
+          const model = fallbackBrain.cleanFallbackModel(b.model);
           reg.fallbackProvider = p;
-          reg.fallbackModel = String(b.model || "").slice(0, 60);
+          reg.fallbackModel = model;
         }
         saveReg();
         res.writeHead(200); res.end("ok");

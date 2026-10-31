@@ -116,7 +116,8 @@
   <div id="bar">
     <input id="name" placeholder="ชื่อ workflow…" data-ph="ชื่อ workflow…" value="Workflow ใหม่">
     <button onclick="newTab()" data-i18n="🆕 ใหม่">🆕 ใหม่</button>
-    <button onclick="draftWf()" data-i18n="🪄 ร่างด้วย Director">🪄 ร่างด้วย Director</button>
+    <button id="draftBtn" onclick="draftWf()">🪄 ให้ Director ร่าง</button>
+    <div id="cpBarPick" class="cp-pick" style="flex:2 1 0;min-width:240px;max-width:460px"></div>
     <button onclick="addNode()">＋ Node</button>
     <select id="wfopen" onchange="if(this.value){openTab(this.value);this.value='';}"><option value="">📂 เปิด…</option></select>
     <span class="grow"></span>
@@ -136,9 +137,10 @@
       <div id="tip" data-i18n="ลากพื้นที่ว่าง = เลื่อน · ล้อเมาส์ = ซูม · ลากจากจุดล่าง (●) ของ node ไปจุดบนของอีก node = เชื่อม · แตกหลายเส้น = ทำขนาน · หลายเส้นเข้า node เดียว = รอให้ครบก่อน · คลิกเส้นเพื่อลบ">ลากพื้นที่ว่าง = เลื่อน · ล้อเมาส์ = ซูม · ลากจากจุดล่าง (●) ของ node ไปจุดบนของอีก node = เชื่อม · แตกหลายเส้น = ทำขนาน · หลายเส้นเข้า node เดียว = รอให้ครบก่อน · คลิกเส้นเพื่อลบ</div>
     </div>
     <div id="side">
-      <h3 data-i18n="🤖 แผนจาก Director">🤖 แผนจาก Director</h3>
+      <h3 id="planTitle">🤖 แผนจาก Director</h3>
+      <div id="cpPlanPick" class="cp-pick" style="flex:none"></div>
       <div id="robadge" data-i18h="📄 นี่คือ <b>ตัวอย่าง</b> (อ่านอย่างเดียว) — กด 💾 บันทึก เพื่อทำสำเนาที่แก้ไขได้">📄 นี่คือ <b>ตัวอย่าง</b> (อ่านอย่างเดียว) — กด 💾 บันทึก เพื่อทำสำเนาที่แก้ไขได้</div>
-      <div class="muted" data-i18h="กด “วิเคราะห์” แล้ว Director จะอ่าน workflow (รวมการแตกแขนง/รวม) แล้วบอกว่าต้องใช้ skill/tool/permission อะไร และมอบหมายให้ใคร">กด “วิเคราะห์” แล้ว Director จะอ่าน workflow (รวมการแตกแขนง/รวม) แล้วบอกว่าต้องใช้ skill/tool/permission อะไร และมอบหมายให้ใคร</div>
+      <div class="muted" id="planHint"></div>
       <div id="plan" data-i18n="— ยังไม่มีการวิเคราะห์ —">— ยังไม่มีการวิเคราะห์ —</div>
       <div class="acts">
         <button onclick="runWf()" data-i18n="▶️ รันเลย">▶️ รันเลย</button>
@@ -162,6 +164,7 @@
   </div>
 <script src="/winlang.js"></script>
 <script src="/md.js"></script>
+<script src="/copilot-ui.js"></script>
 <script>
   // ---- i18n: Thai is the source. English offices use the TR map; OTHER
   //      languages auto-translate via the daemon (/i18n, shared with the main
@@ -171,13 +174,13 @@
     "Workflow ใหม่":"New workflow", "ชื่อ workflow…":"Workflow name…",
     "🆕 ใหม่":"🆕 New","＋ Node":"＋ Node","🗑 ลบ":"🗑 Delete","💾 บันทึก":"💾 Save","🔍 วิเคราะห์":"🔍 Analyze",
     "⤢ พอดี":"⤢ Fit","▶️ รันเลย":"▶️ Run now","🧠 สร้างเป็น Skill":"🧠 Save as Skill",
-    "🤖 แผนจาก Director":"🤖 Director's plan","— ยังไม่มีการวิเคราะห์ —":"— no analysis yet —",
+    "🤖 แผนจาก {name}":"🤖 The {name}'s plan","— ยังไม่มีการวิเคราะห์ —":"— no analysis yet —",
     "⚡ เริ่มเมื่อ":"⚡ Trigger","⬇ ดึงข้อมูล":"⬇ Fetch","⚙ ทำงาน":"⚙ Action","◆ ตัดสินใจ":"◆ Decision","📤 ส่งผล":"📤 Output","📝 โน้ต":"📝 Note",
     "✋ รออนุมัติ":"✋ Approval","🔔 แจ้งเตือน":"🔔 Notify","⏳ หน่วงเวลา":"⏳ Delay",
     "เริ่มเมื่อ… (trigger ตั้งที่แถบขวา ⚡)":"Starts when… (set triggers in the ⚡ panel)",
     "URL ที่จะดึง เช่น https://api.example.com/items":"URL to fetch, e.g. https://api.example.com/items",
     "สิ่งที่อยากให้ทำ · ขึ้นต้น @ชื่อagent: เพื่อเจาะจงคน · ใช้ {{prev}} {{trigger.data.x}} ได้":"What to do · start with @agent: to pick who · {{prev}} and {{trigger.data.x}} work here",
-    "เงื่อนไข เช่น {{n2.output.status}} == 200 หรือคำถาม ให้ Director ตอบ YES/NO":"A condition like {{n2.output.status}} == 200, or a question the Director answers YES/NO",
+    "เงื่อนไข เช่น {{n2.output.status}} == 200 หรือคำถาม ให้ {name} ตอบ YES/NO":"A condition like {{n2.output.status}} == 200, or a question the {name} answers YES/NO",
     "คำถามที่ให้คุณกดอนุมัติก่อนไปต่อ (ไปโผล่ที่ 📥 APPROVALS และมือถือ)":"What you must approve before it continues (lands in 📥 APPROVALS and on your phone)",
     "ข้อความแจ้งเตือน (ผ่านกฎ 🔔 NOTIFY) · ใช้ {{prev}} ได้":"Notification text (through your 🔔 NOTIFY rules) · {{prev}} works",
     "10m · 2h · 30s · until 09:00":"10m · 2h · 30s · until 09:00",
@@ -199,20 +202,21 @@
       "Drag empty space = pan · wheel = zoom · drag a node's bottom dot (●) onto another's top = connect · many arrows out = parallel · many arrows in = wait for all · click an edge to delete",
     "📄 นี่คือ <b>ตัวอย่าง</b> (อ่านอย่างเดียว) — กด 💾 บันทึก เพื่อทำสำเนาที่แก้ไขได้":
       "📄 This is an <b>example</b> (read-only) — press 💾 Save to make an editable copy",
-    "กด “วิเคราะห์” แล้ว Director จะอ่าน workflow (รวมการแตกแขนง/รวม) แล้วบอกว่าต้องใช้ skill/tool/permission อะไร และมอบหมายให้ใคร":
-      "Press “Analyze” and the Director reads the workflow (branches & merges) and tells you which skills/tools/permissions it needs and who to assign.",
+    "กด “วิเคราะห์” แล้ว {name} จะอ่าน workflow (รวมการแตกแขนง/รวม) แล้วบอกว่าต้องใช้ skill/tool/permission อะไร และมอบหมายให้ใคร":
+      "Press “Analyze” and the {name} reads the workflow (branches & merges) and tells you which skills/tools/permissions it needs and who to assign.",
     "“<b>รันเลย</b>” = ให้ทีมทำตาม workflow นี้เดี๋ยวนี้ แล้วรายงานผล · “<b>สร้างเป็น Skill</b>” = บันทึกเป็นสกิลที่นำไปติ๊กให้ agent ในหน้าตั้งค่า เพื่อเรียกใช้ซ้ำเมื่อไหร่ก็ได้ (หรือพิมพ์สั่ง agent ให้ “รัน <ชื่อ workflow>”)":
       "“<b>Run now</b>” = the team does this workflow now and reports back · “<b>Save as Skill</b>” = save it as a skill you assign to an agent in Settings and reuse anytime (or just tell an agent to “run &lt;workflow name&gt;”).",
-    "เพิ่ม node ก่อนนะ":"Add a node first","⏳ Director กำลังวิเคราะห์…":"⏳ Director is analyzing…",
+    "เพิ่ม node ก่อนนะ":"Add a node first","⏳ {name} กำลังวิเคราะห์…":"⏳ The {name} is analyzing…",
     "วิเคราะห์ไม่สำเร็จ ลองใหม่":"Analysis failed — try again","⏳ ทีมกำลังทำงานตาม workflow…":"⏳ The team is running the workflow…",
     "รันไม่สำเร็จ ลองใหม่":"Run failed — try again","💾 บันทึกแล้ว":"💾 Saved","💾 บันทึกเป็นสำเนาแล้ว":"💾 Saved as a copy","บันทึกไม่สำเร็จ":"Save failed","✅ ผลลัพธ์:":"✅ Result:",
     "สร้าง skill ไม่สำเร็จ":"Couldn't create skill","ลบ workflow นี้?":"Delete this workflow?","(ไม่มีชื่อ)":"(untitled)",
     "บันทึกทับ workflow เดิมตัวนี้? กด ตกลง เพื่อเขียนทับของเดิม":"Overwrite this saved workflow? Click OK to replace the existing version.",
     "ตกลง":"OK","ยกเลิก":"Cancel",
-    "🪄 ร่างด้วย Director":"🪄 Draft with Director",
-    "อยากได้ workflow ทำอะไร? พิมพ์เป้าหมายสั้นๆ — Director จะร่างให้":"What should the workflow do? Type a short goal — the Director will draft it.",
+    "🪄 ให้ {name} ร่าง":"🪄 Let the {name} draft","⏳ {name} กำลังร่าง…":"⏳ The {name} is drafting…",
+    "อยากได้ workflow ทำอะไร? พิมพ์เป้าหมายสั้นๆ — {name} จะร่างให้":"What should the workflow do? Type a short goal — the {name} will draft it.",
     "เช่น สรุปข่าว AI ทุกเช้าแล้วส่งเข้า Telegram":"e.g. summarize AI news every morning and send to Telegram",
-    "🪄 Director กำลังร่าง workflow…":"🪄 The Director is drafting a workflow…",
+    "🪄 {name} กำลังร่าง workflow…":"🪄 The {name} is drafting a workflow…",
+    "ร่างไม่สำเร็จ":"Draft failed","วิเคราะห์ไม่สำเร็จ":"Analysis failed","ร่างโดย {brain}":"Drafted by {brain}","วิเคราะห์โดย {brain}":"Analyzed by {brain}",
     "ร่างไม่สำเร็จ ลองใหม่":"Draft failed — try again","✅ ร่างเสร็จ — แก้ไขแล้วกด 💾 บันทึก":"✅ Drafted — edit it, then press 💾 Save",
     "📂 เปิด…":"📂 Open…","ตัวอย่าง (อ่านอย่างเดียว)":"Examples (read-only)","ของฉัน":"Mine",
     "เมื่อสั่งให้เริ่ม…":"When started…","เมื่อสั่งให้เริ่ม":"When started","หาข่าว A":"Find news A","หาข่าว B":"Find news B","รวมแล้วเขียนสรุป":"Merge & summarize",
@@ -230,7 +234,8 @@
     document.querySelectorAll("[data-i18h]").forEach(e=>{ const v=tr(e.getAttribute("data-i18h")); if(v!=null) e.innerHTML=v; });
     document.querySelectorAll("[data-ph]").forEach(e=>{ const v=tr(e.getAttribute("data-ph")); if(v!=null) e.placeholder=v; });
   }
-  function rerenderAll(){ applyLang(); renderTabs(); if(active>=0){ clearCanvas(); nodes.forEach(renderNode); drawEdges(); } }
+  function rerenderAll(){ applyLang(); renderTabs(); if(active>=0){ clearCanvas(); nodes.forEach(renderNode); drawEdges(); }
+    paintDirector(); if (window.ShinoCopilot) ShinoCopilot.relabel(); }
   fetch("/registry").then(r=>r.json()).then(async reg=>{
     const lang = reg.lang || "th";
     if (lang === "th") return;
@@ -246,10 +251,12 @@
   // What each type expects in its text box — shown as the placeholder.
   const HINTS = { trigger:"เริ่มเมื่อ… (trigger ตั้งที่แถบขวา ⚡)", fetch:"URL ที่จะดึง เช่น https://api.example.com/items",
     action:"สิ่งที่อยากให้ทำ · ขึ้นต้น @ชื่อagent: เพื่อเจาะจงคน · ใช้ {{prev}} {{trigger.data.x}} ได้",
-    decision:"เงื่อนไข เช่น {{n2.output.status}} == 200 หรือคำถาม ให้ Director ตอบ YES/NO",
+    decision:"เงื่อนไข เช่น {{n2.output.status}} == 200 หรือคำถาม ให้ {name} ตอบ YES/NO",
     approval:"คำถามที่ให้คุณกดอนุมัติก่อนไปต่อ (ไปโผล่ที่ 📥 APPROVALS และมือถือ)",
     notify:"ข้อความแจ้งเตือน (ผ่านกฎ 🔔 NOTIFY) · ใช้ {{prev}} ได้", delay:"10m · 2h · 30s · until 09:00",
     output:"ผลลัพธ์ · file:C:/path/out.md เขียนไฟล์ · channel: ส่งไปมือถือ", note:"โน้ตบนผืนผ้าใบ (ไม่รัน)" };
+  // A node type's placeholder; "{name}" (the decision hint) becomes the role word "Director".
+  function nodeHint(type){ const s = HINTS[type] || "พิมพ์สิ่งที่อยากให้ทำ…"; return s.indexOf("{name}") >= 0 ? trn(s) : tr(s); }
   // Node types the office and plugins registered (🧑‍💻 Codex, a plugin's own) join the palette.
   fetch("/workflows/types").then(r=>r.json()).then(j => {
     for (const t of (j.types||[])) {
@@ -338,9 +345,9 @@
     const opts = TYPES.map(([v,l]) => `<option value="${v}"${v===n.type?" selected":""}>${tr(l)}</option>`).join("");
     el.innerHTML = `<div class="port in"></div>` +
       `<div class="head"><select>${opts}</select><span class="x">✕</span></div>` +
-      `<textarea placeholder="${tr(HINTS[n.type] || "พิมพ์สิ่งที่อยากให้ทำ…")}">${esc(n.text||"")}</textarea>` +
+      `<textarea placeholder="${esc(nodeHint(n.type))}">${esc(n.text||"")}</textarea>` +
       `<div class="port out"></div>`;
-    el.querySelector("select").onchange = (e) => { n.type = e.target.value; el.querySelector("textarea").placeholder = tr(HINTS[n.type] || "พิมพ์สิ่งที่อยากให้ทำ…"); };
+    el.querySelector("select").onchange = (e) => { n.type = e.target.value; el.querySelector("textarea").placeholder = nodeHint(n.type); };
     el.querySelector("textarea").oninput = (e) => { n.text = e.target.value; drawEdges(); };
     el.querySelector(".x").onclick = (e) => { e.stopPropagation(); removeNode(n.id); };
     dragNode(el, n);
@@ -447,21 +454,62 @@
       document.body.appendChild(wrap); inp.focus();
     });
   }
+  // 🧠 Director copilot (daemon/copilot-ui.js · SPEC2 C6): 🪄 draft and 🔍 analyze are one-shot jobs
+  // of the Director (its real name from /copilot/settings) with the brain picked in the toolbar or
+  // the plan panel — both pickers stay in sync with each other and with the overlay's.
+  let drafting = false, analyzing = false;
+  // Every copilot label names the ROLE, "Director" — never the Director's own name, which the owner
+  // can change (owner's request, 2026-09-29).
+  function dirName(){ return window.ShinoCopilot && typeof ShinoCopilot.roleName === "function" ? ShinoCopilot.roleName() : "Director"; }
+  // tr() with the role word in "{name}" (a translation that lost the slot → the English copy)
+  function trn(s){ let o = tr(s); if (o.indexOf("{name}") < 0) o = TR[s] || s; return o.split("{name}").join(dirName()); }
+  function paintDirector(){
+    const b = document.getElementById("draftBtn"); if (b && !drafting) b.textContent = trn("🪄 ให้ {name} ร่าง");
+    const h = document.getElementById("planTitle"); if (h) h.textContent = trn("🤖 แผนจาก {name}");
+    const p = document.getElementById("planHint"); if (p) p.textContent = trn("กด “วิเคราะห์” แล้ว {name} จะอ่าน workflow (รวมการแตกแขนง/รวม) แล้วบอกว่าต้องใช้ skill/tool/permission อะไร และมอบหมายให้ใคร");
+    for (const el of world.querySelectorAll(".node")) {          // the decision placeholder says Director too
+      const n = nodes.find((x) => x.id === el.dataset.id), ta = el.querySelector("textarea");
+      if (n && ta) ta.placeholder = nodeHint(n.type);
+    }
+  }
+  if (window.ShinoCopilot) {
+    ShinoCopilot.mountPicker(document.getElementById("cpBarPick"), { compact: true, inline: true });
+    ShinoCopilot.mountPicker(document.getElementById("cpPlanPick"), { compact: true });
+    ShinoCopilot.onChange(paintDirector);
+  }
+  paintDirector();
+  // POST a copilot job → { ok, data, brain, error } (x-bagidea-ui; 502 JSON errors come back readable)
+  function copilotPost(url, body){
+    if (window.ShinoCopilot) return ShinoCopilot.request(url, body);
+    return fetch(url, { method:"POST", headers:{ "content-type":"application/json", "x-bagidea-ui":"1" }, body:JSON.stringify(body) })
+      .then(r=>r.json().then(j=>({ ok: r.ok && !!j && j.ok!==false, data:j, brain:j&&j.brain, error:j&&j.error })))
+      .catch(e=>({ ok:false, error:{ code:"OFFLINE", message:String((e&&e.message)||e) } }));
+  }
+  // the result / error line under the plan text: which brain answered, or what went wrong
+  function copilotNote(plan, o, fallback){
+    const el = document.createElement("div"); plan.appendChild(el);
+    if (window.ShinoCopilot) ShinoCopilot.notice(el, o); else if (o.error) el.textContent = tr(fallback);
+  }
   // 🪄 Approach C: describe a goal → the Director drafts a workflow → opens as a new
   // editable tab (the reverse of Analyze). Save makes it your own workflow.
   async function draftWf(){
-    const goal = await askPrompt(tr("อยากได้ workflow ทำอะไร? พิมพ์เป้าหมายสั้นๆ — Director จะร่างให้"),
+    if (drafting) return;
+    const goal = await askPrompt(trn("อยากได้ workflow ทำอะไร? พิมพ์เป้าหมายสั้นๆ — {name} จะร่างให้"),
       tr("เช่น สรุปข่าว AI ทุกเช้าแล้วส่งเข้า Telegram"));
     if(!goal) return;
-    const plan=document.getElementById("plan"); plan.textContent=tr("🪄 Director กำลังร่าง workflow…");
-    fetch("/workflows/draft",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({goal})})
-      .then(r=>r.json()).then(j=>{
-        if(!j.ok||!j.workflow){ plan.textContent=tr("ร่างไม่สำเร็จ ลองใหม่"); return; }
-        const w=j.workflow; stash();
-        tabs.push({ id:"", name:w.name||tr("Workflow ใหม่"), example:false, nodes:w.nodes||[], edges:w.edges||[], pan:{x:60,y:40}, zoom:1 });
-        activate(tabs.length-1); fitView();
-        plan.textContent=tr("✅ ร่างเสร็จ — แก้ไขแล้วกด 💾 บันทึก");
-      }).catch(()=>{ plan.textContent=tr("ร่างไม่สำเร็จ ลองใหม่"); });
+    const plan=document.getElementById("plan"), btn=document.getElementById("draftBtn");
+    drafting=true; btn.disabled=true; btn.textContent=trn("⏳ {name} กำลังร่าง…");
+    plan.textContent=trn("🪄 {name} กำลังร่าง workflow…");
+    try {
+      const r = await copilotPost("/workflows/draft", { goal });
+      const w = r.ok && r.data && r.data.workflow;
+      if(!w){ plan.textContent=""; copilotNote(plan, { title:"ร่างไม่สำเร็จ", error:r.error||{ code:"EMPTY" }, brain:r.brain }, "ร่างไม่สำเร็จ ลองใหม่"); return; }
+      stash();
+      tabs.push({ id:"", name:w.name||tr("Workflow ใหม่"), example:false, nodes:w.nodes||[], edges:w.edges||[], pan:{x:60,y:40}, zoom:1 });
+      activate(tabs.length-1); fitView();
+      plan.textContent=tr("✅ ร่างเสร็จ — แก้ไขแล้วกด 💾 บันทึก");
+      copilotNote(plan, { brain:r.brain, done:"ร่างโดย {brain}" });
+    } finally { drafting=false; btn.disabled=false; paintDirector(); }
   }
   async function saveWf() {
     // Overwriting your own saved workflow is destructive — confirm first. (Examples
@@ -486,12 +534,18 @@
     fetch("/workflows/delete", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({ id: curId }) })
       .then(()=>{ try{localStorage.removeItem("lastWf")}catch{}; closeTab(active); loadList(); });
   }
-  function analyze() {
+  async function analyze() {
     if (!nodes.length) return flash("เพิ่ม node ก่อนนะ");
-    const plan = document.getElementById("plan"); plan.textContent = tr("⏳ Director กำลังวิเคราะห์…");
-    fetch("/workflows/analyze", { method:"POST", headers:{"content-type":"application/json"},
-      body: JSON.stringify({ name: nameInp.value, nodes, edges }) })
-      .then(r=>r.json()).then(j=>{ plan.innerHTML = md(j.analysis || "—"); }).catch(()=>{ plan.textContent=tr("วิเคราะห์ไม่สำเร็จ ลองใหม่"); });
+    if (analyzing) return;
+    const plan = document.getElementById("plan"); plan.textContent = trn("⏳ {name} กำลังวิเคราะห์…");
+    analyzing = true;
+    try {
+      const r = await copilotPost("/workflows/analyze", { name: nameInp.value, nodes, edges });
+      const a = r.ok && r.data && r.data.analysis;
+      if (!a) { plan.textContent = ""; copilotNote(plan, { title:"วิเคราะห์ไม่สำเร็จ", error:r.error||{ code:"EMPTY" }, brain:r.brain }, "วิเคราะห์ไม่สำเร็จ ลองใหม่"); return; }
+      plan.innerHTML = md(String(a));
+      copilotNote(plan, { brain:r.brain, done:"วิเคราะห์โดย {brain}" });
+    } finally { analyzing = false; }
   }
   // ===== v1.3: the engine =====
   const UI = { "content-type":"application/json", "x-bagidea-ui":"1" };
