@@ -68,7 +68,14 @@ early macOS support, when the project was Windows-only:
   tool call**: the proxy now folds Claude Code's `role: system` reminders into the adjacent
   user turn, so strict chat templates on LM Studio / llama.cpp / Ollama / vLLM stop answering
   500 after a tool call ([#56](https://github.com/bagidea/bagidea-office/pull/56), v1.6.3) —
-  plus the 92-commit `dev` sync ([#55](https://github.com/bagidea/bagidea-office/pull/55)).
+  plus the 92-commit `dev` sync ([#55](https://github.com/bagidea/bagidea-office/pull/55)),
+  the local-model reliability work (LM Studio slot queue, aligned timeouts, real state-dir
+  isolation for the tests — [#63](https://github.com/bagidea/bagidea-office/pull/63), v1.8.0),
+  and the **‹ › Edit Agent walk-through, the Director copilot on any brain, the 🐞 report
+  button, and the HIRE A TEAM / fallback-picker fixes** ([#68](https://github.com/bagidea/bagidea-office/pull/68), v1.10.0).
+- **[@yaka0007](https://github.com/yaka0007)** (YAKA) — **Mnemosyne OS** on the Tools Hub's
+  *Thinking & memory* shelf: local vaults with vector + keyword recall, verified package,
+  all 12 overlay languages supplied ([#69](https://github.com/bagidea/bagidea-office/pull/69), v1.10.0).
 
 > Want to be on this list? Open a PR — see [docs/guide/plugin-hub.md](docs/guide/plugin-hub.md)
 > for plugins, or fix anything in the repo. Every merged contribution is credited here

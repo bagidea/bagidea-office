@@ -4,7 +4,7 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
-## [Unreleased] — 🧭 Agents you can walk through, and a Director that thinks on any brain
+## [1.10.0] — 🧭 Agents you can walk through, and a Director that thinks on any brain
 
 **Added**
 - **‹ › Walk the team inside Edit Agent.** Arrows on both sides of the panel (and Alt+←/→) open the next or
@@ -23,6 +23,10 @@ in-app 🔄 update banner. Versions follow [semver](https://semver.org).
   the failed step, and the tail of `daemon.log`. Tokens, keys, user names and the machine name are redacted
   first. It opens a prefilled GitHub issue; nothing is sent until you press Submit. A full copy is kept in
   `daemon/reports/` (gitignored).
+- **🏛️ Mnemosyne OS on the Tools Hub.** A local-memory MCP server on the *Thinking & memory* shelf:
+  each declared folder is a vault the agent recalls from with vector + keyword search. Package, repository
+  and maintainer verified; all 12 overlay languages supplied. The catalog is 54 entries / 30 MCP servers.
+  By [@yaka0007](https://github.com/yaka0007) in [#69](https://github.com/bagidea/bagidea-office/pull/69).
 
 **Fixed**
 - **👥 HIRE A TEAM did nothing.** `askConfirm` was missing from the overlay, so the button (and deleting a
