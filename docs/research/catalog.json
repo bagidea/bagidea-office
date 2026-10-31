@@ -1,0 +1,4779 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "url": "https://github.com/f2dac/awesome-opensource-ai/blob/main/README.md",
+    "rawUrl": "https://raw.githubusercontent.com/f2dac/awesome-opensource-ai/b655d7e800736f88020aa36ce6198329be0b4519/README.md",
+    "commitSha": "b655d7e800736f88020aa36ce6198329be0b4519",
+    "commitStatus": "verified",
+    "commitCheckedAt": "2026-09-28T05:01:37.424Z",
+    "commitDate": "2026-04-29T06:18:07Z",
+    "contentSha256": "c24f7d6282868f70a8bca551968c1be2d314bd1f2a321fd0e1d555b1a0fe47b1",
+    "declaredUpdate": "April 29, 2026"
+  },
+  "checkedAt": "2026-09-28T05:01:37.814Z",
+  "entries": [
+    {
+      "name": "PyTorch",
+      "url": "https://github.com/pytorch/pytorch",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "TensorFlow",
+      "url": "https://github.com/tensorflow/tensorflow",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "JAX",
+      "url": "https://github.com/jax-ml/jax",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "Flax",
+      "url": "https://github.com/google/flax",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "dm-haiku",
+      "url": "https://github.com/google-deepmind/dm-haiku",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "Equinox",
+      "url": "https://github.com/patrick-kidger/equinox",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "Diffrax",
+      "url": "https://github.com/patrick-kidger/diffrax",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "vit-pytorch",
+      "url": "https://github.com/lucidrains/vit-pytorch",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "NumPyro",
+      "url": "https://github.com/pyro-ppl/numpyro",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "Keras",
+      "url": "https://github.com/keras-team/keras",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "tinygrad",
+      "url": "https://github.com/tinygrad/tinygrad",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "PaddlePaddle",
+      "url": "https://github.com/PaddlePaddle/Paddle",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "PyTorch Geometric",
+      "url": "https://github.com/pyg-team/pytorch_geometric",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "timm (PyTorch Image Models)",
+      "url": "https://github.com/huggingface/pytorch-image-models",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "Triton",
+      "url": "https://github.com/triton-lang/triton",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "GGML",
+      "url": "https://github.com/ggml-org/ggml",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "MLX",
+      "url": "https://github.com/ml-explore/mlx",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Deep Learning Frameworks"
+    },
+    {
+      "name": "oneDNN",
+      "url": "https://github.com/uxlfoundation/oneDNN",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "High-Performance Compute Libraries"
+    },
+    {
+      "name": "ONNX",
+      "url": "https://github.com/onnx/onnx",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "High-Performance Compute Libraries"
+    },
+    {
+      "name": "IREE",
+      "url": "https://github.com/iree-org/iree",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "High-Performance Compute Libraries"
+    },
+    {
+      "name": "Burn",
+      "url": "https://github.com/tracel-ai/burn",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Rust ML Frameworks"
+    },
+    {
+      "name": "Candle (Hugging Face)",
+      "url": "https://github.com/huggingface/candle",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Rust ML Frameworks"
+    },
+    {
+      "name": "linfa",
+      "url": "https://github.com/rust-ml/linfa",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Rust ML Frameworks"
+    },
+    {
+      "name": "Flux.jl",
+      "url": "https://github.com/FluxML/Flux.jl",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Julia ML Frameworks"
+    },
+    {
+      "name": "MLJ.jl",
+      "url": "https://github.com/JuliaAI/MLJ.jl",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Julia ML Frameworks"
+    },
+    {
+      "name": "ModelingToolkit.jl",
+      "url": "https://github.com/SciML/ModelingToolkit.jl",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Julia ML Frameworks"
+    },
+    {
+      "name": "spaCy (Explosion AI)",
+      "url": "https://github.com/explosion/spaCy",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "NLP & Transformers"
+    },
+    {
+      "name": "Transformers (Hugging Face)",
+      "url": "https://github.com/huggingface/transformers",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "NLP & Transformers"
+    },
+    {
+      "name": "sentence-transformers",
+      "url": "https://github.com/UKPLab/sentence-transformers",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "NLP & Transformers"
+    },
+    {
+      "name": "tokenizers (Hugging Face)",
+      "url": "https://github.com/huggingface/tokenizers",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "NLP & Transformers"
+    },
+    {
+      "name": "fairseq2",
+      "url": "https://github.com/facebookresearch/fairseq2",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "NLP & Transformers"
+    },
+    {
+      "name": "Pandas",
+      "url": "https://github.com/pandas-dev/pandas",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Polars",
+      "url": "https://github.com/pola-rs/polars",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "cuDF",
+      "url": "https://github.com/rapidsai/cudf",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Modin",
+      "url": "https://github.com/modin-project/modin",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Dask",
+      "url": "https://github.com/dask/dask",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "NumPy",
+      "url": "https://github.com/numpy/numpy",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "SciPy",
+      "url": "https://github.com/scipy/scipy",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "NetworkX",
+      "url": "https://github.com/networkx/networkx",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "cuGraph",
+      "url": "https://github.com/rapidsai/cugraph",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Vaex",
+      "url": "https://github.com/vaexio/vaex",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Datashader",
+      "url": "https://github.com/holoviz/datashader",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Zarr",
+      "url": "https://github.com/zarr-developers/zarr-python",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "NVIDIA DALI",
+      "url": "https://github.com/NVIDIA/DALI",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Narwhals",
+      "url": "https://github.com/narwhals-dev/narwhals",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Ibis",
+      "url": "https://github.com/ibis-project/ibis",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "skrub",
+      "url": "https://github.com/skrub-data/skrub",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Oxen",
+      "url": "https://github.com/Oxen-AI/Oxen",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Pandera",
+      "url": "https://github.com/unionai-oss/pandera",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Snorkel",
+      "url": "https://github.com/snorkel-team/snorkel",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "DuckDB",
+      "url": "https://github.com/duckdb/duckdb",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "FiftyOne",
+      "url": "https://github.com/voxel51/fiftyone",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Label Studio",
+      "url": "https://github.com/HumanSignal/label-studio",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Delta Lake",
+      "url": "https://github.com/delta-io/delta",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Apache Iceberg",
+      "url": "https://github.com/apache/iceberg",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Apache Hudi",
+      "url": "https://github.com/apache/hudi",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "lakeFS",
+      "url": "https://github.com/treeverse/lakeFS",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Apache Airflow",
+      "url": "https://github.com/apache/airflow",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Apache Spark",
+      "url": "https://github.com/apache/spark",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Apache Flink",
+      "url": "https://github.com/apache/flink",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Apache Beam",
+      "url": "https://github.com/apache/beam",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Scrapy",
+      "url": "https://github.com/scrapy/scrapy",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "PandasAI",
+      "url": "https://github.com/sinaptik-ai/pandas-ai",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Temporal",
+      "url": "https://github.com/temporalio/temporal",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Luigi",
+      "url": "https://github.com/spotify/luigi",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Mage.ai",
+      "url": "https://github.com/mage-ai/mage-ai",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "Hamilton",
+      "url": "https://github.com/apache/hamilton",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Processing & Manipulation"
+    },
+    {
+      "name": "scikit-learn",
+      "url": "https://github.com/scikit-learn/scikit-learn",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Classical ML & Gradient Boosting"
+    },
+    {
+      "name": "XGBoost",
+      "url": "https://github.com/dmlc/xgboost",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Classical ML & Gradient Boosting"
+    },
+    {
+      "name": "LightGBM",
+      "url": "https://github.com/microsoft/LightGBM",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Classical ML & Gradient Boosting"
+    },
+    {
+      "name": "CatBoost",
+      "url": "https://github.com/catboost/catboost",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Classical ML & Gradient Boosting"
+    },
+    {
+      "name": "sktime",
+      "url": "https://github.com/sktime/sktime",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Classical ML & Gradient Boosting"
+    },
+    {
+      "name": "StatsForecast",
+      "url": "https://github.com/Nixtla/statsforecast",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Classical ML & Gradient Boosting"
+    },
+    {
+      "name": "MLForecast",
+      "url": "https://github.com/Nixtla/mlforecast",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Classical ML & Gradient Boosting"
+    },
+    {
+      "name": "cuML",
+      "url": "https://github.com/rapidsai/cuml",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Classical ML & Gradient Boosting"
+    },
+    {
+      "name": "SynapseML",
+      "url": "https://github.com/microsoft/SynapseML",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Classical ML & Gradient Boosting"
+    },
+    {
+      "name": "Darts",
+      "url": "https://github.com/unit8co/darts",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Classical ML & Gradient Boosting"
+    },
+    {
+      "name": "PyTorch Forecasting",
+      "url": "https://github.com/sktime/pytorch-forecasting",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Classical ML & Gradient Boosting"
+    },
+    {
+      "name": "DataHub",
+      "url": "https://github.com/datahub-project/datahub",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Engineering & Feature Stores"
+    },
+    {
+      "name": "OpenMetadata",
+      "url": "https://github.com/open-metadata/OpenMetadata",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Engineering & Feature Stores"
+    },
+    {
+      "name": "Amundsen",
+      "url": "https://github.com/amundsen-io/amundsen",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Engineering & Feature Stores"
+    },
+    {
+      "name": "dbt-core",
+      "url": "https://github.com/dbt-labs/dbt-core",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Transformation & Analytics Engineering"
+    },
+    {
+      "name": "SQLMesh",
+      "url": "https://github.com/TobikoData/sqlmesh",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Transformation & Analytics Engineering"
+    },
+    {
+      "name": "Deequ",
+      "url": "https://github.com/awslabs/deequ",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Quality & Validation"
+    },
+    {
+      "name": "Great Expectations",
+      "url": "https://github.com/great-expectations/great_expectations",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Quality & Validation"
+    },
+    {
+      "name": "ydata-profiling",
+      "url": "https://github.com/ydataai/ydata-profiling",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Quality & Validation"
+    },
+    {
+      "name": "Soda Core",
+      "url": "https://github.com/sodadata/soda-core",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Quality & Validation"
+    },
+    {
+      "name": "TFX (TensorFlow Extended)",
+      "url": "https://github.com/tensorflow/tfx",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Quality & Validation"
+    },
+    {
+      "name": "Label Studio",
+      "url": "https://github.com/HumanSignal/label-studio",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Labeling & Annotation"
+    },
+    {
+      "name": "FiftyOne",
+      "url": "https://github.com/voxel51/fiftyone",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Labeling & Annotation"
+    },
+    {
+      "name": "Doccano",
+      "url": "https://github.com/doccano/doccano",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Labeling & Annotation"
+    },
+    {
+      "name": "Snorkel",
+      "url": "https://github.com/snorkel-team/snorkel",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Labeling & Annotation"
+    },
+    {
+      "name": "OpenRefine",
+      "url": "https://github.com/OpenRefine/OpenRefine",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Data Labeling & Annotation"
+    },
+    {
+      "name": "Optuna",
+      "url": "https://github.com/optuna/optuna",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "AutoML & Hyperparameter Optimization"
+    },
+    {
+      "name": "AutoGluon",
+      "url": "https://github.com/autogluon/autogluon",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "AutoML & Hyperparameter Optimization"
+    },
+    {
+      "name": "FLAML",
+      "url": "https://github.com/microsoft/FLAML",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "AutoML & Hyperparameter Optimization"
+    },
+    {
+      "name": "Katib (Kubeflow)",
+      "url": "https://github.com/kubeflow/katib",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "AutoML & Hyperparameter Optimization"
+    },
+    {
+      "name": "AutoKeras",
+      "url": "https://github.com/keras-team/autokeras",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "AutoML & Hyperparameter Optimization"
+    },
+    {
+      "name": "Streamlit",
+      "url": "https://github.com/streamlit/streamlit",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Interactive ML Apps & Notebooks"
+    },
+    {
+      "name": "Gradio",
+      "url": "https://github.com/gradio-app/gradio",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Interactive ML Apps & Notebooks"
+    },
+    {
+      "name": "Marimo",
+      "url": "https://github.com/marimo-team/marimo",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Interactive ML Apps & Notebooks"
+    },
+    {
+      "name": "Hugging Face Accelerate",
+      "url": "https://github.com/huggingface/accelerate",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "DeepSpeed",
+      "url": "https://github.com/microsoft/DeepSpeed",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "Transformers",
+      "url": "https://github.com/huggingface/transformers",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "FlashAttention",
+      "url": "https://github.com/Dao-AILab/flash-attention",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "xFormers",
+      "url": "https://github.com/facebookresearch/xformers",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "PyTorch Lightning",
+      "url": "https://github.com/Lightning-AI/lightning",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "fastai",
+      "url": "https://github.com/fastai/fastai",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "PyTorch Ignite",
+      "url": "https://github.com/pytorch/ignite",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "ONNX Runtime",
+      "url": "https://github.com/microsoft/onnxruntime",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "einops",
+      "url": "https://github.com/arogozhnikov/einops",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "safetensors",
+      "url": "https://github.com/huggingface/safetensors",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "torchmetrics",
+      "url": "https://github.com/Lightning-AI/torchmetrics",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "torchao",
+      "url": "https://github.com/pytorch/ao",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "SHAP",
+      "url": "https://github.com/shap/shap",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "skorch",
+      "url": "https://github.com/skorch-dev/skorch",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "Composer",
+      "url": "https://github.com/mosaicml/composer",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "NVIDIA Apex",
+      "url": "https://github.com/NVIDIA/apex",
+      "category": "Core Frameworks & Libraries",
+      "subcategory": "Model Training & Optimization Utilities"
+    },
+    {
+      "name": "RWKV-7 \"Goose\" (BlinkDL)",
+      "url": "https://github.com/BlinkDL/RWKV-LM",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "Qwen3 (Alibaba)",
+      "url": "https://github.com/QwenLM/Qwen3",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "Qwen3.6 (Alibaba)",
+      "url": "https://github.com/QwenLM/Qwen3.6",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "MiMo-V2-Flash (Xiaomi)",
+      "url": "https://github.com/XiaomiMiMo/MiMo-V2-Flash",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "Nemotron (NVIDIA)",
+      "url": "https://github.com/NVIDIA-NeMo/Nemotron",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "Gemma 4 (Google)",
+      "url": "https://github.com/google-deepmind/gemma",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "Kimi K2 (Moonshot AI)",
+      "url": "https://github.com/MoonshotAI/Kimi-K2",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "Kimi K2.5 (Moonshot AI)",
+      "url": "https://github.com/MoonshotAI/Kimi-K2.5",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "Phi-4 (Microsoft)",
+      "url": "https://github.com/microsoft/PhiCookBook",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "GLM-5 (Zhipu AI)",
+      "url": "https://github.com/zai-org/GLM-5",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "OLMo 2 (Allen AI)",
+      "url": "https://github.com/allenai/OLMo",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "Llama 4 (Meta)",
+      "url": "https://github.com/meta-llama/llama-models",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "GPT-OSS (OpenAI)",
+      "url": "https://github.com/openai/gpt-oss",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "InternLM3 (Shanghai AI Lab)",
+      "url": "https://github.com/InternLM/InternLM",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "Mamba (State Space Models)",
+      "url": "https://github.com/state-spaces/mamba",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "Pythia (EleutherAI)",
+      "url": "https://github.com/EleutherAI/pythia",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "T5 (Google)",
+      "url": "https://github.com/google-research/text-to-text-transfer-transformer",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "GPT-NeoX-20B (EleutherAI)",
+      "url": "https://github.com/EleutherAI/gpt-neox",
+      "category": "Open Foundation Models",
+      "subcategory": "Large Language Models (Base + Chat)"
+    },
+    {
+      "name": "DeepSeek-Coder-V2 / R1-Coder",
+      "url": "https://github.com/deepseek-ai/DeepSeek-Coder",
+      "category": "Open Foundation Models",
+      "subcategory": "Coding & Reasoning Models"
+    },
+    {
+      "name": "Qwen3-Coder-Next (Alibaba)",
+      "url": "https://github.com/QwenLM/Qwen3-Coder",
+      "category": "Open Foundation Models",
+      "subcategory": "Coding & Reasoning Models"
+    },
+    {
+      "name": "MMaDA (Gen-Verse)",
+      "url": "https://github.com/Gen-Verse/MMaDA",
+      "category": "Open Foundation Models",
+      "subcategory": "Multimodal Models (Vision + Language)"
+    },
+    {
+      "name": "Qwen3-VL (Alibaba)",
+      "url": "https://github.com/QwenLM/Qwen3-VL",
+      "category": "Open Foundation Models",
+      "subcategory": "Multimodal Models (Vision + Language)"
+    },
+    {
+      "name": "GLM-4.5V / GLM-4.1V-Thinking (Zhipu AI)",
+      "url": "https://github.com/zai-org/GLM-V",
+      "category": "Open Foundation Models",
+      "subcategory": "Multimodal Models (Vision + Language)"
+    },
+    {
+      "name": "MiniCPM-o 2.6",
+      "url": "https://github.com/OpenBMB/MiniCPM-o",
+      "category": "Open Foundation Models",
+      "subcategory": "Multimodal Models (Vision + Language)"
+    },
+    {
+      "name": "Gemma 4 (Google)",
+      "url": "https://github.com/google-deepmind/gemma",
+      "category": "Open Foundation Models",
+      "subcategory": "Multimodal Models (Vision + Language)"
+    },
+    {
+      "name": "Magma (Microsoft)",
+      "url": "https://github.com/microsoft/Magma",
+      "category": "Open Foundation Models",
+      "subcategory": "Multimodal Models (Vision + Language)"
+    },
+    {
+      "name": "OpenCLIP",
+      "url": "https://github.com/mlfoundations/open_clip",
+      "category": "Open Foundation Models",
+      "subcategory": "Multimodal Models (Vision + Language)"
+    },
+    {
+      "name": "Show-o",
+      "url": "https://github.com/showlab/Show-o",
+      "category": "Open Foundation Models",
+      "subcategory": "Multimodal Models (Vision + Language)"
+    },
+    {
+      "name": "Moondream (m87-labs)",
+      "url": "https://github.com/m87-labs/moondream",
+      "category": "Open Foundation Models",
+      "subcategory": "Multimodal Models (Vision + Language)"
+    },
+    {
+      "name": "VILA (NVIDIA)",
+      "url": "https://github.com/NVlabs/VILA",
+      "category": "Open Foundation Models",
+      "subcategory": "Multimodal Models (Vision + Language)"
+    },
+    {
+      "name": "OmniGen (VectorSpaceLab)",
+      "url": "https://github.com/VectorSpaceLab/OmniGen",
+      "category": "Open Foundation Models",
+      "subcategory": "Multimodal Models (Vision + Language)"
+    },
+    {
+      "name": "NVIDIA NeMo Speech",
+      "url": "https://github.com/NVIDIA-NeMo/NeMo",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "FunASR",
+      "url": "https://github.com/modelscope/FunASR",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "Whisper (OpenAI → community forks)",
+      "url": "https://github.com/openai/whisper",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "faster-whisper (SYSTRAN)",
+      "url": "https://github.com/SYSTRAN/faster-whisper",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "OuteTTS / CosyVoice 2",
+      "url": "https://github.com/edwko/OuteTTS",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "Fish Speech / StyleTTS 2",
+      "url": "https://github.com/fishaudio/fish-speech",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "MusicGen / AudioCraft (Meta)",
+      "url": "https://github.com/facebookresearch/audiocraft",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "VibeVoice (Microsoft)",
+      "url": "https://github.com/microsoft/VibeVoice",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "Qwen3-TTS (Alibaba)",
+      "url": "https://github.com/QwenLM/Qwen3-TTS",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "Chatterbox (Resemble AI)",
+      "url": "https://github.com/resemble-ai/chatterbox",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "Dia (Nari Labs)",
+      "url": "https://github.com/nari-labs/dia",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "Voxtral TTS (Mistral)",
+      "url": "https://github.com/mistralai/mistral-inference",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "WhisperSpeech",
+      "url": "https://github.com/WhisperSpeech/WhisperSpeech",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "VoxCPM",
+      "url": "https://github.com/OpenBMB/VoxCPM",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "F5-TTS",
+      "url": "https://github.com/SWivid/F5-TTS",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "CosyVoice",
+      "url": "https://github.com/FunAudioLLM/CosyVoice",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "ChatTTS",
+      "url": "https://github.com/2noise/ChatTTS",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "SpeechBrain",
+      "url": "https://github.com/speechbrain/speechbrain",
+      "category": "Open Foundation Models",
+      "subcategory": "Speech & Audio Models (TTS, STT, Music)"
+    },
+    {
+      "name": "Open-Sora (HPC-AI Tech)",
+      "url": "https://github.com/hpcaitech/Open-Sora",
+      "category": "Open Foundation Models",
+      "subcategory": "Video & Animation Models"
+    },
+    {
+      "name": "CogVideoX (Zhipu AI / community)",
+      "url": "https://github.com/THUDM/CogVideo",
+      "category": "Open Foundation Models",
+      "subcategory": "Video & Animation Models"
+    },
+    {
+      "name": "Mochi 1 (Genmo)",
+      "url": "https://github.com/genmoai/mochi",
+      "category": "Open Foundation Models",
+      "subcategory": "Video & Animation Models"
+    },
+    {
+      "name": "Stable Diffusion XL",
+      "url": "https://github.com/Stability-AI/generative-models",
+      "category": "Open Foundation Models",
+      "subcategory": "Image Generation Models"
+    },
+    {
+      "name": "MiniCPM-V (OpenBMB)",
+      "url": "https://github.com/OpenBMB/MiniCPM-V",
+      "category": "Open Foundation Models",
+      "subcategory": "Additional Vision-Language Models"
+    },
+    {
+      "name": "llama.cpp",
+      "url": "https://github.com/ggml-org/llama.cpp",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Local / On-device Inference"
+    },
+    {
+      "name": "Ollama",
+      "url": "https://github.com/ollama/ollama",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Local / On-device Inference"
+    },
+    {
+      "name": "MLX",
+      "url": "https://github.com/ml-explore/mlx",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Local / On-device Inference"
+    },
+    {
+      "name": "MLC-LLM",
+      "url": "https://github.com/mlc-ai/mlc-llm",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Local / On-device Inference"
+    },
+    {
+      "name": "WebLLM",
+      "url": "https://github.com/mlc-ai/web-llm",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Local / On-device Inference"
+    },
+    {
+      "name": "llama-cpp-python",
+      "url": "https://github.com/abetlen/llama-cpp-python",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Local / On-device Inference"
+    },
+    {
+      "name": "KoboldCpp",
+      "url": "https://github.com/LostRuins/koboldcpp",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Local / On-device Inference"
+    },
+    {
+      "name": "RamaLama",
+      "url": "https://github.com/containers/ramalama",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Local / On-device Inference"
+    },
+    {
+      "name": "LiteRT-LM",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Local / On-device Inference"
+    },
+    {
+      "name": "llm-d",
+      "url": "https://github.com/llm-d/llm-d",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "LMDeploy",
+      "url": "https://github.com/InternLM/lmdeploy",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "vLLM",
+      "url": "https://github.com/vllm-project/vllm",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "LMCache",
+      "url": "https://github.com/LMCache/LMCache",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "vLLM Production Stack",
+      "url": "https://github.com/vllm-project/production-stack",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "nano-vLLM",
+      "url": "https://github.com/GeeeekExplorer/nano-vllm",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "SGLang",
+      "url": "https://github.com/sgl-project/sglang",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "TensorRT-LLM",
+      "url": "https://github.com/NVIDIA/TensorRT-LLM",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "Aphrodite Engine",
+      "url": "https://github.com/aphrodite-engine/aphrodite-engine",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "AIBrix",
+      "url": "https://github.com/vllm-project/aibrix",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "Triton Inference Server",
+      "url": "https://github.com/triton-inference-server/server",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "mistral.rs",
+      "url": "https://github.com/EricLBuehler/mistral.rs",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "KTransformers",
+      "url": "https://github.com/kvcache-ai/ktransformers",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "llamafile",
+      "url": "https://github.com/mozilla-ai/llamafile",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "Xinference",
+      "url": "https://github.com/xorbitsai/inference",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "RTP-LLM (Alibaba)",
+      "url": "https://github.com/alibaba/rtp-llm",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "LitServe (Lightning AI)",
+      "url": "https://github.com/Lightning-AI/LitServe",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "LightLLM",
+      "url": "https://github.com/ModelTC/LightLLM",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "TabbyAPI",
+      "url": "https://github.com/theroyallab/tabbyAPI",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "GPUStack",
+      "url": "https://github.com/gpustack/gpustack",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "One-API",
+      "url": "https://github.com/songquanpeng/one-api",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "OpenLLM (BentoML)",
+      "url": "https://github.com/bentoml/OpenLLM",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "Higress (Alibaba)",
+      "url": "https://github.com/alibaba/higress",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "NVIDIA Dynamo",
+      "url": "https://github.com/ai-dynamo/dynamo",
+      "category": "Inference Engines & Serving",
+      "subcategory": "High-performance Serving & API Servers"
+    },
+    {
+      "name": "CTranslate2",
+      "url": "https://github.com/OpenNMT/CTranslate2",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Additional Inference Engines"
+    },
+    {
+      "name": "PowerInfer",
+      "url": "https://github.com/SJTU-IPADS/PowerInfer",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Additional Inference Engines"
+    },
+    {
+      "name": "distributed-llama",
+      "url": "https://github.com/b4rtaz/distributed-llama",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Additional Inference Engines"
+    },
+    {
+      "name": "GGUF",
+      "url": "https://github.com/ggml-org/llama.cpp",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Quantization, Distillation & Optimization"
+    },
+    {
+      "name": "bitsandbytes",
+      "url": "https://github.com/bitsandbytes-foundation/bitsandbytes",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Quantization, Distillation & Optimization"
+    },
+    {
+      "name": "ExLlamaV2",
+      "url": "https://github.com/turboderp/exllamav2",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Quantization, Distillation & Optimization"
+    },
+    {
+      "name": "Optimum",
+      "url": "https://github.com/huggingface/optimum",
+      "category": "Inference Engines & Serving",
+      "subcategory": "Quantization, Distillation & Optimization"
+    },
+    {
+      "name": "LangGraph",
+      "url": "https://github.com/langchain-ai/langgraph",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "CrewAI",
+      "url": "https://github.com/crewAIInc/crewAI",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "AutoGen (AG2)",
+      "url": "https://github.com/microsoft/autogen",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "DSPy",
+      "url": "https://github.com/stanfordnlp/dspy",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "Semantic Kernel",
+      "url": "https://github.com/microsoft/semantic-kernel",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "smolagents",
+      "url": "https://github.com/huggingface/smolagents",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "LangChain",
+      "url": "https://github.com/langchain-ai/langchain",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "Neuron AI",
+      "url": "https://github.com/neuron-core/neuron-ai",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "II-Agent (Intelligent Internet)",
+      "url": "https://github.com/Intelligent-Internet/ii-agent",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "Hermes Agent (NousResearch)",
+      "url": "https://github.com/NousResearch/hermes-agent",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "Strands Agents",
+      "url": "https://github.com/strands-agents/sdk-python",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "Agno",
+      "url": "https://github.com/agno-agi/agno",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "Upsonic",
+      "url": "https://github.com/Upsonic/Upsonic",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "VoltAgent",
+      "url": "https://github.com/VoltAgent/voltagent",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "PocketFlow",
+      "url": "https://github.com/The-Pocket/PocketFlow",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "Agent Development Kit (Google)",
+      "url": "https://github.com/google/adk-python",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "PydanticAI",
+      "url": "https://github.com/pydantic/pydantic-ai",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "Qwen-Agent",
+      "url": "https://github.com/QwenLM/Qwen-Agent",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "Griptape",
+      "url": "https://github.com/griptape-ai/griptape",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "TaskWeaver (Microsoft)",
+      "url": "https://github.com/microsoft/TaskWeaver",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "Langroid",
+      "url": "https://github.com/langroid/langroid",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "Marvin",
+      "url": "https://github.com/PrefectHQ/marvin",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "Burr",
+      "url": "https://github.com/apache/burr",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "KaibanJS",
+      "url": "https://github.com/kaiban-ai/KaibanJS",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Single-Agent Frameworks"
+    },
+    {
+      "name": "MetaGPT",
+      "url": "https://github.com/FoundationAgents/MetaGPT",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "ChatDev",
+      "url": "https://github.com/OpenBMB/ChatDev",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "CAMEL",
+      "url": "https://github.com/camel-ai/camel",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "Swarms",
+      "url": "https://github.com/kyegomez/swarms",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "Mastra",
+      "url": "https://github.com/mastra-ai/mastra",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "Deer-Flow (ByteDance)",
+      "url": "https://github.com/bytedance/deer-flow",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "OpenAI Agents SDK",
+      "url": "https://github.com/openai/openai-agents-python",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "Paperclip",
+      "url": "https://github.com/paperclipai/paperclip",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "AgentScope",
+      "url": "https://github.com/agentscope-ai/agentscope",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "mcp-agent",
+      "url": "https://github.com/lastmile-ai/mcp-agent",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "Microsoft Agent Framework",
+      "url": "https://github.com/microsoft/agent-framework",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "Agency Swarm",
+      "url": "https://github.com/VRSEN/agency-swarm",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "elizaOS",
+      "url": "https://github.com/elizaOS/eliza",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "Hive (Aden)",
+      "url": "https://github.com/aden-hive/hive",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "Agent Squad (AWS Labs)",
+      "url": "https://github.com/awslabs/agent-squad",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "DeepResearchAgent",
+      "url": "https://github.com/SkyworkAI/DeepResearchAgent",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "Composio Agent Orchestrator",
+      "url": "https://github.com/ComposioHQ/agent-orchestrator",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "Open Multi-Agent",
+      "url": "https://github.com/JackChen-me/open-multi-agent",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "BeeAI Framework (IBM)",
+      "url": "https://github.com/i-am-bee/beeai-framework",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "AI Town",
+      "url": "https://github.com/a16z-infra/ai-town",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "Conductor OSS",
+      "url": "https://github.com/conductor-oss/conductor",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Multi-Agent Orchestration"
+    },
+    {
+      "name": "OpenHands (ex-OpenDevin)",
+      "url": "https://github.com/All-Hands-AI/OpenHands",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "Goose",
+      "url": "https://github.com/block/goose",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "OpenCode",
+      "url": "https://github.com/anomalyco/opencode",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "Aider",
+      "url": "https://github.com/paul-gauthier/aider",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "Pi (badlogic)",
+      "url": "https://github.com/badlogic/pi-mono",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "Mistral-Vibe (Mistral)",
+      "url": "https://github.com/mistralai/mistral-vibe",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "Nanocoder (Nano-Collective)",
+      "url": "https://github.com/Nano-Collective/nanocoder",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "Gemini CLI (Google)",
+      "url": "https://github.com/google-gemini/gemini-cli",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "Archon",
+      "url": "https://github.com/coleam00/Archon",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "mini-SWE-agent",
+      "url": "https://github.com/SWE-agent/mini-swe-agent",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "Trae Agent",
+      "url": "https://github.com/bytedance/trae-agent",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "Kilo Code",
+      "url": "https://github.com/Kilo-Org/kilocode",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "Open SWE",
+      "url": "https://github.com/langchain-ai/open-swe",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Autonomous Coding Agents"
+    },
+    {
+      "name": "Outlines",
+      "url": "https://github.com/dottxt-ai/outlines",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Prompt Engineering & Structured Outputs"
+    },
+    {
+      "name": "Promptify",
+      "url": "https://github.com/promptslab/Promptify",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Prompt Engineering & Structured Outputs"
+    },
+    {
+      "name": "LangGPT",
+      "url": "https://github.com/langgptai/LangGPT",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Prompt Engineering & Structured Outputs"
+    },
+    {
+      "name": "AutoPrompt",
+      "url": "https://github.com/Eladlev/AutoPrompt",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Prompt Engineering & Structured Outputs"
+    },
+    {
+      "name": "Prompt Optimizer",
+      "url": "https://github.com/linshenkx/prompt-optimizer",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Prompt Engineering & Structured Outputs"
+    },
+    {
+      "name": "Guidance",
+      "url": "https://github.com/guidance-ai/guidance",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Prompt Engineering & Structured Outputs"
+    },
+    {
+      "name": "XGrammar",
+      "url": "https://github.com/mlc-ai/xgrammar",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Prompt Engineering & Structured Outputs"
+    },
+    {
+      "name": "LM Format Enforcer",
+      "url": "https://github.com/noamgat/lm-format-enforcer",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Prompt Engineering & Structured Outputs"
+    },
+    {
+      "name": "Composio",
+      "url": "https://github.com/ComposioHQ/composio",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "Langflow",
+      "url": "https://github.com/langflow-ai/langflow",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "Dify",
+      "url": "https://github.com/langgenius/dify",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "OWL (camel-ai/owl)",
+      "url": "https://github.com/camel-ai/owl",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "gpt-researcher",
+      "url": "https://github.com/assafelovic/gpt-researcher",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "AI-Scientist-v2 (SakanaAI)",
+      "url": "https://github.com/SakanaAI/AI-Scientist-v2",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "PraisonAI",
+      "url": "https://github.com/MervinPraison/PraisonAI",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "Agent-S (Simular AI)",
+      "url": "https://github.com/simular-ai/Agent-S",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "MobileAgent (Alibaba/X-PLUG)",
+      "url": "https://github.com/X-PLUG/MobileAgent",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "UI-TARS Desktop (ByteDance)",
+      "url": "https://github.com/bytedance/UI-TARS-desktop",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "Browser Use",
+      "url": "https://github.com/browser-use/browser-use",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "Steel Browser",
+      "url": "https://github.com/steel-dev/steel-browser",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "TradingAgents",
+      "url": "https://github.com/TauricResearch/TradingAgents",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "Parlant",
+      "url": "https://github.com/emcie-co/parlant",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "n8n",
+      "url": "https://github.com/n8n-io/n8n",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "Activepieces",
+      "url": "https://github.com/activepieces/activepieces",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "Julep",
+      "url": "https://github.com/julep-ai/julep",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "uAgents (Fetch.ai)",
+      "url": "https://github.com/fetchai/uAgents",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "Tracecat",
+      "url": "https://github.com/TracecatHQ/tracecat",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "ToolJet",
+      "url": "https://github.com/ToolJet/ToolJet",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Domain-Specific Agents"
+    },
+    {
+      "name": "Letta (ex-MemGPT)",
+      "url": "https://github.com/letta-ai/letta",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Agent Memory & State"
+    },
+    {
+      "name": "Mem0",
+      "url": "https://github.com/mem0ai/mem0",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Agent Memory & State"
+    },
+    {
+      "name": "Hindsight",
+      "url": "https://github.com/vectorize-io/hindsight",
+      "category": "Agentic AI & Multi-Agent Systems",
+      "subcategory": "Agent Memory & State"
+    },
+    {
+      "name": "Chroma",
+      "url": "https://github.com/chroma-core/chroma",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Qdrant",
+      "url": "https://github.com/qdrant/qdrant",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Weaviate",
+      "url": "https://github.com/weaviate/weaviate",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Milvus",
+      "url": "https://github.com/milvus-io/milvus",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Faiss",
+      "url": "https://github.com/facebookresearch/faiss",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "LanceDB",
+      "url": "https://github.com/lancedb/lancedb",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Vespa",
+      "url": "https://github.com/vespa-engine/vespa",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "pgvector",
+      "url": "https://github.com/pgvector/pgvector",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "pgvectorscale",
+      "url": "https://github.com/timescale/pgvectorscale",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "VectorChord",
+      "url": "https://github.com/tensorchord/VectorChord",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Quickwit",
+      "url": "https://github.com/quickwit-oss/quickwit",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Tantivy",
+      "url": "https://github.com/quickwit-oss/tantivy",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Manticore Search",
+      "url": "https://github.com/manticoresoftware/manticoresearch",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "OpenSearch",
+      "url": "https://github.com/opensearch-project/OpenSearch",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Marqo",
+      "url": "https://github.com/marqo-ai/marqo",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Vald",
+      "url": "https://github.com/vdaas/vald",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Annoy",
+      "url": "https://github.com/spotify/annoy",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "hnswlib",
+      "url": "https://github.com/nmslib/hnswlib",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "sqlite-vec",
+      "url": "https://github.com/asg017/sqlite-vec",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "zvec",
+      "url": "https://github.com/alibaba/zvec",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Meilisearch",
+      "url": "https://github.com/meilisearch/meilisearch",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Typesense",
+      "url": "https://github.com/typesense/typesense",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Elasticsearch",
+      "url": "https://github.com/elastic/elasticsearch",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Apache Solr",
+      "url": "https://github.com/apache/solr",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "RediSearch",
+      "url": "https://github.com/RediSearch/RediSearch",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "ParadeDB",
+      "url": "https://github.com/paradedb/paradedb",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Orama",
+      "url": "https://github.com/oramasearch/orama",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "HelixDB",
+      "url": "https://github.com/HelixDB/helix-db",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "USearch",
+      "url": "https://github.com/unum-cloud/usearch",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Voyager",
+      "url": "https://github.com/spotify/voyager",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "Deep Lake",
+      "url": "https://github.com/activeloopai/deeplake",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Vector Databases & Search Engines"
+    },
+    {
+      "name": "BGE (FlagEmbedding)",
+      "url": "https://github.com/FlagOpen/FlagEmbedding",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Embedding Models"
+    },
+    {
+      "name": "E5 (Microsoft)",
+      "url": "https://github.com/microsoft/unilm",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Embedding Models"
+    },
+    {
+      "name": "FastEmbed (Qdrant)",
+      "url": "https://github.com/qdrant/fastembed",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Embedding Models"
+    },
+    {
+      "name": "EmbedAnything",
+      "url": "https://github.com/StarlightSearch/EmbedAnything",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Embedding Models"
+    },
+    {
+      "name": "Text Embeddings Inference (Hugging Face)",
+      "url": "https://github.com/huggingface/text-embeddings-inference",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Embedding Models"
+    },
+    {
+      "name": "MTEB",
+      "url": "https://github.com/embeddings-benchmark/mteb",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Embedding Benchmarks"
+    },
+    {
+      "name": "EmbedChain",
+      "url": "https://github.com/embedchain/embedchain",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "LlamaIndex",
+      "url": "https://github.com/run-llama/llama_index",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "R2R (SciPhi)",
+      "url": "https://github.com/SciPhi-AI/R2R",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Haystack",
+      "url": "https://github.com/deepset-ai/haystack",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "RAGFlow",
+      "url": "https://github.com/infiniflow/ragflow",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "GraphRAG (Microsoft)",
+      "url": "https://github.com/microsoft/graphrag",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Docling",
+      "url": "https://github.com/docling-project/docling",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Unstructured",
+      "url": "https://github.com/Unstructured-IO/unstructured",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "MinerU",
+      "url": "https://github.com/opendatalab/MinerU",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Marker",
+      "url": "https://github.com/datalab-to/marker",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "ColPali / ColQwen",
+      "url": "https://github.com/illuin-tech/colpali",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "LightRAG",
+      "url": "https://github.com/HKUDS/LightRAG",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "RAG-Anything",
+      "url": "https://github.com/HKUDS/RAG-Anything",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "LangChain4j",
+      "url": "https://github.com/langchain4j/langchain4j",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Kernel Memory (Microsoft)",
+      "url": "https://github.com/microsoft/kernel-memory",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "txtai",
+      "url": "https://github.com/neuml/txtai",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Infinity (Embeddings Server)",
+      "url": "https://github.com/michaelfeil/infinity",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "FlashRAG",
+      "url": "https://github.com/RUC-NLPIR/FlashRAG",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "DocsGPT",
+      "url": "https://github.com/arc53/DocsGPT",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "llmware",
+      "url": "https://github.com/llmware-ai/llmware",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "AutoFlow",
+      "url": "https://github.com/pingcap/autoflow",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "rerankers (Answer.AI)",
+      "url": "https://github.com/AnswerDotAI/rerankers",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "KAG (OpenSPG)",
+      "url": "https://github.com/OpenSPG/KAG",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Chonkie",
+      "url": "https://github.com/chonkie-inc/chonkie",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "PageIndex (VectifyAI)",
+      "url": "https://github.com/VectifyAI/PageIndex",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Kotaemon (Cinnamon)",
+      "url": "https://github.com/Cinnamon/kotaemon",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Reader (Jina AI)",
+      "url": "https://github.com/jina-ai/reader",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "UltraRAG (OpenBMB)",
+      "url": "https://github.com/OpenBMB/UltraRAG",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Semantic Router",
+      "url": "https://github.com/aurelio-labs/semantic-router",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Neurite",
+      "url": "https://github.com/satellitecomponent/Neurite",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Verba",
+      "url": "https://github.com/weaviate/Verba",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Pathway",
+      "url": "https://github.com/pathwaycom/pathway",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Infinity (AI Database)",
+      "url": "https://github.com/infiniflow/infinity",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "PrivateGPT",
+      "url": "https://github.com/zylon-ai/private-gpt",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "FastGPT",
+      "url": "https://github.com/labring/FastGPT",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "MaxKB",
+      "url": "https://github.com/1Panel-dev/MaxKB",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "DB-GPT",
+      "url": "https://github.com/eosphoros-ai/DB-GPT",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "localGPT",
+      "url": "https://github.com/PromtEngineer/localGPT",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "SurfSense",
+      "url": "https://github.com/MODSetter/SurfSense",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "RAG Frameworks & Advanced Retrieval Tools"
+    },
+    {
+      "name": "Graphiti",
+      "url": "https://github.com/getzep/graphiti",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Knowledge Graphs for RAG"
+    },
+    {
+      "name": "Crawl4AI",
+      "url": "https://github.com/unclecode/crawl4ai",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Web Data Ingestion"
+    },
+    {
+      "name": "Lightpanda",
+      "url": "https://github.com/lightpanda-io/browser",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Web Data Ingestion"
+    },
+    {
+      "name": "Paperless-AI",
+      "url": "https://github.com/clusterzx/paperless-ai",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Web Data Ingestion"
+    },
+    {
+      "name": "Firecrawl",
+      "url": "https://github.com/firecrawl/firecrawl",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Web Data Ingestion"
+    },
+    {
+      "name": "MarkItDown (Microsoft)",
+      "url": "https://github.com/microsoft/markitdown",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Document Conversion & Preprocessing"
+    },
+    {
+      "name": "OmniParse",
+      "url": "https://github.com/adithya-s-k/omniparse",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Document Conversion & Preprocessing"
+    },
+    {
+      "name": "DocETL (UC Berkeley)",
+      "url": "https://github.com/ucbepic/docetl",
+      "category": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "subcategory": "Document Conversion & Preprocessing"
+    },
+    {
+      "name": "ComfyUI",
+      "url": "https://github.com/Comfy-Org/ComfyUI",
+      "category": "Generative Media Tools",
+      "subcategory": "Image Generation & Editing"
+    },
+    {
+      "name": "Stable Diffusion WebUI Forge - Neo",
+      "url": "https://github.com/Haoming02/sd-webui-forge-classic",
+      "category": "Generative Media Tools",
+      "subcategory": "Image Generation & Editing"
+    },
+    {
+      "name": "Fooocus",
+      "url": "https://github.com/lllyasviel/Fooocus",
+      "category": "Generative Media Tools",
+      "subcategory": "Image Generation & Editing"
+    },
+    {
+      "name": "Diffusers",
+      "url": "https://github.com/huggingface/diffusers",
+      "category": "Generative Media Tools",
+      "subcategory": "Image Generation & Editing"
+    },
+    {
+      "name": "InvokeAI",
+      "url": "https://github.com/invoke-ai/InvokeAI",
+      "category": "Generative Media Tools",
+      "subcategory": "Image Generation & Editing"
+    },
+    {
+      "name": "PowerPaint (OpenMMLab)",
+      "url": "https://github.com/open-mmlab/PowerPaint",
+      "category": "Generative Media Tools",
+      "subcategory": "Image Generation & Editing"
+    },
+    {
+      "name": "SD.Next",
+      "url": "https://github.com/vladmandic/sdnext",
+      "category": "Generative Media Tools",
+      "subcategory": "Image Generation & Editing"
+    },
+    {
+      "name": "Qwen-Image (Alibaba)",
+      "url": "https://github.com/QwenLM/Qwen-Image",
+      "category": "Generative Media Tools",
+      "subcategory": "Image Generation & Editing"
+    },
+    {
+      "name": "Upscayl",
+      "url": "https://github.com/upscayl/upscayl",
+      "category": "Generative Media Tools",
+      "subcategory": "Image Generation & Editing"
+    },
+    {
+      "name": "Z-Image (Tongyi)",
+      "url": "https://github.com/Tongyi-MAI/Z-Image",
+      "category": "Generative Media Tools",
+      "subcategory": "Image Generation & Editing"
+    },
+    {
+      "name": "Deep-Live-Cam",
+      "url": "https://github.com/hacksider/Deep-Live-Cam",
+      "category": "Generative Media Tools",
+      "subcategory": "Face Swap & Deepfake"
+    },
+    {
+      "name": "EchoMimic (Ant Group)",
+      "url": "https://github.com/antgroup/echomimic",
+      "category": "Generative Media Tools",
+      "subcategory": "Portrait Animation"
+    },
+    {
+      "name": "Wan2.2 (Alibaba)",
+      "url": "https://github.com/Wan-Video/Wan2.1",
+      "category": "Generative Media Tools",
+      "subcategory": "Video Generation"
+    },
+    {
+      "name": "HunyuanVideo (Tencent)",
+      "url": "https://github.com/Tencent-Hunyuan/HunyuanVideo",
+      "category": "Generative Media Tools",
+      "subcategory": "Video Generation"
+    },
+    {
+      "name": "SkyReels V2/V3 (Skywork)",
+      "url": "https://github.com/SkyworkAI/SkyReels-V2",
+      "category": "Generative Media Tools",
+      "subcategory": "Video Generation"
+    },
+    {
+      "name": "Mochi 1 (Genmo)",
+      "url": "https://github.com/genmoai/mochi",
+      "category": "Generative Media Tools",
+      "subcategory": "Video Generation"
+    },
+    {
+      "name": "LTX-Video (Lightricks)",
+      "url": "https://github.com/Lightricks/LTX-Video",
+      "category": "Generative Media Tools",
+      "subcategory": "Video Generation"
+    },
+    {
+      "name": "Stable Video Diffusion (Stability AI)",
+      "url": "https://github.com/Stability-AI/generative-models",
+      "category": "Generative Media Tools",
+      "subcategory": "Video Generation"
+    },
+    {
+      "name": "Latte (Vchitect)",
+      "url": "https://github.com/Vchitect/Latte",
+      "category": "Generative Media Tools",
+      "subcategory": "Video Generation"
+    },
+    {
+      "name": "Open-Sora-Plan (PKU-YuanGroup)",
+      "url": "https://github.com/PKU-YuanGroup/Open-Sora-Plan",
+      "category": "Generative Media Tools",
+      "subcategory": "Video Generation"
+    },
+    {
+      "name": "Open-Sora (HPC-AI Tech)",
+      "url": "https://github.com/hpcaitech/Open-Sora",
+      "category": "Generative Media Tools",
+      "subcategory": "Video Generation"
+    },
+    {
+      "name": "Helios (PKU-YuanGroup)",
+      "url": "https://github.com/PKU-YuanGroup/Helios",
+      "category": "Generative Media Tools",
+      "subcategory": "Video Generation"
+    },
+    {
+      "name": "AudioCraft / MusicGen (Meta)",
+      "url": "https://github.com/facebookresearch/audiocraft",
+      "category": "Generative Media Tools",
+      "subcategory": "Audio / Music / Voice Generation"
+    },
+    {
+      "name": "ACE-Step 1.5",
+      "url": "https://github.com/ace-step/ACE-Step-1.5",
+      "category": "Generative Media Tools",
+      "subcategory": "Audio / Music / Voice Generation"
+    },
+    {
+      "name": "Fish Speech",
+      "url": "https://github.com/fishaudio/fish-speech",
+      "category": "Generative Media Tools",
+      "subcategory": "Audio / Music / Voice Generation"
+    },
+    {
+      "name": "CosyVoice 2",
+      "url": "https://github.com/FunAudioLLM/CosyVoice",
+      "category": "Generative Media Tools",
+      "subcategory": "Audio / Music / Voice Generation"
+    },
+    {
+      "name": "OuteTTS",
+      "url": "https://github.com/edwko/OuteTTS",
+      "category": "Generative Media Tools",
+      "subcategory": "Audio / Music / Voice Generation"
+    },
+    {
+      "name": "Amphion",
+      "url": "https://github.com/open-mmlab/Amphion",
+      "category": "Generative Media Tools",
+      "subcategory": "Audio / Music / Voice Generation"
+    },
+    {
+      "name": "Stable Audio Tools",
+      "url": "https://github.com/Stability-AI/stable-audio-tools",
+      "category": "Generative Media Tools",
+      "subcategory": "Audio / Music / Voice Generation"
+    },
+    {
+      "name": "GPT-SoVITS",
+      "url": "https://github.com/RVC-Boss/GPT-SoVITS",
+      "category": "Generative Media Tools",
+      "subcategory": "Audio / Music / Voice Generation"
+    },
+    {
+      "name": "Chatterbox",
+      "url": "https://github.com/resemble-ai/chatterbox",
+      "category": "Generative Media Tools",
+      "subcategory": "Audio / Music / Voice Generation"
+    },
+    {
+      "name": "F5-TTS",
+      "url": "https://github.com/SWivid/F5-TTS",
+      "category": "Generative Media Tools",
+      "subcategory": "Audio / Music / Voice Generation"
+    },
+    {
+      "name": "Real-Time Voice Cloning",
+      "url": "https://github.com/CorentinJ/Real-Time-Voice-Cloning",
+      "category": "Generative Media Tools",
+      "subcategory": "Audio / Music / Voice Generation"
+    },
+    {
+      "name": "Hunyuan3D-2 (Tencent)",
+      "url": "https://github.com/Tencent-Hunyuan/Hunyuan3D-2",
+      "category": "Generative Media Tools",
+      "subcategory": "3D & Creative Tools"
+    },
+    {
+      "name": "Trellis (Microsoft)",
+      "url": "https://github.com/microsoft/TRELLIS",
+      "category": "Generative Media Tools",
+      "subcategory": "3D & Creative Tools"
+    },
+    {
+      "name": "gsplat (3D Gaussian Splatting tools)",
+      "url": "https://github.com/nerfstudio-project/gsplat",
+      "category": "Generative Media Tools",
+      "subcategory": "3D & Creative Tools"
+    },
+    {
+      "name": "LichtFeld-Studio",
+      "url": "https://github.com/MrNeRF/LichtFeld-Studio",
+      "category": "Generative Media Tools",
+      "subcategory": "3D & Creative Tools"
+    },
+    {
+      "name": "OpenSplat",
+      "url": "https://github.com/pierotofy/OpenSplat",
+      "category": "Generative Media Tools",
+      "subcategory": "3D & Creative Tools"
+    },
+    {
+      "name": "Oumi",
+      "url": "https://github.com/oumi-ai/oumi",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "LLaMA-Factory",
+      "url": "https://github.com/hiyouga/LLaMA-Factory",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "Axolotl",
+      "url": "https://github.com/axolotl-ai-cloud/axolotl",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "ms-swift",
+      "url": "https://github.com/modelscope/ms-swift",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "Unsloth",
+      "url": "https://github.com/unslothai/unsloth",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "LitGPT",
+      "url": "https://github.com/Lightning-AI/litgpt",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "LLM Foundry",
+      "url": "https://github.com/mosaicml/llm-foundry",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "torchtune",
+      "url": "https://github.com/pytorch/torchtune",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "kohya_ss",
+      "url": "https://github.com/bmaltais/kohya_ss",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "TRL (Transformers Reinforcement Learning)",
+      "url": "https://github.com/huggingface/trl",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "verl",
+      "url": "https://github.com/volcengine/verl",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "NeMo-RL",
+      "url": "https://github.com/NVIDIA-NeMo/RL",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "OpenRLHF",
+      "url": "https://github.com/OpenRLHF/OpenRLHF",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "LMFlow",
+      "url": "https://github.com/OptimalScale/LMFlow",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "XTuner",
+      "url": "https://github.com/InternLM/xtuner",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "Ludwig",
+      "url": "https://github.com/ludwig-ai/ludwig",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "nanoGPT (Andrej Karpathy)",
+      "url": "https://github.com/karpathy/nanoGPT",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "TorchTitan (PyTorch)",
+      "url": "https://github.com/pytorch/torchtitan",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "VeOmni (ByteDance)",
+      "url": "https://github.com/ByteDance-Seed/VeOmni",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "H2O LLM Studio",
+      "url": "https://github.com/h2oai/h2o-llmstudio",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "TinyZero",
+      "url": "https://github.com/Jiayi-Pan/TinyZero",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "PRIME-RL",
+      "url": "https://github.com/PrimeIntellect-ai/prime-rl",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "slime",
+      "url": "https://github.com/THUDM/slime",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "rLLM",
+      "url": "https://github.com/rllm-org/rllm",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "EasyR1",
+      "url": "https://github.com/hiyouga/EasyR1",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "simpleRL-reason",
+      "url": "https://github.com/hkust-nlp/simpleRL-reason",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "align-anything",
+      "url": "https://github.com/PKU-Alignment/align-anything",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "LeRobot",
+      "url": "https://github.com/huggingface/lerobot",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "AI-Toolkit",
+      "url": "https://github.com/ostris/ai-toolkit",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "OneTrainer",
+      "url": "https://github.com/Nerogar/OneTrainer",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "FluxGym",
+      "url": "https://github.com/cocktailpeanut/fluxgym",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Full Training Frameworks"
+    },
+    {
+      "name": "PEFT (Parameter-Efficient Fine-Tuning)",
+      "url": "https://github.com/huggingface/peft",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "LoRA / PEFT Tools"
+    },
+    {
+      "name": "Liger Kernel",
+      "url": "https://github.com/linkedin/Liger-Kernel",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "LoRA / PEFT Tools"
+    },
+    {
+      "name": "MergeKit",
+      "url": "https://github.com/arcee-ai/mergekit",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "LoRA / PEFT Tools"
+    },
+    {
+      "name": "distilabel",
+      "url": "https://github.com/argilla-io/distilabel",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Synthetic Data Generation"
+    },
+    {
+      "name": "Data-Juicer",
+      "url": "https://github.com/alibaba/data-juicer",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Synthetic Data Generation"
+    },
+    {
+      "name": "Argilla",
+      "url": "https://github.com/argilla-io/argilla",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Synthetic Data Generation"
+    },
+    {
+      "name": "SDV (Synthetic Data Vault)",
+      "url": "https://github.com/sdv-dev/SDV",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Synthetic Data Generation"
+    },
+    {
+      "name": "DataTrove (Hugging Face)",
+      "url": "https://github.com/huggingface/datatrove",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Synthetic Data Generation"
+    },
+    {
+      "name": "Bespoke Curator",
+      "url": "https://github.com/bespokelabsai/curator",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Synthetic Data Generation"
+    },
+    {
+      "name": "SDG (Harbin Institute)",
+      "url": "https://github.com/hitsz-ids/synthetic-data-generator",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Synthetic Data Generation"
+    },
+    {
+      "name": "DeepSpeed",
+      "url": "https://github.com/deepspeedai/DeepSpeed",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Distributed Training"
+    },
+    {
+      "name": "Colossal-AI",
+      "url": "https://github.com/hpcaitech/ColossalAI",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Distributed Training"
+    },
+    {
+      "name": "Megatron-LM",
+      "url": "https://github.com/NVIDIA/Megatron-LM",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Distributed Training"
+    },
+    {
+      "name": "Composer",
+      "url": "https://github.com/mosaicml/composer",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Distributed Training"
+    },
+    {
+      "name": "Ray Train",
+      "url": "https://github.com/ray-project/ray",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Distributed Training"
+    },
+    {
+      "name": "Nanotron (Hugging Face)",
+      "url": "https://github.com/huggingface/nanotron",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Distributed Training"
+    },
+    {
+      "name": "veScale (ByteDance)",
+      "url": "https://github.com/volcengine/veScale",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Distributed Training"
+    },
+    {
+      "name": "GPT-NeoX (EleutherAI)",
+      "url": "https://github.com/EleutherAI/gpt-neox",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Distributed Training"
+    },
+    {
+      "name": "RLinf",
+      "url": "https://github.com/RLinf/RLinf",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Distributed Training"
+    },
+    {
+      "name": "dstack",
+      "url": "https://github.com/dstackai/dstack",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Distributed Training"
+    },
+    {
+      "name": "Streaming (MosaicML)",
+      "url": "https://github.com/mosaicml/streaming",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Distributed Training"
+    },
+    {
+      "name": "LLM Compressor (vLLM)",
+      "url": "https://github.com/vllm-project/llm-compressor",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Model Quantization & Optimization"
+    },
+    {
+      "name": "NVIDIA Model Optimizer",
+      "url": "https://github.com/NVIDIA/Model-Optimizer",
+      "category": "Training & Fine-tuning Ecosystem",
+      "subcategory": "Model Quantization & Optimization"
+    },
+    {
+      "name": "MLflow",
+      "url": "https://github.com/mlflow/mlflow",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Experiment Tracking & Versioning"
+    },
+    {
+      "name": "DVC (Data Version Control)",
+      "url": "https://github.com/iterative/dvc",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Experiment Tracking & Versioning"
+    },
+    {
+      "name": "ClearML",
+      "url": "https://github.com/clearml/clearml",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Experiment Tracking & Versioning"
+    },
+    {
+      "name": "Weights & Biases Weave",
+      "url": "https://github.com/wandb/weave",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Experiment Tracking & Versioning"
+    },
+    {
+      "name": "Aim",
+      "url": "https://github.com/aimhubio/aim",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Experiment Tracking & Versioning"
+    },
+    {
+      "name": "Feast",
+      "url": "https://github.com/feast-dev/feast",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Experiment Tracking & Versioning"
+    },
+    {
+      "name": "Civitai",
+      "url": "https://github.com/civitai/civitai",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Model Hubs & Registries"
+    },
+    {
+      "name": "Hugging Face Hub",
+      "url": "https://github.com/huggingface/huggingface_hub",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Model Hubs & Registries"
+    },
+    {
+      "name": "ModelScope",
+      "url": "https://github.com/modelscope/modelscope",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Model Hubs & Registries"
+    },
+    {
+      "name": "OpenVINO Open Model Zoo",
+      "url": "https://github.com/openvinotoolkit/open_model_zoo",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Model Hubs & Registries"
+    },
+    {
+      "name": "ONNX Model Zoo",
+      "url": "https://github.com/onnx/models",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Model Hubs & Registries"
+    },
+    {
+      "name": "Transformers.js",
+      "url": "https://github.com/huggingface/transformers.js",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Model Hubs & Registries"
+    },
+    {
+      "name": "DJL (Deep Java Library)",
+      "url": "https://github.com/deepjavalibrary/djl",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Model Hubs & Registries"
+    },
+    {
+      "name": "PaddleSeg",
+      "url": "https://github.com/PaddlePaddle/PaddleSeg",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Model Hubs & Registries"
+    },
+    {
+      "name": "Cog (Replicate)",
+      "url": "https://github.com/replicate/cog",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Model Packaging & Deployment"
+    },
+    {
+      "name": "BentoML",
+      "url": "https://github.com/bentoml/BentoML",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Ray Serve",
+      "url": "https://github.com/ray-project/ray",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "ZenML",
+      "url": "https://github.com/zenml-io/zenml",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Kubeflow",
+      "url": "https://github.com/kubeflow/kubeflow",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "KServe",
+      "url": "https://github.com/kserve/kserve",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Seldon Core",
+      "url": "https://github.com/SeldonIO/seldon-core",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Metaflow",
+      "url": "https://github.com/Netflix/metaflow",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Flyte",
+      "url": "https://github.com/flyteorg/flyte",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Prefect",
+      "url": "https://github.com/prefecthq/prefect",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Dagster",
+      "url": "https://github.com/dagster-io/dagster",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Kubeflow Pipelines",
+      "url": "https://github.com/kubeflow/pipelines",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Argo Workflows",
+      "url": "https://github.com/argoproj/argo-workflows",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "MLRun",
+      "url": "https://github.com/mlrun/mlrun",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Kestra",
+      "url": "https://github.com/kestra-io/kestra",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "KitOps",
+      "url": "https://github.com/jozu-ai/kitops",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Polyaxon",
+      "url": "https://github.com/polyaxon/polyaxon",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Netflix Maestro",
+      "url": "https://github.com/Netflix/maestro",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "HAMi",
+      "url": "https://github.com/Project-HAMi/HAMi",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "NVIDIA KAI Scheduler",
+      "url": "https://github.com/NVIDIA/KAI-Scheduler",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "NVIDIA DeepOps",
+      "url": "https://github.com/NVIDIA/deepops",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "SkyPilot",
+      "url": "https://github.com/skypilot-org/skypilot",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Deployment & Orchestration"
+    },
+    {
+      "name": "Featuretools",
+      "url": "https://github.com/alteryx/featuretools",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Feature Engineering & Data Preparation"
+    },
+    {
+      "name": "Kedro",
+      "url": "https://github.com/kedro-org/kedro",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Feature Engineering & Data Preparation"
+    },
+    {
+      "name": "Feature-engine",
+      "url": "https://github.com/feature-engine/feature_engine",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Feature Engineering & Data Preparation"
+    },
+    {
+      "name": "NVTabular",
+      "url": "https://github.com/NVIDIA-Merlin/NVTabular",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Feature Engineering & Data Preparation"
+    },
+    {
+      "name": "OpenMLDB",
+      "url": "https://github.com/4paradigm/OpenMLDB",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Feature Engineering & Data Preparation"
+    },
+    {
+      "name": "Langfuse",
+      "url": "https://github.com/langfuse/langfuse",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "Phoenix (Arize)",
+      "url": "https://github.com/Arize-ai/phoenix",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "Evidently",
+      "url": "https://github.com/evidentlyai/evidently",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "Deepchecks",
+      "url": "https://github.com/deepchecks/deepchecks",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "Opik (Comet)",
+      "url": "https://github.com/comet-ml/opik",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "LiteLLM",
+      "url": "https://github.com/BerriAI/litellm",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "OpenLIT",
+      "url": "https://github.com/openlit/openlit",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "OpenLLMetry (Traceloop)",
+      "url": "https://github.com/traceloop/openllmetry",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "Agenta",
+      "url": "https://github.com/Agenta-AI/agenta",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "Latitude",
+      "url": "https://github.com/latitude-dev/latitude-llm",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "Helicone",
+      "url": "https://github.com/helicone/helicone",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "Giskard",
+      "url": "https://github.com/Giskard-AI/giskard-oss",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "Portkey Gateway",
+      "url": "https://github.com/Portkey-AI/gateway",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "TensorZero",
+      "url": "https://github.com/tensorzero/tensorzero",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "Envoy AI Gateway",
+      "url": "https://github.com/envoyproxy/ai-gateway",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "Pezzo",
+      "url": "https://github.com/pezzolabs/pezzo",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "Microsoft PromptFlow",
+      "url": "https://github.com/microsoft/promptflow",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "ChainForge",
+      "url": "https://github.com/ianarawjo/ChainForge",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Monitoring, Evaluation & Observability"
+    },
+    {
+      "name": "NVIDIA NeMo Guardrails",
+      "url": "https://github.com/NVIDIA/NeMo-Guardrails",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Guardrails & Safety Tools"
+    },
+    {
+      "name": "Guardrails AI",
+      "url": "https://github.com/guardrails-ai/guardrails",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Guardrails & Safety Tools"
+    },
+    {
+      "name": "LLM Guard",
+      "url": "https://github.com/protectai/llm-guard",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Guardrails & Safety Tools"
+    },
+    {
+      "name": "PurpleLlama (Meta)",
+      "url": "https://github.com/meta-llama/PurpleLlama",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Guardrails & Safety Tools"
+    },
+    {
+      "name": "Garak (NVIDIA)",
+      "url": "https://github.com/NVIDIA/garak",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Guardrails & Safety Tools"
+    },
+    {
+      "name": "Promptfoo",
+      "url": "https://github.com/promptfoo/promptfoo",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Guardrails & Safety Tools"
+    },
+    {
+      "name": "DeepTeam (Confident AI)",
+      "url": "https://github.com/confident-ai/deepteam",
+      "category": "MLOps / LLMOps & Production",
+      "subcategory": "Guardrails & Safety Tools"
+    },
+    {
+      "name": "LiveBench",
+      "url": "https://github.com/LiveBench/LiveBench",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "lm-evaluation-harness (EleutherAI)",
+      "url": "https://github.com/EleutherAI/lm-evaluation-harness",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "HELM (Stanford)",
+      "url": "https://github.com/stanford-crfm/helm",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "SWE-bench",
+      "url": "https://github.com/SWE-bench/SWE-bench",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "GAIA",
+      "url": "https://huggingface.co/datasets/gaia-benchmark/GAIA",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "OpenCompass",
+      "url": "https://github.com/open-compass/opencompass",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "MLPerf Inference",
+      "url": "https://github.com/mlcommons/inference",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "MLPerf Training",
+      "url": "https://github.com/mlcommons/training",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "VLMEvalKit",
+      "url": "https://github.com/open-compass/VLMEvalKit",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "MTEB",
+      "url": "https://github.com/embeddings-benchmark/mteb",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "Vectara Hallucination Leaderboard",
+      "url": "https://github.com/vectara/hallucination-leaderboard",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "SWE-rebench (Nebius)",
+      "url": "https://huggingface.co/datasets/nebius/SWE-rebench",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "AgentBench (THUDM)",
+      "url": "https://github.com/THUDM/AgentBench",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Benchmark Suites"
+    },
+    {
+      "name": "DeepEval",
+      "url": "https://github.com/confident-ai/deepeval",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "Inspect AI",
+      "url": "https://github.com/UKGovernmentBEIS/inspect_ai",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "RAGAs",
+      "url": "https://github.com/explodinggradients/ragas",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "Lighteval",
+      "url": "https://github.com/huggingface/lighteval",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "Hugging Face Evaluate",
+      "url": "https://github.com/huggingface/evaluate",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "OpenAI Evals",
+      "url": "https://github.com/openai/evals",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "LMMs-Eval",
+      "url": "https://github.com/EvolvingLMMs-Lab/lmms-eval",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "FlashRAG",
+      "url": "https://github.com/RUC-NLPIR/FlashRAG",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "BrowserGym",
+      "url": "https://github.com/ServiceNow/BrowserGym",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "TruLens",
+      "url": "https://github.com/truera/trulens",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "OpenEvals",
+      "url": "https://github.com/langchain-ai/openevals",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "AutoRAG",
+      "url": "https://github.com/Marker-Inc-Korea/AutoRAG",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "E2B Code Interpreter",
+      "url": "https://github.com/e2b-dev/code-interpreter",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "SimpleEvals (OpenAI)",
+      "url": "https://github.com/openai/simple-evals",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "Evaluation Frameworks"
+    },
+    {
+      "name": "Hugging Face Datasets",
+      "url": "https://github.com/huggingface/datasets",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "High-quality Open Datasets & Data Tools"
+    },
+    {
+      "name": "Cleanlab",
+      "url": "https://github.com/cleanlab/cleanlab",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "High-quality Open Datasets & Data Tools"
+    },
+    {
+      "name": "FineWeb / FineWeb-2 (Hugging Face)",
+      "url": "https://huggingface.co/datasets/HuggingFaceFW/fineweb",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "High-quality Open Datasets & Data Tools"
+    },
+    {
+      "name": "OSWorld",
+      "url": "https://github.com/xlang-ai/OSWorld",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "High-quality Open Datasets & Data Tools"
+    },
+    {
+      "name": "OpenThoughts",
+      "url": "https://github.com/open-thoughts/open-thoughts",
+      "category": "Evaluation, Benchmarks & Datasets",
+      "subcategory": "High-quality Open Datasets & Data Tools"
+    },
+    {
+      "name": "Inspect AI",
+      "url": "https://github.com/UKGovernmentBEIS/inspect_ai",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Safety Evaluation Frameworks"
+    },
+    {
+      "name": "AgentOps",
+      "url": "https://github.com/AgentOps-AI/agentops",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Safety Evaluation Frameworks"
+    },
+    {
+      "name": "DeepEval",
+      "url": "https://github.com/confident-ai/deepeval",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Safety Evaluation Frameworks"
+    },
+    {
+      "name": "Bloom",
+      "url": "https://github.com/safety-research/bloom",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Safety Evaluation Frameworks"
+    },
+    {
+      "name": "Safe-RLHF",
+      "url": "https://github.com/PKU-Alignment/safe-rlhf",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Alignment & RLHF Tools"
+    },
+    {
+      "name": "Alignment Handbook",
+      "url": "https://github.com/huggingface/alignment-handbook",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Alignment & RLHF Tools"
+    },
+    {
+      "name": "OpenRLHF",
+      "url": "https://github.com/OpenRLHF/OpenRLHF",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Alignment & RLHF Tools"
+    },
+    {
+      "name": "interpret (Microsoft)",
+      "url": "https://github.com/interpretml/interpret",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Interpretability & Explainability"
+    },
+    {
+      "name": "TransformerLens",
+      "url": "https://github.com/TransformerLensOrg/TransformerLens",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Interpretability & Explainability"
+    },
+    {
+      "name": "SAELens",
+      "url": "https://github.com/jbloomAus/SAELens",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Interpretability & Explainability"
+    },
+    {
+      "name": "Captum",
+      "url": "https://github.com/pytorch/captum",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Interpretability & Explainability"
+    },
+    {
+      "name": "SHAP",
+      "url": "https://github.com/shap/shap",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Interpretability & Explainability"
+    },
+    {
+      "name": "XAI",
+      "url": "https://github.com/EthicalML/xai",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Interpretability & Explainability"
+    },
+    {
+      "name": "EasyEdit",
+      "url": "https://github.com/zjunlp/EasyEdit",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Interpretability & Explainability"
+    },
+    {
+      "name": "AIX360",
+      "url": "https://github.com/Trusted-AI/AIX360",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Interpretability & Explainability"
+    },
+    {
+      "name": "ELI5",
+      "url": "https://github.com/TeamHG-Memex/eli5",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Interpretability & Explainability"
+    },
+    {
+      "name": "Shapash",
+      "url": "https://github.com/MAIF/shapash",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Interpretability & Explainability"
+    },
+    {
+      "name": "AI Fairness 360",
+      "url": "https://github.com/Trusted-AI/AIF360",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Fairness & Bias Mitigation"
+    },
+    {
+      "name": "Fairlearn",
+      "url": "https://github.com/fairlearn/fairlearn",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Fairness & Bias Mitigation"
+    },
+    {
+      "name": "PyRIT (Microsoft)",
+      "url": "https://github.com/microsoft/PyRIT",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Adversarial & Red-teaming Tools"
+    },
+    {
+      "name": "Garak (NVIDIA)",
+      "url": "https://github.com/NVIDIA/garak",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Adversarial & Red-teaming Tools"
+    },
+    {
+      "name": "Promptfoo",
+      "url": "https://github.com/promptfoo/promptfoo",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Adversarial & Red-teaming Tools"
+    },
+    {
+      "name": "LLM Guard (Protect AI)",
+      "url": "https://github.com/protectai/llm-guard",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Adversarial & Red-teaming Tools"
+    },
+    {
+      "name": "Adversarial Robustness Toolbox (ART)",
+      "url": "https://github.com/Trusted-AI/adversarial-robustness-toolbox",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Adversarial & Red-teaming Tools"
+    },
+    {
+      "name": "DeepTeam (Confident AI)",
+      "url": "https://github.com/confident-ai/deepteam",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Adversarial & Red-teaming Tools"
+    },
+    {
+      "name": "Agentic Security",
+      "url": "https://github.com/msoedov/agentic_security",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Adversarial & Red-teaming Tools"
+    },
+    {
+      "name": "LlamaFirewall (Meta)",
+      "url": "https://github.com/meta-llama/PurpleLlama",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Adversarial & Red-teaming Tools"
+    },
+    {
+      "name": "Detoxify",
+      "url": "https://github.com/unitaryai/detoxify",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Adversarial & Red-teaming Tools"
+    },
+    {
+      "name": "Responsible AI Toolbox",
+      "url": "https://github.com/microsoft/responsible-ai-toolbox",
+      "category": "AI Safety, Alignment & Interpretability",
+      "subcategory": "Responsible AI Development"
+    },
+    {
+      "name": "GraphCast",
+      "url": "https://github.com/google-deepmind/graphcast",
+      "category": "Specialized Domains",
+      "subcategory": "Weather & Climate AI"
+    },
+    {
+      "name": "NVIDIA Modulus",
+      "url": "https://github.com/NVIDIA/modulus",
+      "category": "Specialized Domains",
+      "subcategory": "Scientific AI & Physics ML"
+    },
+    {
+      "name": "TorchGeo",
+      "url": "https://github.com/microsoft/torchgeo",
+      "category": "Specialized Domains",
+      "subcategory": "Scientific AI & Physics ML"
+    },
+    {
+      "name": "Astropy",
+      "url": "https://github.com/astropy/astropy",
+      "category": "Specialized Domains",
+      "subcategory": "Scientific AI & Physics ML"
+    },
+    {
+      "name": "Boltz",
+      "url": "https://github.com/jwohlwend/boltz",
+      "category": "Specialized Domains",
+      "subcategory": "Scientific AI & Drug Discovery"
+    },
+    {
+      "name": "Protenix",
+      "url": "https://github.com/bytedance/Protenix",
+      "category": "Specialized Domains",
+      "subcategory": "Scientific AI & Drug Discovery"
+    },
+    {
+      "name": "OpenFold",
+      "url": "https://github.com/aqlaboratory/openfold",
+      "category": "Specialized Domains",
+      "subcategory": "Scientific AI & Drug Discovery"
+    },
+    {
+      "name": "DeepChem",
+      "url": "https://github.com/deepchem/deepchem",
+      "category": "Specialized Domains",
+      "subcategory": "Scientific AI & Drug Discovery"
+    },
+    {
+      "name": "PyMC",
+      "url": "https://github.com/pymc-devs/pymc",
+      "category": "Specialized Domains",
+      "subcategory": "Probabilistic Programming & Bayesian ML"
+    },
+    {
+      "name": "ArviZ",
+      "url": "https://github.com/arviz-devs/arviz",
+      "category": "Specialized Domains",
+      "subcategory": "Probabilistic Programming & Bayesian ML"
+    },
+    {
+      "name": "Stanza",
+      "url": "https://github.com/stanfordnlp/stanza",
+      "category": "Specialized Domains",
+      "subcategory": "Probabilistic Programming & Bayesian ML"
+    },
+    {
+      "name": "MONAI",
+      "url": "https://github.com/Project-MONAI/MONAI",
+      "category": "Specialized Domains",
+      "subcategory": "Medical Imaging & Healthcare AI"
+    },
+    {
+      "name": "nnU-Net",
+      "url": "https://github.com/MIC-DKFZ/nnUNet",
+      "category": "Specialized Domains",
+      "subcategory": "Medical Imaging & Healthcare AI"
+    },
+    {
+      "name": "Unity ML-Agents",
+      "url": "https://github.com/Unity-Technologies/ml-agents",
+      "category": "Specialized Domains",
+      "subcategory": "Game AI & Simulations"
+    },
+    {
+      "name": "OpenSpiel",
+      "url": "https://github.com/google-deepmind/open_spiel",
+      "category": "Specialized Domains",
+      "subcategory": "Game AI & Simulations"
+    },
+    {
+      "name": "OpenBB",
+      "url": "https://github.com/OpenBB-finance/OpenBB",
+      "category": "Specialized Domains",
+      "subcategory": "Finance & Quantitative AI"
+    },
+    {
+      "name": "FinGPT",
+      "url": "https://github.com/AI4Finance-Foundation/FinGPT",
+      "category": "Specialized Domains",
+      "subcategory": "Finance & Quantitative AI"
+    },
+    {
+      "name": "FinRL",
+      "url": "https://github.com/AI4Finance-Foundation/FinRL",
+      "category": "Specialized Domains",
+      "subcategory": "Finance & Quantitative AI"
+    },
+    {
+      "name": "Qlib",
+      "url": "https://github.com/microsoft/qlib",
+      "category": "Specialized Domains",
+      "subcategory": "Finance & Quantitative AI"
+    },
+    {
+      "name": "FinRobot",
+      "url": "https://github.com/AI4Finance-Foundation/FinRobot",
+      "category": "Specialized Domains",
+      "subcategory": "Finance & Quantitative AI"
+    },
+    {
+      "name": "OpenCV",
+      "url": "https://github.com/opencv/opencv",
+      "category": "Specialized Domains",
+      "subcategory": "Computer Vision"
+    },
+    {
+      "name": "Ultralytics YOLO",
+      "url": "https://github.com/ultralytics/ultralytics",
+      "category": "Specialized Domains",
+      "subcategory": "Computer Vision"
+    },
+    {
+      "name": "Detectron2",
+      "url": "https://github.com/facebookresearch/detectron2",
+      "category": "Specialized Domains",
+      "subcategory": "Computer Vision"
+    },
+    {
+      "name": "CVAT",
+      "url": "https://github.com/cvat-ai/cvat",
+      "category": "Specialized Domains",
+      "subcategory": "Computer Vision"
+    },
+    {
+      "name": "SAM 2",
+      "url": "https://github.com/facebookresearch/sam2",
+      "category": "Specialized Domains",
+      "subcategory": "Computer Vision"
+    },
+    {
+      "name": "Kornia",
+      "url": "https://github.com/kornia/kornia",
+      "category": "Specialized Domains",
+      "subcategory": "Computer Vision"
+    },
+    {
+      "name": "torchaudio",
+      "url": "https://github.com/pytorch/audio",
+      "category": "Specialized Domains",
+      "subcategory": "Computer Vision"
+    },
+    {
+      "name": "MediaPipe",
+      "url": "https://github.com/google-ai-edge/mediapipe",
+      "category": "Specialized Domains",
+      "subcategory": "Computer Vision"
+    },
+    {
+      "name": "Open3D",
+      "url": "https://github.com/isl-org/Open3D",
+      "category": "Specialized Domains",
+      "subcategory": "3D Vision & Point Cloud Processing"
+    },
+    {
+      "name": "Point Cloud Library (PCL)",
+      "url": "https://github.com/PointCloudLibrary/pcl",
+      "category": "Specialized Domains",
+      "subcategory": "3D Vision & Point Cloud Processing"
+    },
+    {
+      "name": "PyTorch3D",
+      "url": "https://github.com/facebookresearch/pytorch3d",
+      "category": "Specialized Domains",
+      "subcategory": "3D Vision & Point Cloud Processing"
+    },
+    {
+      "name": "RTAB-Map",
+      "url": "https://github.com/introlab/rtabmap",
+      "category": "Specialized Domains",
+      "subcategory": "3D Vision & Point Cloud Processing"
+    },
+    {
+      "name": "MoveIt 2",
+      "url": "https://github.com/ros-planning/moveit2",
+      "category": "Specialized Domains",
+      "subcategory": "3D Vision & Point Cloud Processing"
+    },
+    {
+      "name": "LeRobot (Hugging Face)",
+      "url": "https://github.com/huggingface/lerobot",
+      "category": "Specialized Domains",
+      "subcategory": "Reinforcement Learning & Robotics"
+    },
+    {
+      "name": "Stable-Baselines3",
+      "url": "https://github.com/DLR-RM/stable-baselines3",
+      "category": "Specialized Domains",
+      "subcategory": "Reinforcement Learning & Robotics"
+    },
+    {
+      "name": "Isaac Lab",
+      "url": "https://github.com/isaac-sim/IsaacLab",
+      "category": "Specialized Domains",
+      "subcategory": "Reinforcement Learning & Robotics"
+    },
+    {
+      "name": "MuJoCo",
+      "url": "https://github.com/google-deepmind/mujoco",
+      "category": "Specialized Domains",
+      "subcategory": "Reinforcement Learning & Robotics"
+    },
+    {
+      "name": "Gymnasium (ex-OpenAI Gym)",
+      "url": "https://github.com/Farama-Foundation/Gymnasium",
+      "category": "Specialized Domains",
+      "subcategory": "Reinforcement Learning & Robotics"
+    },
+    {
+      "name": "Time Series Library (TSLib)",
+      "url": "https://github.com/thuml/Time-Series-Library",
+      "category": "Specialized Domains",
+      "subcategory": "Time Series & Scientific AI"
+    },
+    {
+      "name": "Chronos (Amazon)",
+      "url": "https://github.com/amazon-science/chronos-forecasting",
+      "category": "Specialized Domains",
+      "subcategory": "Time Series & Scientific AI"
+    },
+    {
+      "name": "GluonTS (AWS Labs)",
+      "url": "https://github.com/awslabs/gluonts",
+      "category": "Specialized Domains",
+      "subcategory": "Time Series & Scientific AI"
+    },
+    {
+      "name": "Darts",
+      "url": "https://github.com/unit8co/darts",
+      "category": "Specialized Domains",
+      "subcategory": "Time Series & Scientific AI"
+    },
+    {
+      "name": "AutoTS",
+      "url": "https://github.com/winedarksea/AutoTS",
+      "category": "Specialized Domains",
+      "subcategory": "Time Series & Scientific AI"
+    },
+    {
+      "name": "TensorFlow Lite",
+      "url": "https://github.com/tensorflow/tensorflow",
+      "category": "Specialized Domains",
+      "subcategory": "Edge / On-device AI"
+    },
+    {
+      "name": "ONNX Runtime",
+      "url": "https://github.com/microsoft/onnxruntime",
+      "category": "Specialized Domains",
+      "subcategory": "Edge / On-device AI"
+    },
+    {
+      "name": "ExecuTorch",
+      "url": "https://github.com/pytorch/executorch",
+      "category": "Specialized Domains",
+      "subcategory": "Edge / On-device AI"
+    },
+    {
+      "name": "OpenVINO",
+      "url": "https://github.com/openvinotoolkit/openvino",
+      "category": "Specialized Domains",
+      "subcategory": "Edge / On-device AI"
+    },
+    {
+      "name": "Apache TVM",
+      "url": "https://github.com/apache/tvm",
+      "category": "Specialized Domains",
+      "subcategory": "Edge / On-device AI"
+    },
+    {
+      "name": "NCNN",
+      "url": "https://github.com/Tencent/ncnn",
+      "category": "Specialized Domains",
+      "subcategory": "Edge / On-device AI"
+    },
+    {
+      "name": "MNN",
+      "url": "https://github.com/alibaba/MNN",
+      "category": "Specialized Domains",
+      "subcategory": "Edge / On-device AI"
+    },
+    {
+      "name": "OpenContracts",
+      "url": "https://github.com/Open-Source-Legal/OpenContracts",
+      "category": "Specialized Domains",
+      "subcategory": "Legal AI & Contract Analysis"
+    },
+    {
+      "name": "CARLA",
+      "url": "https://github.com/carla-simulator/carla",
+      "category": "Specialized Domains",
+      "subcategory": "Autonomous Driving & Robotics Simulators"
+    },
+    {
+      "name": "Webots",
+      "url": "https://github.com/cyberbotics/webots",
+      "category": "Specialized Domains",
+      "subcategory": "Autonomous Driving & Robotics Simulators"
+    },
+    {
+      "name": "Habitat-Sim",
+      "url": "https://github.com/facebookresearch/habitat-sim",
+      "category": "Specialized Domains",
+      "subcategory": "Autonomous Driving & Robotics Simulators"
+    },
+    {
+      "name": "NASA Astrobee",
+      "url": "https://github.com/nasa/astrobee",
+      "category": "Specialized Domains",
+      "subcategory": "Autonomous Driving & Robotics Simulators"
+    },
+    {
+      "name": "OpenPilot",
+      "url": "https://github.com/commaai/openpilot",
+      "category": "Specialized Domains",
+      "subcategory": "Autonomous Driving & Robotics Simulators"
+    },
+    {
+      "name": "Autoware",
+      "url": "https://github.com/autowarefoundation/autoware",
+      "category": "Specialized Domains",
+      "subcategory": "Autonomous Driving & Robotics Simulators"
+    },
+    {
+      "name": "OpenClaw",
+      "url": "https://github.com/openclaw/openclaw",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "Open WebUI",
+      "url": "https://github.com/open-webui/open-webui",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "text-generation-webui",
+      "url": "https://github.com/oobabooga/text-generation-webui",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "LobeChat",
+      "url": "https://github.com/lobehub/lobe-chat",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "LibreChat",
+      "url": "https://github.com/danny-avila/LibreChat",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "HuggingChat (self-hosted)",
+      "url": "https://github.com/huggingface/chat-ui",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "Khoj",
+      "url": "https://github.com/khoj-ai/khoj",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "Newelle",
+      "url": "https://github.com/qwersyk/Newelle",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "NextChat",
+      "url": "https://github.com/ChatGPTNextWeb/NextChat",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "big-AGI",
+      "url": "https://github.com/enricoros/big-AGI",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "Morphic",
+      "url": "https://github.com/miurla/morphic",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "Leon",
+      "url": "https://github.com/leon-ai/leon",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "Willow",
+      "url": "https://github.com/HeyWillow/willow",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "CoPaw",
+      "url": "https://github.com/agentscope-ai/CoPaw",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "Smart2Brain",
+      "url": "https://github.com/your-papa/obsidian-Smart2Brain",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "Casibase",
+      "url": "https://github.com/casibase/casibase",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "BionicGPT",
+      "url": "https://github.com/bionic-gpt/bionic-gpt",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Local AI Chat UIs & Personal Assistants"
+    },
+    {
+      "name": "AnythingLLM",
+      "url": "https://github.com/Mintplex-Labs/anything-llm",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Full Self-hosted AI Platforms"
+    },
+    {
+      "name": "Dify",
+      "url": "https://github.com/langgenius/dify",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Full Self-hosted AI Platforms"
+    },
+    {
+      "name": "Langflow",
+      "url": "https://github.com/langflow-ai/langflow",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Full Self-hosted AI Platforms"
+    },
+    {
+      "name": "Flowise",
+      "url": "https://github.com/FlowiseAI/Flowise",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Full Self-hosted AI Platforms"
+    },
+    {
+      "name": "LocalAI",
+      "url": "https://github.com/mudler/LocalAI",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Full Self-hosted AI Platforms"
+    },
+    {
+      "name": "Onyx",
+      "url": "https://github.com/onyx-dot-app/onyx",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Full Self-hosted AI Platforms"
+    },
+    {
+      "name": "biniou",
+      "url": "https://github.com/Woolverine94/biniou",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Full Self-hosted AI Platforms"
+    },
+    {
+      "name": "Self-hosted AI Starter Kit (n8n)",
+      "url": "https://github.com/n8n-io/self-hosted-ai-starter-kit",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Full Self-hosted AI Platforms"
+    },
+    {
+      "name": "CoAI",
+      "url": "https://github.com/coaidev/coai",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Full Self-hosted AI Platforms"
+    },
+    {
+      "name": "Plane",
+      "url": "https://github.com/makeplane/plane",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Full Self-hosted AI Platforms"
+    },
+    {
+      "name": "RAG Web UI",
+      "url": "https://github.com/rag-web-ui/rag-web-ui",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Full Self-hosted AI Platforms"
+    },
+    {
+      "name": "Jan",
+      "url": "https://github.com/janhq/jan",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Desktop & Mobile AI Apps"
+    },
+    {
+      "name": "Cherry Studio",
+      "url": "https://github.com/CherryHQ/cherry-studio",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Desktop & Mobile AI Apps"
+    },
+    {
+      "name": "DeepChat",
+      "url": "https://github.com/ThinkInAIXYZ/deepchat",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Desktop & Mobile AI Apps"
+    },
+    {
+      "name": "SillyTavern",
+      "url": "https://github.com/SillyTavern/SillyTavern",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Desktop & Mobile AI Apps"
+    },
+    {
+      "name": "ChatALL",
+      "url": "https://github.com/ai-shifu/ChatALL",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Desktop & Mobile AI Apps"
+    },
+    {
+      "name": "Chatbox",
+      "url": "https://github.com/chatboxai/chatbox",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Desktop & Mobile AI Apps"
+    },
+    {
+      "name": "Maid",
+      "url": "https://github.com/Mobile-Artificial-Intelligence/maid",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Desktop & Mobile AI Apps"
+    },
+    {
+      "name": "Dive",
+      "url": "https://github.com/OpenAgentPlatform/Dive",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Desktop & Mobile AI Apps"
+    },
+    {
+      "name": "PocketPal AI",
+      "url": "https://github.com/a-ghorbani/pocketpal-ai",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Desktop & Mobile AI Apps"
+    },
+    {
+      "name": "LiveKit Agents",
+      "url": "https://github.com/livekit/agents",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Agent & Voice Infrastructure"
+    },
+    {
+      "name": "Pipecat",
+      "url": "https://github.com/pipecat-ai/pipecat",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Agent & Voice Infrastructure"
+    },
+    {
+      "name": "Agent Chat UI",
+      "url": "https://github.com/langchain-ai/agent-chat-ui",
+      "category": "User Interfaces & Self-hosted Platforms",
+      "subcategory": "Agent & Voice Infrastructure"
+    },
+    {
+      "name": "Zed",
+      "url": "https://github.com/zed-industries/zed",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI-Native IDEs & Development Environments"
+    },
+    {
+      "name": "Void Editor",
+      "url": "https://github.com/voideditor/void",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI-Native IDEs & Development Environments"
+    },
+    {
+      "name": "Code Server",
+      "url": "https://github.com/coder/code-server",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI-Native IDEs & Development Environments"
+    },
+    {
+      "name": "Gitpod",
+      "url": "https://github.com/gitpod-io/gitpod",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI-Native IDEs & Development Environments"
+    },
+    {
+      "name": "Onlook",
+      "url": "https://github.com/onlook-dev/onlook",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI-Native IDEs & Development Environments"
+    },
+    {
+      "name": "Continue",
+      "url": "https://github.com/continuedev/continue",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI Coding Assistants (open-source)"
+    },
+    {
+      "name": "Tabby",
+      "url": "https://github.com/TabbyML/tabby",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI Coding Assistants (open-source)"
+    },
+    {
+      "name": "Cline",
+      "url": "https://github.com/cline/cline",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI Coding Assistants (open-source)"
+    },
+    {
+      "name": "Open Interpreter",
+      "url": "https://github.com/OpenInterpreter/open-interpreter",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI Coding Assistants (open-source)"
+    },
+    {
+      "name": "Roo Code",
+      "url": "https://github.com/RooCodeInc/Roo-Code",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI Coding Assistants (open-source)"
+    },
+    {
+      "name": "Aider",
+      "url": "https://github.com/Aider-AI/aider",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI Coding Assistants (open-source)"
+    },
+    {
+      "name": "Refact",
+      "url": "https://github.com/smallcloudai/refact",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI Coding Assistants (open-source)"
+    },
+    {
+      "name": "Qwen Code",
+      "url": "https://github.com/QwenLM/qwen-code",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI Coding Assistants (open-source)"
+    },
+    {
+      "name": "DeepCode",
+      "url": "https://github.com/HKUDS/DeepCode",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "AI Coding Assistants (open-source)"
+    },
+    {
+      "name": "Open Notebook",
+      "url": "https://github.com/lfnovo/open-notebook",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "Notebooks & Interactive Computing"
+    },
+    {
+      "name": "Deta Surf",
+      "url": "https://github.com/deta/surf",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "Notebooks & Interactive Computing"
+    },
+    {
+      "name": "Quarto",
+      "url": "https://github.com/quarto-dev/quarto-cli",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "Notebooks & Interactive Computing"
+    },
+    {
+      "name": "llama.vim",
+      "url": "https://github.com/ggml-org/llama.vim",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "IDE Plugins & Extensions"
+    },
+    {
+      "name": "CodeCompanion.nvim",
+      "url": "https://github.com/olimorris/codecompanion.nvim",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "IDE Plugins & Extensions"
+    },
+    {
+      "name": "Continue VS Code / JetBrains",
+      "url": "https://github.com/continuedev/continue",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "IDE Plugins & Extensions"
+    },
+    {
+      "name": "ProxyAI",
+      "url": "https://github.com/carlrobertoh/ProxyAI",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "IDE Plugins & Extensions"
+    },
+    {
+      "name": "avante.nvim",
+      "url": "https://github.com/yetone/avante.nvim",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "IDE Plugins & Extensions"
+    },
+    {
+      "name": "Serena",
+      "url": "https://github.com/oraios/serena",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "IDE Plugins & Extensions"
+    },
+    {
+      "name": "vim-ai",
+      "url": "https://github.com/madox2/vim-ai",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "IDE Plugins & Extensions"
+    },
+    {
+      "name": "windsurf.vim",
+      "url": "https://github.com/Exafunction/windsurf.vim",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "IDE Plugins & Extensions"
+    },
+    {
+      "name": "Jupyter AI",
+      "url": "https://github.com/jupyterlab/jupyter-ai",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "IDE Plugins & Extensions"
+    },
+    {
+      "name": "Minuet AI",
+      "url": "https://github.com/milanglacier/minuet-ai.nvim",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "IDE Plugins & Extensions"
+    },
+    {
+      "name": "Peekaboo",
+      "url": "https://github.com/steipete/Peekaboo",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "IDE Plugins & Extensions"
+    },
+    {
+      "name": "Assistant UI",
+      "url": "https://github.com/assistant-ui/assistant-ui",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "UI Components & Chat Libraries"
+    },
+    {
+      "name": "Deep Chat",
+      "url": "https://github.com/OvidijusParsiunas/deep-chat",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "UI Components & Chat Libraries"
+    },
+    {
+      "name": "CopilotKit",
+      "url": "https://github.com/CopilotKit/CopilotKit",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "UI Components & Chat Libraries"
+    },
+    {
+      "name": "Ruler",
+      "url": "https://github.com/intellectronica/ruler",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "CLI Tools & API Clients"
+    },
+    {
+      "name": "PR-Agent (Qodo)",
+      "url": "https://github.com/qodo-ai/pr-agent",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "CLI Tools & API Clients"
+    },
+    {
+      "name": "Gemini CLI",
+      "url": "https://github.com/google-gemini/gemini-cli",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "CLI Tools & API Clients"
+    },
+    {
+      "name": "LLM (Simon Willison)",
+      "url": "https://github.com/simonw/llm",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "CLI Tools & API Clients"
+    },
+    {
+      "name": "AIChat",
+      "url": "https://github.com/sigoden/aichat",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "CLI Tools & API Clients"
+    },
+    {
+      "name": "aicommits",
+      "url": "https://github.com/Nutlope/aicommits",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "CLI Tools & API Clients"
+    },
+    {
+      "name": "Codex CLI",
+      "url": "https://github.com/openai/codex",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "CLI Tools & API Clients"
+    },
+    {
+      "name": "Repomix",
+      "url": "https://github.com/yamadashy/repomix",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "CLI Tools & API Clients"
+    },
+    {
+      "name": "GitIngest",
+      "url": "https://github.com/cyclotruc/gitingest",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "CLI Tools & API Clients"
+    },
+    {
+      "name": "Instructor",
+      "url": "https://github.com/jxnl/instructor",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "CLI Tools & API Clients"
+    },
+    {
+      "name": "Mirascope",
+      "url": "https://github.com/Mirascope/mirascope",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "CLI Tools & API Clients"
+    },
+    {
+      "name": "Context7",
+      "url": "https://github.com/upstash/context7",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "CLI Tools & API Clients"
+    },
+    {
+      "name": "Vercel AI SDK",
+      "url": "https://github.com/vercel/ai",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "SDKs & API Development Tools"
+    },
+    {
+      "name": "GitHub Copilot SDK",
+      "url": "https://github.com/github/copilot-sdk",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "SDKs & API Development Tools"
+    },
+    {
+      "name": "Fern",
+      "url": "https://github.com/fern-api/fern",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "SDKs & API Development Tools"
+    },
+    {
+      "name": "Promptfoo",
+      "url": "https://github.com/promptfoo/promptfoo",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "Testing & Debugging Tools"
+    },
+    {
+      "name": "DeepEval",
+      "url": "https://github.com/confident-ai/deepeval",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "Testing & Debugging Tools"
+    },
+    {
+      "name": "Garak",
+      "url": "https://github.com/NVIDIA/garak",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "Testing & Debugging Tools"
+    },
+    {
+      "name": "Phoenix (Arize)",
+      "url": "https://github.com/Arize-ai/phoenix",
+      "category": "Developer Tools & Integrations",
+      "subcategory": "Testing & Debugging Tools"
+    },
+    {
+      "name": "Papers with Code",
+      "url": "https://paperswithcode.com/",
+      "category": "Resources & Learning",
+      "subcategory": "Papers with Open Implementations"
+    },
+    {
+      "name": "Hugging Face Papers",
+      "url": "https://huggingface.co/papers",
+      "category": "Resources & Learning",
+      "subcategory": "Papers with Open Implementations"
+    },
+    {
+      "name": "Open LLM Leaderboard (Hugging Face)",
+      "url": "https://huggingface.co/spaces/open-llm-leaderboard",
+      "category": "Resources & Learning",
+      "subcategory": "Papers with Open Implementations"
+    },
+    {
+      "name": "Hugging Face Discussions",
+      "url": "https://discuss.huggingface.co/",
+      "category": "Resources & Learning",
+      "subcategory": "Communities, Forums & Newsletters"
+    },
+    {
+      "name": "Prompt Engineering Guide (DAIR-AI)",
+      "url": "https://github.com/dair-ai/Prompt-Engineering-Guide",
+      "category": "Resources & Learning",
+      "subcategory": "Educational Resources & Courses"
+    },
+    {
+      "name": "Homemade Machine Learning (trekhleb)",
+      "url": "https://github.com/trekhleb/homemade-machine-learning",
+      "category": "Resources & Learning",
+      "subcategory": "Educational Resources & Courses"
+    },
+    {
+      "name": "Start Machine Learning (louisfb01)",
+      "url": "https://github.com/louisfb01/start-machine-learning",
+      "category": "Resources & Learning",
+      "subcategory": "Educational Resources & Courses"
+    },
+    {
+      "name": "r/LocalLLaMA",
+      "url": "https://www.reddit.com/r/LocalLLaMA",
+      "category": "Resources & Learning",
+      "subcategory": "Educational Resources & Courses"
+    },
+    {
+      "name": "Hugging Face Course",
+      "url": "https://huggingface.co/learn",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "ML For Beginners (Microsoft)",
+      "url": "https://github.com/microsoft/ML-For-Beginners",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "LLM Course (Maxime Labonne)",
+      "url": "https://github.com/mlabonne/llm-course",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "AI For Beginners (Microsoft)",
+      "url": "https://github.com/microsoft/AI-For-Beginners",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "Generative AI for Beginners (Microsoft)",
+      "url": "https://github.com/microsoft/generative-ai-for-beginners",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "Fast.ai",
+      "url": "https://github.com/fastai/fastai",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "LangChain Academy",
+      "url": "https://academy.langchain.com/",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "Data Science for Beginners (Microsoft)",
+      "url": "https://github.com/microsoft/Data-Science-For-Beginners",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "Learn PyTorch for Deep Learning (Zero to Mastery)",
+      "url": "https://github.com/mrdbourke/pytorch-deep-learning",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "The Incredible PyTorch",
+      "url": "https://github.com/ritchieng/the-incredible-pytorch",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "Deep RL Class (Hugging Face)",
+      "url": "https://github.com/huggingface/deep-rl-class",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "Practical RL (Yandex Data School)",
+      "url": "https://github.com/yandexdataschool/Practical_RL",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "NLP Course (Yandex Data School)",
+      "url": "https://github.com/yandexdataschool/nlp_course",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "Large Language Model Notebooks Course",
+      "url": "https://github.com/peremartra/Large-Language-Model-Notebooks-Course",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "Transformers Tutorials (Niels Rogge)",
+      "url": "https://github.com/NielsRogge/Transformers-Tutorials",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "Made With ML (Goku Mohandas)",
+      "url": "https://github.com/GokuMohandas/Made-With-ML",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "AI Engineering Hub",
+      "url": "https://github.com/patchy631/ai-engineering-hub",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "Complete Agentic AI Engineering Course",
+      "url": "https://github.com/ed-donner/agents",
+      "category": "Resources & Learning",
+      "subcategory": "Courses & Interactive Playgrounds"
+    },
+    {
+      "name": "TensorFlow Tutorials",
+      "url": "https://github.com/tensorflow/docs",
+      "category": "Resources & Learning",
+      "subcategory": "Starter Projects & Examples"
+    },
+    {
+      "name": "Hugging Face Transformers Notebooks",
+      "url": "https://github.com/huggingface/notebooks",
+      "category": "Resources & Learning",
+      "subcategory": "Starter Projects & Examples"
+    },
+    {
+      "name": "Awesome Machine Learning",
+      "url": "https://github.com/josephmisiti/awesome-machine-learning",
+      "category": "Resources & Learning",
+      "subcategory": "Curated Resource Lists"
+    },
+    {
+      "name": "Andrej Karpathy Skills",
+      "url": "https://github.com/forrestchang/andrej-karpathy-skills",
+      "category": "Resources & Learning",
+      "subcategory": "Curated Resource Lists"
+    }
+  ],
+  "categories": [
+    {
+      "number": 1,
+      "name": "Core Frameworks & Libraries",
+      "count": 118
+    },
+    {
+      "number": 2,
+      "name": "Open Foundation Models",
+      "count": 54
+    },
+    {
+      "number": 3,
+      "name": "Inference Engines & Serving",
+      "count": 40
+    },
+    {
+      "number": 4,
+      "name": "Agentic AI & Multi-Agent Systems",
+      "count": 89
+    },
+    {
+      "number": 5,
+      "name": "Retrieval-Augmented Generation (RAG) & Knowledge",
+      "count": 84
+    },
+    {
+      "number": 6,
+      "name": "Generative Media Tools",
+      "count": 38
+    },
+    {
+      "number": 7,
+      "name": "Training & Fine-tuning Ecosystem",
+      "count": 54
+    },
+    {
+      "number": 8,
+      "name": "MLOps / LLMOps & Production",
+      "count": 66
+    },
+    {
+      "number": 9,
+      "name": "Evaluation, Benchmarks & Datasets",
+      "count": 32
+    },
+    {
+      "number": 10,
+      "name": "AI Safety, Alignment & Interpretability",
+      "count": 29
+    },
+    {
+      "number": 11,
+      "name": "Specialized Domains",
+      "count": 57
+    },
+    {
+      "number": 12,
+      "name": "User Interfaces & Self-hosted Platforms",
+      "count": 40
+    },
+    {
+      "number": 13,
+      "name": "Developer Tools & Integrations",
+      "count": 50
+    },
+    {
+      "number": 14,
+      "name": "Resources & Learning",
+      "count": 30
+    }
+  ],
+  "changes": {
+    "comparedWithCheckedAt": "2026-09-25T21:57:30.557Z",
+    "added": [],
+    "removed": []
+  }
+}
