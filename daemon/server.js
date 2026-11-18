@@ -8101,7 +8101,7 @@ end tell`;
         const langName = { en: "English", zh: "Simplified Chinese", ja: "Japanese",
           ko: "Korean", es: "Spanish", fr: "French", de: "German", hi: "Hindi",
           ar: "Arabic", pt: "Portuguese", ru: "Russian", id: "Indonesian",
-          vi: "Vietnamese" }[L] || L;
+          vi: "Vietnamese", it: "Italian" }[L] || L;
         // batch in chunks to keep prompts sane
         const chunks = [];
         for (let i = 0; i < missing.length; i += 60) chunks.push(missing.slice(i, i + 60));

@@ -90,7 +90,7 @@ test("overlay.html: the feed/log chrome it writes itself goes through tr()", () 
   assert.deepStrictEqual(bad, [], "Thai feed/log literal outside tr():\n" + bad.join("\n"));
 });
 
-test("i18n seeds: every tr() key used by the feed/log lines is pre-translated in all 13 languages", () => {
+test("i18n seeds: every tr() key used by the feed/log lines is pre-translated in all 14 languages", () => {
   const src = read("overlay.html").join("\n");
   const keys = new Set();
   // tr("...") and tr(cond ? "..." : "...") on feed/log lines only.
@@ -101,7 +101,7 @@ test("i18n seeds: every tr() key used by the feed/log lines is pre-translated in
   assert.ok(keys.size >= 20, "found the feed keys (" + keys.size + ")");
   const dir = path.join(__dirname, "..", "i18n-seed");
   const langs = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).map((f) => f.replace(".json", ""));
-  assert.strictEqual(langs.length, 13, "13 seed files");
+  assert.strictEqual(langs.length, 14, "14 seed files");
   for (const l of langs) {
     const seed = JSON.parse(fs.readFileSync(path.join(dir, l + ".json"), "utf8"));
     for (const k of keys) {

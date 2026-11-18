@@ -59,7 +59,7 @@ var _billboard_path := ""         # user-uploaded billboard image (persisted in 
 const LANGS := [["en", "🇬🇧 EN"], ["zh", "🇨🇳 中文"], ["es", "🇪🇸 Español"], ["hi", "🇮🇳 हिन्दी"],
 	["ar", "🇸🇦 العربية"], ["pt", "🇧🇷 Português"], ["ru", "🇷🇺 Русский"], ["ja", "🇯🇵 日本語"],
 	["de", "🇩🇪 Deutsch"], ["fr", "🇫🇷 Français"], ["ko", "🇰🇷 한국어"], ["id", "🇮🇩 Indonesia"],
-	["vi", "🇻🇳 Tiếng Việt"], ["th", "🇹🇭 ไทย"]]
+	["vi", "🇻🇳 Tiếng Việt"], ["it", "🇮🇹 Italiano"], ["th", "🇹🇭 ไทย"]]
 
 ## Pick the localized string. English is the default; th passed inline, zh/ja
 ## looked up by the English key so existing L(en, th) call sites need no change.

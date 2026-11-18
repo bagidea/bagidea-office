@@ -4,7 +4,7 @@
 //       Clear+Export sources lifted into node:vm with a minimal fake DOM
 //   (c) live daemon (127.0.0.1:8787) — skipped when the daemon is down;
 //       always restores the previous devMode value
-//   (d) i18n completeness: inline DICT + 13 seed files, 14 languages
+//   (d) i18n completeness: inline DICT + 14 seed files, 15 languages
 //   (e) toggle-handler / roster.sync state transitions
 //   (f) feed-mode CSS rule parsed, not grepped
 const test = require("node:test");
@@ -22,7 +22,7 @@ const html = fs.readFileSync(OVERLAY, "utf8");
 const serverSrc = fs.readFileSync(path.join(DAEMON, "server.js"), "utf8");
 const devmode = require("../devmode");
 
-const LANGS = ["en", "zh", "es", "hi", "ar", "pt", "ru", "ja", "de", "fr", "ko", "id", "vi"]; // + th (source)
+const LANGS = ["en", "zh", "es", "hi", "ar", "pt", "ru", "ja", "de", "fr", "ko", "id", "vi", "it"]; // + th (source)
 const DEV_MODE_KEYS = [
   "🛠 DEV MODE — โหมดนักพัฒนา: แสดงแผงละเอียด พร้อม scroll bar บันทึกงานแบบเต็มรูปแบบ สำหรับการดีบักและตรวจสอบงานรายละเอียด",
   "🛠 เปิด Dev Mode — แผงละเอียดและ scroll bar พร้อมใช้งาน",
@@ -1199,12 +1199,12 @@ function extractDict() {
   assert.ok(m, "DICT literal");
   return vm.runInNewContext("(" + m[1] + ")", {});
 }
-test("i18n: inline DICT has every Dev Mode key in all 13 non-Thai languages", () => {
+test("i18n: inline DICT has every Dev Mode key in all 14 non-Thai languages", () => {
   const DICT = extractDict();
   for (const k of DEV_MODE_KEYS) {
     assert.ok(DICT[k], "DICT missing " + k);
     for (const l of LANGS) assert.ok(typeof DICT[k][l] === "string" && DICT[k][l].trim(), `DICT[${k}].${l}`);
-    assert.deepStrictEqual(Object.keys(DICT[k]).sort(), [...LANGS].sort(), "exactly the 13 languages for " + k);
+    assert.deepStrictEqual(Object.keys(DICT[k]).sort(), [...LANGS].sort(), "exactly the 14 languages for " + k);
   }
   // the strings are actually used (static HTML → DOM walker, JS → tr())
   for (const k of DEV_MODE_KEYS) assert.ok(html.split(k).length >= 3, "key must appear in DICT and at a use site: " + k);
@@ -1218,7 +1218,7 @@ test("i18n: inline DICT has every Dev Mode key in all 13 non-Thai languages", ()
   assert.match(html, /const NO_I18N = new Set\(\[[^\]]*"devEventLog", "devToolLog", "devAgentLog", "devPerfLog"\]\)/);
 });
 
-test("i18n: all 13 seed files parse, keep their HEAD format, and carry every Dev Mode key matching DICT", () => {
+test("i18n: all 14 seed files parse, keep their HEAD format, and carry every Dev Mode key matching DICT", () => {
   const DICT = extractDict();
   assert.ok(!fs.existsSync(path.join(SEED_DIR, "add-devmode-translations.js")), "one-shot script must be deleted");
   for (const l of LANGS) {
