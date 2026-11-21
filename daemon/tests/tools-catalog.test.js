@@ -181,7 +181,7 @@ test("catalog: the game and 3D tools are present", () => {
 // aspirational.
 const I18N_DIR = path.join(__dirname, "..", "..", "web", "assets", "tools-i18n");
 // The site's own list, minus the two that live in the catalog itself.
-const OVERLAY_LANGS = ["zh", "es", "hi", "ar", "pt", "ru", "ja", "de", "fr", "ko", "id", "vi"];
+const OVERLAY_LANGS = ["zh", "es", "hi", "ar", "pt", "ru", "ja", "de", "fr", "ko", "id", "vi", "it"];
 
 function sourceStrings() {
   const out = new Set();

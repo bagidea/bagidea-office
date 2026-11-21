@@ -299,7 +299,7 @@ Sponsorship is a **recurring monthly subscription handled entirely by GitHub Spo
 - **🎨 Office Editor**: rearrange the **room grid** (click two rooms to swap), place furniture / walls / decor on a top-down grid, and **import your own models (.glb/.gltf/.fbx) and images** — spawned on top of the world, atmosphere intact
 - **Agent skill library**: every office ships with **15 builtin capability packs** you can assign from the editor — deep-research, web-automation, office-control, office-ops, plugin-builder, code-review, doc-writer, debug-detective, data-wrangler, project-kickoff, diagram-maker, archive-search, build-workflow, **file-media-toolkit**, and **schedule-via-office-job** — plus Hermes-style auto-learned skills that grow at runtime. Four of them (**file-media-toolkit, archive-search, doc-writer, schedule-via-office-job**) are carried by *every* agent by default. Skills are delivered **natively & on demand** (Claude Code progressive disclosure) so a skill's instructions load only when it's actually relevant, never bloating every prompt
 - **📄 File & Media Toolkit** (built into every agent): the office can actually *work with your files*, not just talk about them. Any agent can **read and convert PDFs**, turn **Excel / Word / PowerPoint** into data or the other way around (via LibreOffice), **author documents and slide decks** (via `pandoc`), **transcribe a YouTube link or a local video** (via `yt-dlp` + `ffmpeg`), edit and convert images (ImageMagick), and slice JSON (`jq`) — so "summarize this PDF", "make a deck from these notes", or "get me the transcript of that video" are one message, no setup. It degrades gracefully: whichever helper binaries are present are used, and the agent tells you if one is missing
-- **🌐 Multi-language UI — 14 languages**: English default + ไทย/中文/Español/हिन्दी/العربية/Português/Русский/日本語/Deutsch/Français/한국어/Indonesia/Tiếng Việt. Now **ships fully pre-translated** — switching is instant and works even **without a Gemini key**; picker in settings (office-wide, per-machine default)
+- **🌐 Multi-language UI — 15 languages**: English default + ไทย/中文/Español/हिन्दी/العربية/Português/Русский/日本語/Deutsch/Français/한국어/Indonesia/Tiếng Việt/Italiano. Now **ships fully pre-translated** — switching is instant and works even **without a Gemini key**; picker in settings (office-wide, per-machine default)
 - **🌍 Official website** in [`web/`](web/) — landing page + browsable docs, deployable to any static host
 
 ### 🎤 Voice, channels, memory & media (2026-06)
@@ -687,7 +687,7 @@ bagidea proposal show <id>        read a pitch in full
 bagidea proposal approve|reject <id> [note]   decide (+ optional note to the team)
 bagidea plugins                   list installed plugins
 bagidea plugin install <git-url>  add a plugin · plugin remove <id>
-bagidea lang [code]               show / set the office language (14 languages)
+bagidea lang [code]               show / set the office language (15 languages)
 bagidea say "<text>" | voices     speak via TTS / list voice presets
 bagidea image "<prompt>"          generate an image into the office
 bagidea channels | keys           channel + API-key status
@@ -943,6 +943,9 @@ platform we couldn't reach.
   <tr>
     <td align="center" valign="top" width="120">
       <a href="https://github.com/yaka0007"><img src="https://github.com/yaka0007.png?size=100" width="72" alt="@yaka0007"><br><sub><b>@yaka0007</b></sub></a><br><sub>Mnemosyne OS tool</sub>
+    </td>
+    <td align="center" valign="top" width="120">
+      <a href="https://github.com/PZminer85"><img src="https://github.com/PZminer85.png?size=100" width="72" alt="@PZminer85"><br><sub><b>@PZminer85</b></sub></a><br><sub>Italian language</sub>
     </td>
   </tr>
 </table>

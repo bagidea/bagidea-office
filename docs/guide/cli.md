@@ -48,7 +48,7 @@ Plugins
   bagidea plugin remove <id>    Remove (built-in plugins cannot be removed)
 
 AI features (use main API keys)
-  bagidea lang [code]               View/set the office language (14 languages)
+  bagidea lang [code]               View/set the office language (15 languages)
   bagidea say "<message>" [preset]  Have a TTS voice speak (default sunny)
   bagidea voices                    List of voice presets
   bagidea image "<prompt>"          Generate an AI image → returns a path

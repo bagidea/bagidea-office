@@ -18,7 +18,7 @@ const CATALOG = JSON.parse(fs.readFileSync(path.join(WEB, "plugins.json"), "utf8
 const PLUGINS = CATALOG.plugins || [];
 const I18N_DIR = path.join(WEB, "assets", "plugins-i18n");
 // The site's fourteen, minus the two authored in the catalog itself.
-const OVERLAY_LANGS = ["zh", "es", "hi", "ar", "pt", "ru", "ja", "de", "fr", "ko", "id", "vi"];
+const OVERLAY_LANGS = ["zh", "es", "hi", "ar", "pt", "ru", "ja", "de", "fr", "ko", "id", "vi", "it"];
 
 const sourceStrings = () =>
   new Set(PLUGINS.map((p) => p.en && p.en.desc).filter(Boolean));

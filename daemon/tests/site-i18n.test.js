@@ -7,7 +7,7 @@
 // the reader's.
 //
 // English lives inline in web/assets/i18n.js (I18N.en) and is the source of
-// truth. German and Thai are inline beside it; the other eleven languages are
+// truth. German and Thai are inline beside it; the other twelve languages are
 // per-language JSON files fetched on demand, and a missing key there silently
 // falls back to English — which is exactly why "it renders" proves nothing.
 const test = require("node:test");
@@ -47,8 +47,8 @@ function table(code) {
   return JSON.parse(fs.readFileSync(path.join(I18N_DIR, code + ".json"), "utf8"));
 }
 
-test("the site advertises 14 languages and English is the source", () => {
-  assert.strictEqual(CODES.length, 14, "LANGS no longer lists 14 languages");
+test("the site advertises 15 languages and English is the source", () => {
+  assert.strictEqual(CODES.length, 15, "LANGS no longer lists 15 languages");
   assert.strictEqual(CODES[0], "en", "English must lead the list — it is the default");
   assert.ok(Object.keys(EN).length > 300, "I18N.en looks truncated");
 });
@@ -105,7 +105,7 @@ test("i18n: no paragraph is just the English left in place", () => {
 
 test("i18n: every data-i18n key on every page exists in English", () => {
   // A typo'd key renders the hard-coded English in the markup forever, in all
-  // 14 languages, and nothing anywhere reports it.
+  // 15 languages, and nothing anywhere reports it.
   const unknown = [];
   for (const page of PAGES) {
     const html = fs.readFileSync(path.join(WEB, page), "utf8");

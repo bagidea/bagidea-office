@@ -4,6 +4,18 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
+## [Unreleased] — 🇮🇹 Italiano
+
+**Added**
+- **🇮🇹 Italian is the 15th language.** The office UI, the Dev Mode strings and the Godot map editor's
+  language list — about 880 strings, every key the other seeds carry, placeholders and markup intact —
+  by [@PZminer85](https://github.com/PZminer85) in [#71](https://github.com/bagidea/bagidea-office/pull/71).
+- **The website and both catalogs follow in the same release.** `web/assets/i18n/it.json` (407 strings),
+  the Tools Hub catalog (111) and the Plugins Hub catalog (7) are written, not left to fall back, so a
+  reader who picks Italiano on the site gets Italian end to end rather than English inside an Italian
+  layout — which the site tests treat as unsupported. Every "14 languages" on the README, the guides
+  and the website now says 15, in all 15 languages, and the tests that pin the count moved with it.
+
 ## [1.10.0] — 🧭 Agents you can walk through, and a Director that thinks on any brain
 
 **Added**

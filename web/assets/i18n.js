@@ -1,11 +1,11 @@
 /* BagIdea Office — site i18n. English is the canonical source (I18N.en).
    Other languages override per key; any missing key falls back to English.
-   The 14 languages mirror the ones the app itself supports. */
+   The 15 languages mirror the ones the app itself supports. */
 const LANGS = [
   ["en","🇬🇧 English"],["zh","🇨🇳 中文"],["es","🇪🇸 Español"],["hi","🇮🇳 हिन्दी"],
   ["ar","🇸🇦 العربية"],["pt","🇧🇷 Português"],["ru","🇷🇺 Русский"],["ja","🇯🇵 日本語"],
   ["de","🇩🇪 Deutsch"],["fr","🇫🇷 Français"],["ko","🇰🇷 한국어"],["id","🇮🇩 Indonesia"],
-  ["vi","🇻🇳 Tiếng Việt"],["th","🇹🇭 ไทย"],
+  ["vi","🇻🇳 Tiếng Việt"],["it","🇮🇹 Italiano"],["th","🇹🇭 ไทย"],
 ];
 const RTL = new Set(["ar"]);
 
@@ -51,7 +51,7 @@ const I18N = {
     hero_title:'Your wallpaper <span class="grad">goes to work</span>.',
     hero_sub:"BagIdea Office turns your desktop into a living HD-2D office where every AI agent is a real Claude that walks to its desk, asks permission, holds meetings, and gets work done — behind your icons.",
     badge_win:"Windows · macOS (beta) · Linux (experimental)", badge_open:"Open source", badge_free:"Free to run",
-    badge_langs:"14 languages",
+    badge_langs:"15 languages",
     shot_cap:"A real desktop, captured live — agents at their desks, the brand billboard, the day/night cycle following your local time.",
 
     what_eyebrow:"What is it", what_title:"Not a dashboard. A world.",
@@ -84,7 +84,7 @@ const I18N = {
     f_security_t:"Spatialized security", f_security_d:"When an agent needs a tool you haven't granted, it physically walks to the Security Center and waits. You Allow / ✓✓ Forever / Deny. Granted tools run silently and never leave the desk. A project that ships its own .claude hooks is a separate question: the card shows the literal commands, and the work waits until you answer.",
     f_auto_t:"Work that doesn't wait for you", f_auto_d:"Switch on AUTO and the team stops parking jobs on questions: each agent decides within its remit and opens its own next turn until the work is genuinely finished — up to 8 rounds, every one announced in chat. It still stops for a credential it can't get or an action that can't be undone. Scheduled orders run the same way, whether or not you're at the desk.",
     f_projects_t:"Real projects", f_projects_d:"Register real folders as projects; the Director creates and routes work into them. Each assignee's Claude session lives inside the directory and is resumable by you — one window per project.",
-    f_i18n_t:"14 languages", f_i18n_d:"The whole UI speaks 14 languages — English, ไทย, 中文, Español, हिन्दी, العربية, Português, Русский, 日本語, Deutsch, Français, 한국어, Indonesia, Tiếng Việt — auto-translated and switchable office-wide.",
+    f_i18n_t:"15 languages", f_i18n_d:"The whole UI speaks 15 languages — English, ไทย, 中文, Español, हिन्दी, العربية, Português, Русский, 日本語, Deutsch, Français, 한국어, Indonesia, Tiếng Việt, Italiano — auto-translated and switchable office-wide.",
     f_inbox_t:"One inbox, on your phone",
     f_inbox_d:"Everything the office needs from you — a tool permission, a project's hooks, a team pitch, a blocked agent, a workflow's approval — lands in one queue, and reaches you where you are: the sidebar, a pop-up, Telegram or Discord, a sound. Answer with a tap. Rules per kind, quiet hours, and a presence-aware 'only when I'm away'.",
     f_budget_t:"Budgets in money",
@@ -224,7 +224,7 @@ const I18N = {
     d_plugins_h:"Plugins, skills & tools",
     d_plugins_p:"Plugins extend the office for real — a folder with a manifest can add UI panels, HTTP routes, and commands agents can drive, with ctx access to the registry, feed, broadcasting and even running Claude turns. Two core plugins ship in the box (🎵 Music Player, 🧮 Calculator); install more from any GitHub repo. Start from the official template, or read the worked example repos.",
     d_skills_p:"Every office ships with 15 builtin skill packs — deep research, web automation, office control, office operations, plugin building, code review, doc writing, debugging, data wrangling, project kickoff, diagram making, archive recall, workflow building, a file & media toolkit (read/convert PDF·Excel·Word·PowerPoint, build slide decks, transcribe video, edit images), and office-scheduled jobs — that you can assign to any agent, plus Hermes-style skills the office learns automatically after real work. Add new raw capability via MCP servers.",
-    d_lang_h:"Languages", d_lang_p:"The whole interface supports 14 languages. English is the default; pick another in settings and the office translates office-wide (and remembers your choice per machine). This website speaks the same 14 languages — use the picker in the top bar.",
+    d_lang_h:"Languages", d_lang_p:"The whole interface supports 15 languages. English is the default; pick another in settings and the office translates office-wide (and remembers your choice per machine). This website speaks the same 15 languages — use the picker in the top bar.",
     d_wf_h:"Workflow Builder",
     d_wf_p:"Plan work as plain-language nodes on a drag-drop canvas (⋯ menu → Workflow Builder) — each node is a step (trigger / fetch / action / decision / output) and the flow reads top to bottom. Press Analyze and the Director reads your plan and tells you which skills and tools it needs, what permissions or extra agents to add, and what's still undecided — so you can plan work even if you don't know how to instruct it, and let the team work out the execution.",
     d_wf_1:"<b>Add nodes & write in plain language.</b> e.g. “every morning summarize AI news, then send it to Telegram”. Drag cards to order the flow top→bottom.",
@@ -295,7 +295,7 @@ const I18N = {
     hero_title:'Ihr Hintergrundbild <span class="grad">geht arbeiten</span>.',
     hero_sub:"BagIdea Office verwandelt deinen Desktop in ein lebendiges HD-2D-Büro, in dem jeder KI-Agent ein echter Claude ist, der an seinen Schreibtisch geht, um Erlaubnis bittet, Meetings abhält und Arbeit erledigt – hinter deinen Icons.",
     badge_win:"Windows · macOS (beta) · Linux (experimental)", badge_open:"Open Source", badge_free:"Kostenlos nutzbar",
-    badge_langs:"14 Sprachen",
+    badge_langs:"15 Sprachen",
     shot_cap:"Ein echter Desktop, live aufgenommen — Agents an ihren Schreibtischen, das Marken-Billboard, der Tag-Nacht-Zyklus nach Ihrer lokalen Zeit.",
 
     what_eyebrow:"Was ist das", what_title:"Kein Dashboard. Eine Welt.",
@@ -326,7 +326,7 @@ const I18N = {
     f_security_t:"Räumliche Sicherheit", f_security_d:"Wenn ein Agent ein Werkzeug benötigt, das Sie nicht freigegeben haben, geht er physisch zur Sicherheitszentrale und wartet. Sie wählen Erlauben / ✓✓ Immer / Ablehnen. Freigegebene Werkzeuge laufen lautlos und verlassen nie den Schreibtisch. Ein Projekt, das eigene .claude-Hooks mitbringt, ist eine eigene Frage: Die Karte zeigt die Befehle im Wortlaut, und die Arbeit wartet, bis Sie antworten.",
     f_auto_t:"Arbeit, die nicht auf Sie wartet", f_auto_d:"Schalten Sie AUTO ein und das Team parkt die Arbeit nicht mehr bei einer Rückfrage: Jeder Agent entscheidet im Rahmen seiner Zuständigkeit und öffnet seinen nächsten Zug selbst, bis die Arbeit wirklich fertig ist — bis zu 8 Runden, jede davon im Chat angekündigt. Vor einem Zugang, den er sich nicht selbst holen kann, oder einer nicht rückgängig zu machenden Aktion hält er weiterhin an. Geplante Aufträge laufen genauso, ob Sie am Schreibtisch sitzen oder nicht.",
     f_projects_t:"Echte Projekte", f_projects_d:"Registrieren Sie echte Ordner als Projekte; der Director erstellt und leitet Arbeit in diese weiter. Die Claude-Sitzung jedes Aufgabennehmers läuft innerhalb des Verzeichnisses und kann von Ihnen fortgesetzt werden — ein Fenster pro Projekt.",
-    f_i18n_t:"14 Sprachen", f_i18n_d:"Die gesamte Benutzeroberfläche spricht 14 Sprachen — Englisch, ไทย, 中文, Español, हिन्दी, العربية, Português, Русский, 日本語, Deutsch, Français, 한국어, Indonesia, Tiếng Việt — automatisch übersetzt und büroweit umschaltbar.",
+    f_i18n_t:"15 Sprachen", f_i18n_d:"Die gesamte Benutzeroberfläche spricht 15 Sprachen — Englisch, ไทย, 中文, Español, हिन्दी, العربية, Português, Русский, 日本語, Deutsch, Français, 한국어, Indonesia, Tiếng Việt, Italiano — automatisch übersetzt und büroweit umschaltbar.",
     f_inbox_t:"Ein Posteingang, auf dem Handy",
     f_inbox_d:"Alles, was das Büro von dir braucht — eine Tool-Erlaubnis, die Hooks eines Projekts, ein Team-Vorschlag, ein blockierter Agent, die Freigabe eines Workflows — landet in einer Warteschlange und erreicht dich dort, wo du bist: Seitenleiste, Pop-up, Telegram oder Discord, ein Ton. Antworte mit einem Tipp. Regeln pro Art, Ruhezeiten und ein präsenzbewusstes „nur wenn ich weg bin“.",
     f_budget_t:"Budgets in Geld",
@@ -525,7 +525,7 @@ const I18N = {
     d_plugins_h:"Plugins, Fähigkeiten und Werkzeuge",
     d_plugins_p:"Plugins erweitern das Büro wirklich — ein Ordner mit einem Manifest kann UI-Panels, HTTP-Routen und Befehle hinzufügen, die Agents steuern können, mit ctx-Zugriff auf die Registry, den Feed, Broadcasting und sogar das Ausführen von Claude-Aufgaben. Zwei Kern-Plugins werden mitgeliefert (🎵 Music Player, 🧮 Calculator); installieren Sie weitere aus jedem GitHub-Repo. Starten Sie mit der offiziellen Vorlage oder lesen Sie die Beispiel-Repos.",
     d_skills_p:"Jedes Büro wird mit 15 integrierten Skill-Paketen geliefert — Tiefenrecherche, Web-Automatisierung, Bürosteuerung, Bürobetrieb, Plugin-Erstellung, Code-Review, Dokumentation, Debugging, Datenverwaltung, Projekt-Kickoff, Diagramm-Erstellung, Archiv-Abruf, Workflow-Erstellung, ein Datei- & Medien-Toolkit (PDF·Excel·Word·PowerPoint lesen/konvertieren, Foliensätze erstellen, Videos transkribieren, Bilder bearbeiten) und büroterminierte Jobs — die Sie jedem Agent zuweisen können, plus Hermes-artige Fähigkeiten, die das Büro nach echter Arbeit automatisch erlernt. Fügen Sie neue rohe Fähigkeiten über MCP-Server hinzu.",
-    d_lang_h:"Sprachen", d_lang_p:"Die gesamte Oberfläche unterstützt 14 Sprachen. Englisch ist die Standardsprache; wählen Sie eine andere in den Einstellungen und das Büro übersetzt büroweit (und merkt sich Ihre Wahl pro Rechner). Diese Website spricht dieselben 14 Sprachen — verwenden Sie die Auswahl in der oberen Leiste.",
+    d_lang_h:"Sprachen", d_lang_p:"Die gesamte Oberfläche unterstützt 15 Sprachen. Englisch ist die Standardsprache; wählen Sie eine andere in den Einstellungen und das Büro übersetzt büroweit (und merkt sich Ihre Wahl pro Rechner). Diese Website spricht dieselben 15 Sprachen — verwenden Sie die Auswahl in der oberen Leiste.",
 
     d_cli_h:"CLI-Referenz", d_cli_p:"Der Installer legt bagidea in Ihrem PATH ab. Es spricht mit dem laufenden Büro und kann es starten. Ein paar Highlights:",
     d_faq_h:"FAQ",
@@ -601,7 +601,7 @@ const I18N = {
     hero_title:'วอลเปเปอร์ของคุณ <span class="grad">ทำงานได้จริง</span>',
     hero_sub:"BagIdea Office เปลี่ยนเดสก์ท็อปของคุณให้เป็นออฟฟิศ HD-2D ที่มีชีวิตชีวา ซึ่งเอเจนต์ AI ทุกตัวคือ Claude ตัวจริงที่เดินไปที่โต๊ะทำงานของตัวเอง ขออนุญาต จัดประชุม และทำงานจนเสร็จสิ้น — อยู่เบื้องหลังไอคอนต่างๆ ของคุณ",
     badge_win:"Windows · macOS (beta) · Linux (experimental)", badge_open:"โอเพนซอร์ส", badge_free:"ใช้ฟรี",
-    badge_langs:"14 ภาษา",
+    badge_langs:"15 ภาษา",
     shot_cap:"เดสก์ท็อปจริง ถ่ายสด — agents นั่งทำงานที่โต๊ะ, ป้ายแบรนด์, วงจรกลางวัน-กลางคืนตามเวลาเครื่องคุณ",
 
     what_eyebrow:"มันคืออะไร", what_title:"ไม่ใช่แดชบอร์ด แต่เป็นโลกทั้งใบ",
@@ -634,7 +634,7 @@ const I18N = {
     f_security_t:"ระบบความปลอดภัยเชิงพื้นที่", f_security_d:"เมื่อ agent ต้องใช้เครื่องมือที่คุณยังไม่อนุญาต มันจะเดินไปห้องขอสิทธิ์และรอ คุณกด อนุญาต / ✓✓ ตลอดไป / ปฏิเสธ เครื่องมือที่อนุญาตแล้วทำงานเงียบ ๆ ไม่ต้องลุกจากโต๊ะ ส่วนโปรเจคที่มี .claude hook ของตัวเองเป็นอีกคำถามหนึ่ง: การ์ดจะโชว์คำสั่งจริงที่จะรัน และงานจะรอจนกว่าคุณจะตอบ",
     f_auto_t:"งานที่ไม่ต้องรอคุณ", f_auto_d:"เปิดโหมด AUTO แล้วทีมจะไม่จอดงานไว้เพราะคำถามอีก: แต่ละคนตัดสินใจเองในขอบเขตของตัวเอง แล้วเปิดเทิร์นถัดไปเองจนกว่างานจะเสร็จจริง — สูงสุด 8 รอบ และประกาศทุกรอบในแชท ยังหยุดเหมือนเดิมถ้าขาดสิทธิ์เข้าถึงที่หาเองไม่ได้ หรือเป็นสิ่งที่ย้อนกลับไม่ได้ ส่วนงานที่ตั้งเวลาไว้ก็ทำงานแบบเดียวกัน ไม่ว่าคุณจะอยู่หน้าจอหรือไม่",
     f_projects_t:"โปรเจคจริง", f_projects_d:"ลงทะเบียนโฟลเดอร์จริงเป็นโปรเจค Director สร้างและจัดงานเข้าไปได้ session ของผู้รับงานทำงานอยู่ในโฟลเดอร์นั้นและกลับมาทำต่อได้ — หนึ่งหน้าต่างต่อหนึ่งโปรเจค",
-    f_i18n_t:"14 ภาษา", f_i18n_d:"ทั้ง UI พูดได้ 14 ภาษา — อังกฤษ, ไทย, จีน, สเปน, ฮินดี, อาหรับ, โปรตุเกส, รัสเซีย, ญี่ปุ่น, เยอรมัน, ฝรั่งเศส, เกาหลี, อินโดนีเซีย, เวียดนาม — แปลอัตโนมัติและสลับได้ทั้งออฟฟิศ",
+    f_i18n_t:"15 ภาษา", f_i18n_d:"ทั้ง UI พูดได้ 15 ภาษา — อังกฤษ, ไทย, จีน, สเปน, ฮินดี, อาหรับ, โปรตุเกส, รัสเซีย, ญี่ปุ่น, เยอรมัน, ฝรั่งเศส, เกาหลี, อินโดนีเซีย, เวียดนาม, อิตาลี — แปลอัตโนมัติและสลับได้ทั้งออฟฟิศ",
     f_inbox_t:"กล่องเดียว บนมือถือคุณ",
     f_inbox_d:"ทุกอย่างที่ออฟฟิศต้องการจากคุณ — สิทธิ์ใช้เครื่องมือ hook ของโปรเจกต์ ข้อเสนอจากทีม agent ที่ติดขัด การอนุมัติของ workflow — มารวมในคิวเดียว และไปหาคุณในที่ที่คุณอยู่: แถบข้าง ป๊อปอัป Telegram หรือ Discord เสียงเตือน ตอบได้ด้วยแตะเดียว มีกฎรายประเภท ช่วงเงียบ และ \"เฉพาะตอนไม่อยู่หน้าจอ\"",
     f_budget_t:"งบเป็นเงินจริง",
@@ -773,7 +773,7 @@ const I18N = {
     d_plugins_h:"Plugin สกิล และเครื่องมือ",
     d_plugins_p:"Plugin ต่อยอดออฟฟิศได้จริง — โฟลเดอร์ที่มี manifest เพิ่มแผง UI, HTTP route, และคำสั่งที่ agent ใช้ได้ พร้อม ctx เข้าถึง registry, feed, broadcast และแม้แต่รัน Claude ได้ มี plugin หลัก 2 ตัวมาในกล่อง (🎵 Music Player, 🧮 Calculator) ติดตั้งเพิ่มจาก GitHub repo ใดก็ได้ เริ่มจากเทมเพลตทางการ หรืออ่าน repo ตัวอย่าง",
     d_skills_p:"ทุกออฟฟิศมาพร้อมสกิลแพ็กพื้นฐาน 15 ชุด — ค้นคว้าเชิงลึก, ทำงานเว็บอัตโนมัติ, ควบคุมออฟฟิศ, ดูแลงานออฟฟิศ, สร้าง plugin, รีวิวโค้ด, เขียนเอกสาร, ดีบัก, จัดการข้อมูล, เริ่มโปรเจค, ทำไดอะแกรม, ค้นคลังข้อมูลเก่า, สร้าง workflow, ชุดเครื่องมือไฟล์และสื่อ (อ่าน/แปลง PDF·Excel·Word·PowerPoint, ทำสไลด์, ถอดเสียงวิดีโอ, แก้ไขรูป), และงานตั้งเวลาของออฟฟิศ — assign ให้ agent คนไหนก็ได้ บวกสกิลสไตล์ Hermes ที่ออฟฟิศเรียนรู้เองหลังทำงานจริง เพิ่มความสามารถใหม่ผ่าน MCP servers",
-    d_lang_h:"ภาษา", d_lang_p:"ทั้งอินเทอร์เฟซรองรับ 14 ภาษา ค่าเริ่มต้นเป็นอังกฤษ เลือกภาษาอื่นในตั้งค่าแล้วออฟฟิศแปลทั้งระบบ (และจำค่าต่อเครื่อง) เว็บนี้ก็พูดได้ 14 ภาษาเดียวกัน — ใช้ตัวเลือกที่แถบบน",
+    d_lang_h:"ภาษา", d_lang_p:"ทั้งอินเทอร์เฟซรองรับ 15 ภาษา ค่าเริ่มต้นเป็นอังกฤษ เลือกภาษาอื่นในตั้งค่าแล้วออฟฟิศแปลทั้งระบบ (และจำค่าต่อเครื่อง) เว็บนี้ก็พูดได้ 15 ภาษาเดียวกัน — ใช้ตัวเลือกที่แถบบน",
     d_wf_h:"Workflow Builder",
     d_wf_p:"วางแผนงานเป็น node ภาษามนุษย์บน canvas ลากวาง (เมนู ⋯ → Workflow Builder) — แต่ละ node คือหนึ่งขั้น (เริ่มเมื่อ / ดึงข้อมูล / ทำงาน / ตัดสินใจ / ส่งผล) ลำดับอ่านจากบนลงล่าง กดปุ่ม “วิเคราะห์” แล้ว Director จะอ่านแผนของคุณ บอกว่าต้องใช้ skill/tool ไหน ต้องเปิด permission หรือจ้าง agent อะไรเพิ่ม และยังมีอะไรค้างให้ตัดสินใจ — เหมาะกับคนที่อยากให้ออฟฟิศทำงานแต่ไม่รู้จะสั่งยังไง แล้วปล่อยให้ทีม AI คิดวิธีทำเอง",
     d_wf_1:"<b>เพิ่ม node แล้วพิมพ์ภาษาคนปกติ</b> เช่น “ทุกเช้าสรุปข่าว AI แล้วส่งเข้า Telegram” ลากการ์ดจัดลำดับบน→ล่าง",

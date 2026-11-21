@@ -200,7 +200,7 @@ its `upload` route accepts a raw file body via `readBodyRaw`).
 > and send it: `curl ... --data-binary @body.json`. The daemon and panels handle UTF-8
 > fine; only the inline command line is unsafe.
 
-> **Don't ASCII-strip filenames or text (the office speaks 14 languages):** a
+> **Don't ASCII-strip filenames or text (the office speaks 15 languages):** a
 > sanitizer like `name.replace(/[^\w.\- ]/g, "_")` deletes every Thai/Chinese/Arabic
 > character (`\w` is ASCII-only) — that turned Thai song names into `____` in the Music
 > Player. Strip only what's unsafe and keep all letters:

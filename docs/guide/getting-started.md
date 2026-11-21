@@ -124,15 +124,15 @@ he'll walk back to deliver a summary report right to you
 
 Extra tools live in the **⋯ (More)** menu on the chat window header — open it to see everything
 
-### 🌐 Change language (14 languages)
+### 🌐 Change language (15 languages)
 
 Press **⋯ → 🌐 Language** for a list of languages; switching applies instantly across the whole program
 (it's an office-wide setting, remembered per machine) — full translations ship built in, so you can switch right away
 even without a Gemini key
 
-Supports 14 languages: English, ไทย (Thai), 中文 (Chinese), Español (Spanish), हिन्दी (Hindi),
+Supports 15 languages: English, ไทย (Thai), 中文 (Chinese), Español (Spanish), हिन्दी (Hindi),
 العربية (Arabic), Português (Portuguese), Русский (Russian), 日本語 (Japanese),
-Deutsch (German), Français (French), 한국어 (Korean), Indonesia, Tiếng Việt (Vietnamese)
+Deutsch (German), Français (French), 한국어 (Korean), Indonesia, Tiếng Việt (Vietnamese), Italiano (Italian)
 
 ### 🗺 Office map (live map)
 

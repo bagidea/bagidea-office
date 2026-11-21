@@ -76,6 +76,9 @@ early macOS support, when the project was Windows-only:
 - **[@yaka0007](https://github.com/yaka0007)** (YAKA) — **Mnemosyne OS** on the Tools Hub's
   *Thinking & memory* shelf: local vaults with vector + keyword recall, verified package,
   all 12 overlay languages supplied ([#69](https://github.com/bagidea/bagidea-office/pull/69), v1.10.0).
+- **[@PZminer85](https://github.com/PZminer85)** — **Italiano**, the 15th UI language: the full
+  overlay seed (~880 strings, every key the other seeds carry), the Dev Mode dictionary and the
+  Godot editor's language list, checked by hand in a running office ([#71](https://github.com/bagidea/bagidea-office/pull/71), v1.11.0).
 
 > Want to be on this list? Open a PR — see [docs/guide/plugin-hub.md](docs/guide/plugin-hub.md)
 > for plugins, or fix anything in the repo. Every merged contribution is credited here
