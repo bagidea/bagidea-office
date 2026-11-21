@@ -1326,7 +1326,7 @@
     ["en", "🇬🇧 English"], ["zh", "🇨🇳 中文"], ["es", "🇪🇸 Español"], ["hi", "🇮🇳 हिन्दी"],
     ["ar", "🇸🇦 العربية"], ["pt", "🇧🇷 Português"], ["ru", "🇷🇺 Русский"], ["ja", "🇯🇵 日本語"],
     ["de", "🇩🇪 Deutsch"], ["fr", "🇫🇷 Français"], ["ko", "🇰🇷 한국어"], ["id", "🇮🇩 Indonesia"],
-    ["vi", "🇻🇳 Tiếng Việt"], ["th", "🇹🇭 ไทย"],
+    ["vi", "🇻🇳 Tiếng Việt"], ["it", "🇮🇹 Italiano"], ["th", "🇹🇭 ไทย"],
   ];
   // DICT["thai"] = { en, zh, ja }
   const DICT = {
@@ -1500,7 +1500,7 @@
     "ทำงานอยู่…": { en: "Working…", zh: "运行中…", ja: "稼働中…" },
     "ขอใช้": { en: "Requesting", zh: "请求使用", ja: "リクエスト" },
     // 🛠 DEV MODE
-    "ไม่มีรายละเอียดที่บันทึกไว้สำหรับการเรียกนี้": {"en":"Detailed input was not captured for this call.","zh":"未记录此次调用的详细输入。","ja":"この呼び出しの詳細な入力は記録されていません。","es":"No se registró la entrada detallada de esta llamada.","hi":"इस कॉल के लिए विस्तृत इनपुट रिकॉर्ड नहीं किया गया था।","ar":"لم يتم تسجيل المدخلات التفصيلية لهذا الاستدعاء.","pt":"A entrada detalhada desta chamada não foi registrada.","ru":"Подробные входные данные этого вызова не были записаны.","de":"Für diesen Aufruf wurden keine detaillierten Eingaben erfasst.","fr":"Les données détaillées de cet appel n’ont pas été enregistrées.","ko":"이 호출의 상세 입력이 기록되지 않았습니다.","id":"Input terperinci untuk panggilan ini tidak direkam.","vi":"Đầu vào chi tiết cho lần gọi này chưa được ghi lại."},
+    "ไม่มีรายละเอียดที่บันทึกไว้สำหรับการเรียกนี้": {"en":"Detailed input was not captured for this call.","zh":"未记录此次调用的详细输入。","ja":"この呼び出しの詳細な入力は記録されていません。","es":"No se registró la entrada detallada de esta llamada.","hi":"इस कॉल के लिए विस्तृत इनपुट रिकॉर्ड नहीं किया गया था।","ar":"لم يتم تسجيل المدخلات التفصيلية لهذا الاستدعاء.","pt":"A entrada detalhada desta chamada não foi registrada.","ru":"Подробные входные данные этого вызова не были записаны.","de":"Für diesen Aufruf wurden keine detaillierten Eingaben erfasst.","fr":"Les données détaillées de cet appel n’ont pas été enregistrées.","ko":"이 호출의 상세 입력이 기록되지 않았습니다.","id":"Input terperinci untuk panggilan ini tidak direkam.","vi":"Đầu vào chi tiết cho lần gọi này chưa được ghi lại.", it: "L'input dettagliato non è stato registrato per questa chiamata."},
     "🛠 DEV MODE — โหมดนักพัฒนา: แสดงแผงละเอียด พร้อม scroll bar บันทึกงานแบบเต็มรูปแบบ สำหรับการดีบักและตรวจสอบงานรายละเอียด": {
       en: "🛠 DEV MODE — Developer mode: show detailed panels with scroll bars, full verbose logging for debugging and detailed work inspection",
       zh: "🛠 开发模式 — 显示带滚动条的详细面板，完整的详细日志记录，用于调试和详细工作检查",
@@ -1514,7 +1514,7 @@
       fr: "🛠 MODE DEV — Mode développeur : afficher les panneaux détaillés avec barres de défilement, journalisation verbeuse complète pour le débogage et l'inspection détaillée du travail",
       ko: "🛠 개발자 모드 — 개발자 모드: 스크롤바가 있는 상세 패널 표시, 디버깅 및 상세 작업 검사를 위한 전체 상세 로깅",
       id: "🛠 MODE DEV — Mode pengembang: tampilkan panel detail dengan scroll bar, logging verbose penuh untuk debugging dan inspeksi kerja detail",
-      vi: "🛠 CHẾ ĐỘ DEV — Chế độ nhà phát triển: hiển thị các panel chi tiết có thanh cuộn, ghi log chi tiết đầy đủ cho gỡ lỗi và kiểm tra công việc chi tiết" },
+      vi: "🛠 CHẾ ĐỘ DEV — Chế độ nhà phát triển: hiển thị các panel chi tiết có thanh cuộn, ghi log chi tiết đầy đủ cho gỡ lỗi và kiểm tra công việc chi tiết", it: "🛠 DEV MODE — Modalità sviluppatore: mostra pannelli dettagliati con barre di scorrimento e log completi per il debug e l'analisi del lavoro" },
     "🛠 เปิด Dev Mode — แผงละเอียดและ scroll bar พร้อมใช้งาน": {
       en: "🛠 Dev Mode ON — detailed panels and scroll bars ready",
       zh: "🛠 开发模式已开启 — 详细面板和滚动条已就绪",
@@ -1528,7 +1528,7 @@
       fr: "🛠 Dev Mode ON — panneaux détaillés et barres de défilement prêts",
       ko: "🛠 개발자 모드 켜기 — 상세 패널 및 스크롤바 준비 완료",
       id: "🛠 Dev Mode ON — panel detail dan scroll bar siap",
-      vi: "🛠 Bật Dev Mode — các panel chi tiết và thanh cuộn sẵn sàng" },
+      vi: "🛠 Bật Dev Mode — các panel chi tiết và thanh cuộn sẵn sàng", it: "🛠 Dev Mode ACCESA — pannelli dettagliati e barre di scorrimento pronti" },
     "🛠 ปิด Dev Mode — กลับมาสู่โหมดปกติ": {
       en: "🛠 Dev Mode OFF — back to normal mode",
       zh: "🛠 开发模式已关闭 — 返回正常模式",
@@ -1542,79 +1542,79 @@
       fr: "🛠 Dev Mode OFF — retour au mode normal",
       ko: "🛠 개발자 모드 끄기 — 일반 모드로 돌아가기",
       id: "🛠 Dev Mode OFF — kembali ke mode normal",
-      vi: "🛠 Tắt Dev Mode — quay về chế độ bình thường" },
+      vi: "🛠 Tắt Dev Mode — quay về chế độ bình thường", it: "🛠 Dev Mode SPENTA — torna alla modalità normale" },
     "🛠 แผงดีบัก DEV MODE": {
       en: "🛠 DEV MODE DEBUG", zh: "🛠 开发模式调试面板", ja: "🛠 開発モード デバッグ",
       es: "🛠 DEPURACIÓN DEV MODE", hi: "🛠 DEV MODE डीबग", ar: "🛠 تصحيح وضع المطور",
       pt: "🛠 DEPURAÇÃO DEV MODE", ru: "🛠 ОТЛАДКА DEV MODE", de: "🛠 DEV MODE DEBUG",
       fr: "🛠 DÉBOGAGE DEV MODE", ko: "🛠 개발자 모드 디버그", id: "🛠 DEBUG DEV MODE",
-      vi: "🛠 GỠ LỖI DEV MODE" },
+      vi: "🛠 GỠ LỖI DEV MODE", it: "🛠 DEBUG DEV MODE" },
     "📊 สตรีมเหตุการณ์": {
       en: "📊 Event Stream", zh: "📊 事件流", ja: "📊 イベントストリーム",
       es: "📊 Flujo de eventos", hi: "📊 इवेंट स्ट्रीम", ar: "📊 تدفق الأحداث",
       pt: "📊 Fluxo de eventos", ru: "📊 Поток событий", de: "📊 Ereignis-Stream",
       fr: "📊 Flux d'événements", ko: "📊 이벤트 스트림", id: "📊 Aliran peristiwa",
-      vi: "📊 Luồng sự kiện" },
+      vi: "📊 Luồng sự kiện", it: "📊 Flusso degli eventi" },
     "🔧 การเรียกใช้เครื่องมือ": {
       en: "🔧 Tool Calls", zh: "🔧 工具调用", ja: "🔧 ツール呼び出し",
       es: "🔧 Llamadas a herramientas", hi: "🔧 टूल कॉल", ar: "🔧 استدعاءات الأدوات",
       pt: "🔧 Chamadas de ferramentas", ru: "🔧 Вызовы инструментов", de: "🔧 Tool-Aufrufe",
       fr: "🔧 Appels d'outils", ko: "🔧 도구 호출", id: "🔧 Panggilan alat",
-      vi: "🔧 Lệnh gọi công cụ" },
+      vi: "🔧 Lệnh gọi công cụ", it: "🔧 Chiamate agli strumenti" },
     "📨 ข้อความจาก agent": {
       en: "📨 Agent Messages", zh: "📨 代理消息", ja: "📨 エージェントメッセージ",
       es: "📨 Mensajes de agentes", hi: "📨 एजेंट संदेश", ar: "📨 رسائل الوكلاء",
       pt: "📨 Mensagens dos agentes", ru: "📨 Сообщения агентов", de: "📨 Agenten-Nachrichten",
       fr: "📨 Messages des agents", ko: "📨 에이전트 메시지", id: "📨 Pesan agen",
-      vi: "📨 Tin nhắn của agent" },
+      vi: "📨 Tin nhắn của agent", it: "📨 Messaggi degli agenti" },
     "⚡ ประสิทธิภาพ": {
       en: "⚡ Performance", zh: "⚡ 性能", ja: "⚡ パフォーマンス",
       es: "⚡ Rendimiento", hi: "⚡ प्रदर्शन", ar: "⚡ الأداء",
       pt: "⚡ Desempenho", ru: "⚡ Производительность", de: "⚡ Leistung",
       fr: "⚡ Performance", ko: "⚡ 성능", id: "⚡ Kinerja",
-      vi: "⚡ Hiệu năng" },
+      vi: "⚡ Hiệu năng", it: "⚡ Prestazioni" },
     "🧹 ล้าง Log ทั้งหมด": {
       en: "🧹 Clear all logs", zh: "🧹 清除全部日志", ja: "🧹 すべてのログを消去",
       es: "🧹 Borrar todos los registros", hi: "🧹 सभी लॉग साफ़ करें", ar: "🧹 مسح كل السجلات",
       pt: "🧹 Limpar todos os registros", ru: "🧹 Очистить все логи", de: "🧹 Alle Logs löschen",
       fr: "🧹 Effacer tous les journaux", ko: "🧹 모든 로그 지우기", id: "🧹 Hapus semua log",
-      vi: "🧹 Xóa tất cả log" },
+      vi: "🧹 Xóa tất cả log", it: "🧹 Cancella tutti i log" },
     "📤 ส่งออก Log": {
       en: "📤 Export logs", zh: "📤 导出日志", ja: "📤 ログを書き出す",
       es: "📤 Exportar registros", hi: "📤 लॉग निर्यात करें", ar: "📤 تصدير السجلات",
       pt: "📤 Exportar registros", ru: "📤 Экспорт логов", de: "📤 Logs exportieren",
       fr: "📤 Exporter les journaux", ko: "📤 로그 내보내기", id: "📤 Ekspor log",
-      vi: "📤 Xuất log" },
+      vi: "📤 Xuất log", it: "📤 Esporta log" },
     "❌ เปิด/ปิด Dev Mode ไม่สำเร็จ:": {
       en: "❌ Dev Mode toggle failed:", zh: "❌ 切换开发模式失败：", ja: "❌ 開発モードの切り替えに失敗:",
       es: "❌ No se pudo cambiar Dev Mode:", hi: "❌ Dev Mode टॉगल विफल:", ar: "❌ فشل تبديل وضع المطور:",
       pt: "❌ Falha ao alternar o Dev Mode:", ru: "❌ Не удалось переключить Dev Mode:", de: "❌ Dev Mode konnte nicht umgeschaltet werden:",
       fr: "❌ Échec du basculement du Dev Mode :", ko: "❌ 개발자 모드 전환 실패:", id: "❌ Gagal mengubah Dev Mode:",
-      vi: "❌ Bật/tắt Dev Mode thất bại:" },
+      vi: "❌ Bật/tắt Dev Mode thất bại:", it: "❌ Attivazione Dev Mode non riuscita:" },
     "🧹 ล้าง Dev Mode log แล้ว": {
       en: "🧹 Dev Mode logs cleared", zh: "🧹 已清除开发模式日志", ja: "🧹 開発モードのログを消去しました",
       es: "🧹 Registros de Dev Mode borrados", hi: "🧹 Dev Mode लॉग साफ़ कर दिए गए", ar: "🧹 تم مسح سجلات وضع المطور",
       pt: "🧹 Registros do Dev Mode limpos", ru: "🧹 Логи Dev Mode очищены", de: "🧹 Dev-Mode-Logs gelöscht",
       fr: "🧹 Journaux du Dev Mode effacés", ko: "🧹 개발자 모드 로그를 지웠습니다", id: "🧹 Log Dev Mode telah dihapus",
-      vi: "🧹 Đã xóa log Dev Mode" },
+      vi: "🧹 Đã xóa log Dev Mode", it: "🧹 Log della Dev Mode cancellati" },
     "ไม่มี log ให้ส่งออก": {
       en: "No logs to export", zh: "没有可导出的日志", ja: "書き出すログがありません",
       es: "No hay registros para exportar", hi: "निर्यात करने के लिए कोई लॉग नहीं", ar: "لا توجد سجلات للتصدير",
       pt: "Não há registros para exportar", ru: "Нет логов для экспорта", de: "Keine Logs zum Exportieren",
       fr: "Aucun journal à exporter", ko: "내보낼 로그가 없습니다", id: "Tidak ada log untuk diekspor",
-      vi: "Không có log để xuất" },
+      vi: "Không có log để xuất", it: "Nessun log da esportare" },
     "📤 คัดลอก Dev Mode log ไปที่คลิปบอร์ดแล้ว": {
       en: "📤 Dev Mode logs copied to the clipboard", zh: "📤 已将开发模式日志复制到剪贴板", ja: "📤 開発モードのログをクリップボードにコピーしました",
       es: "📤 Registros de Dev Mode copiados al portapapeles", hi: "📤 Dev Mode लॉग क्लिपबोर्ड पर कॉपी हो गए", ar: "📤 تم نسخ سجلات وضع المطور إلى الحافظة",
       pt: "📤 Registros do Dev Mode copiados para a área de transferência", ru: "📤 Логи Dev Mode скопированы в буфер обмена", de: "📤 Dev-Mode-Logs in die Zwischenablage kopiert",
       fr: "📤 Journaux du Dev Mode copiés dans le presse-papiers", ko: "📤 개발자 모드 로그를 클립보드에 복사했습니다", id: "📤 Log Dev Mode disalin ke papan klip",
-      vi: "📤 Đã sao chép log Dev Mode vào clipboard" },
+      vi: "📤 Đã sao chép log Dev Mode vào clipboard", it: "📤 Log della Dev Mode copiati negli appunti" },
     "📥 ดาวน์โหลด Dev Mode log แล้ว": {
       en: "📥 Dev Mode logs downloaded", zh: "📥 已下载开发模式日志", ja: "📥 開発モードのログをダウンロードしました",
       es: "📥 Registros de Dev Mode descargados", hi: "📥 Dev Mode लॉग डाउनलोड हो गए", ar: "📥 تم تنزيل سجلات وضع المطور",
       pt: "📥 Registros do Dev Mode baixados", ru: "📥 Логи Dev Mode загружены", de: "📥 Dev-Mode-Logs heruntergeladen",
       fr: "📥 Journaux du Dev Mode téléchargés", ko: "📥 개발자 모드 로그를 다운로드했습니다", id: "📥 Log Dev Mode diunduh",
-      vi: "📥 Đã tải xuống log Dev Mode" },
+      vi: "📥 Đã tải xuống log Dev Mode", it: "📥 Log della Dev Mode scaricati" },
   };
   function uiLang() {
     try {
