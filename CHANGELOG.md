@@ -4,7 +4,7 @@ All notable changes to BagIdea Office. A **release** is a deliberate `VERSION`
 bump on `main` (see [RELEASING.md](RELEASING.md)) — that's what triggers the
 in-app 🔄 update banner. Versions follow [semver](https://semver.org).
 
-## [Unreleased] — 🇮🇹 Italiano
+## [1.11.0] — 🇮🇹 Italiano
 
 **Added**
 - **🇮🇹 Italian is the 15th language.** The office UI, the Dev Mode strings and the Godot map editor's
