@@ -68,7 +68,51 @@ func L(en: String, th: String) -> String:
 		"th": return th
 		"zh": return _ZH.get(en, en)
 		"ja": return _JA.get(en, en)
+		"it": return _IT.get(en, en)
 		_: return en
+
+const _IT := {
+	"All 6 workstations are taken": "Tutte e 6 le postazioni sono occupate",
+	"Both beds are taken": "Entrambi i letti sono occupati",
+	"Added — drag to position": "Aggiunto — trascinalo dove vuoi",
+	"🏷 Billboard": "🏷 Insegna",
+	"💾 Save": "💾 Salva",
+	"🔀 Room layout (click 2 rooms = swap)": "🔀 Disposizione stanze (clicca 2 stanze = scambia)",
+	"👻 Ghost office (move)": "👻 Stanza dei cloni (sposta)",
+	"👻 moved ghost office": "👻 Stanza dei cloni spostata",
+	"＋ Add object": "＋ Aggiungi oggetto",
+	"L-drag=pan · click=select · drag=move · R-drag=rotate · wheel=zoom": "trascina sx=sposta vista · clic=seleziona · trascina=muovi · trascina dx=ruota · rotella=zoom",
+	"🔵 System (agents use)": "🔵 Di sistema (usati dagli agenti)",
+	"🟢 Decor (free to move)": "🟢 Arredo (si sposta liberamente)",
+	"📦 Furniture (Low Poly)": "📦 Mobili (Low Poly)",
+	"🗃 LIBRARY — imported models/images": "🗃 LIBRERIA — modelli/immagini importati",
+	"🗂 SCENE — placed objects": "🗂 SCENA — oggetti posizionati",
+	"📐 Best: 1380×207 px (ratio ~6.7:1, wide banner)": "📐 Ideale: 1380×207 px (rapporto ~6,7:1, striscione largo)",
+	"📁 Upload new image…": "📁 Carica una nuova immagine…",
+	"(library has no images yet)": "(nessuna immagine nella libreria)",
+	"🏷 Billboard set — Save to keep (best ratio ~6.7:1, e.g. 1380×207)": "🏷 Insegna impostata — salva per tenerla (rapporto ideale ~6,7:1, es. 1380×207)",
+	"Rotate": "Rotazione",
+	"Size": "Dimensione",
+	"(none)": "(nessuno)",
+	"🗑 Delete this": "🗑 Elimina",
+	"Picked first room — click another to swap": "Prima stanza scelta — clicca un'altra per scambiarle",
+	"Cancelled": "Annullato",
+	"🔀 Rooms swapped — press 💾 Save to keep it": "🔀 Stanze scambiate — premi 💾 Salva per tenerle",
+	"(empty — use Import)": "(vuoto — usa Importa)",
+	"⭐ Loaded: ": "⭐ Caricato: ",
+	"Confirm save": "Conferma salvataggio",
+	"Save this office layout, update the wallpaper, and close the editor?": "Salvare questa disposizione, aggiornare l'ufficio e chiudere l'editor?",
+	"💾 Save & close": "💾 Salva e chiudi",
+	"Cancel": "Annulla",
+	"💾 Saved — updating wallpaper, closing…": "💾 Salvato — aggiorno l'ufficio e chiudo…",
+	"Save as preset": "Salva come modello",
+	"preset name": "nome del modello",
+	"⭐ Saved preset: ": "⭐ Modello salvato: ",
+	"🖥 Workstation": "🖥 Postazione",
+	"⭐ Director desk": "⭐ Scrivania del Director",
+	"👑 CEO desk": "👑 Scrivania del CEO",
+	"🛏 Bed": "🛏 Letto",
+}
 
 const _ZH := {
 	"💾 Save": "💾 保存", "🏷 Billboard": "🏷 招牌",
